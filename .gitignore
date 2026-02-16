@@ -1,0 +1,22 @@
+# Binaries
+/bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Go
+/vendor/
+
+# Frontend
+/frontend/node_modules/
+/frontend/.svelte-kit/
+/frontend/build/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Presto data
+.presto/
+cache/
