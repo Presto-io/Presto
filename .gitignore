@@ -25,3 +25,5 @@ cache/
 
 # Generated
 /design-system/
+/cmd/presto-desktop/build/*
+!/cmd/presto-desktop/build/index.html
