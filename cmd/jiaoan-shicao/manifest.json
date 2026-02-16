@@ -1,0 +1,9 @@
+{
+  "name": "jiaoan-shicao",
+  "displayName": "实操教案格式化",
+  "description": "将 Markdown 格式的实操教案转换为标准表格排版",
+  "version": "1.0.0",
+  "author": "mrered",
+  "license": "MIT",
+  "minPrestoVersion": "0.1.0"
+}
