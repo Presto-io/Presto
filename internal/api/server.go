@@ -43,19 +43,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`{"status":"ok"}`))
 }
 
-// Stub handlers - implemented in convert.go and templates.go
-func (s *Server) handleConvert(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, `{"error":"not implemented"}`, http.StatusNotImplemented)
-}
-func (s *Server) handleCompile(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, `{"error":"not implemented"}`, http.StatusNotImplemented)
-}
-func (s *Server) handleConvertAndCompile(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, `{"error":"not implemented"}`, http.StatusNotImplemented)
-}
-func (s *Server) handleBatch(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, `{"error":"not implemented"}`, http.StatusNotImplemented)
-}
+// Stub handlers - implemented in templates.go
 func (s *Server) handleListTemplates(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, `{"error":"not implemented"}`, http.StatusNotImplemented)
 }
