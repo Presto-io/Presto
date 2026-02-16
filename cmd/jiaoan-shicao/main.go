@@ -14,20 +14,25 @@ linux darwin windows
 package main
 
 import (
+	_ "embed"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 	"os/exec"
 	"strings"
 )
 
+//go:embed manifest.json
+var manifestJSON string
+
 var (
-	isTemplate bool
-	isPdf      bool
-	verbose    bool
-	help       bool
+	isTemplate   bool
+	isPdf        bool
+	verbose      bool
+	help         bool
+	manifestFlag bool
 )
 
 const preamble = `// 中文字号转换函数
@@ -109,6 +114,7 @@ func init() {
 	flag.BoolVar(&isPdf, "p", false, "生成 PDF 文件（需要安装 typst）")
 	flag.BoolVar(&verbose, "v", false, "显示详细输出信息")
 	flag.BoolVar(&help, "h", false, "显示帮助信息")
+	flag.BoolVar(&manifestFlag, "manifest", false, "output manifest JSON")
 }
 
 func printHelp() {
@@ -122,6 +128,11 @@ func printHelp() {
 func main() {
 	flag.Parse()
 
+	if manifestFlag {
+		fmt.Print(manifestJSON)
+		return
+	}
+
 	if help {
 		printHelp()
 		return
@@ -129,7 +140,7 @@ func main() {
 
 	// 处理生成模板的情况
 	if isTemplate {
-		if err := ioutil.WriteFile("template.md", []byte(templateMd), 0644); err != nil {
+		if err := os.WriteFile("template.md", []byte(templateMd), 0644); err != nil {
 			log.Fatalf("failed to generate template: %v", err)
 		}
 		if verbose {
@@ -138,14 +149,21 @@ func main() {
 		return
 	}
 
-	// 检查是否提供了输入文件
+	// 如果没有文件参数，从 stdin 读取并输出到 stdout
 	if flag.NArg() == 0 {
-		printHelp()
+		source, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			log.Fatalf("failed to read stdin: %v", err)
+		}
+
+		sections := parseMarkdown(string(source))
+		typstOutput := generateTypst(sections)
+		fmt.Print(typstOutput)
 		return
 	}
 
 	inputFile := flag.Arg(0)
-	source, err := ioutil.ReadFile(inputFile)
+	source, err := os.ReadFile(inputFile)
 	if err != nil {
 		log.Fatalf("failed to read file: %v", err)
 	}
@@ -155,7 +173,7 @@ func main() {
 	typstOutput := generateTypst(sections)
 
 	outputFile := strings.TrimSuffix(inputFile, ".md") + ".typ"
-	if err := ioutil.WriteFile(outputFile, []byte(typstOutput), 0644); err != nil {
+	if err := os.WriteFile(outputFile, []byte(typstOutput), 0644); err != nil {
 		log.Fatalf("failed to write file: %v", err)
 	}
 
