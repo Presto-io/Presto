@@ -4,6 +4,8 @@
 *.dll
 *.so
 *.dylib
+/gongwen
+/jiaoan-shicao
 
 # Go
 /vendor/
@@ -20,3 +22,6 @@ Thumbs.db
 # Presto data
 .presto/
 cache/
+
+# Generated
+/design-system/
