@@ -1,0 +1,11 @@
+services:
+  presto:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - presto-data:/root/.presto
+    restart: unless-stopped
+
+volumes:
+  presto-data:
