@@ -1,0 +1,15 @@
+{
+  "name": "gongwen",
+  "displayName": "中国党政机关公文格式",
+  "description": "符合 GB/T 9704-2012 标准的公文排版，支持标题、作者、日期、签名等元素",
+  "version": "1.0.0",
+  "author": "mrered",
+  "license": "MIT",
+  "minPrestoVersion": "0.1.0",
+  "frontmatterSchema": {
+    "title": { "type": "string", "default": "请输入文字" },
+    "author": { "type": "string", "default": "请输入文字" },
+    "date": { "type": "string", "format": "YYYY-MM-DD" },
+    "signature": { "type": "boolean", "default": false }
+  }
+}

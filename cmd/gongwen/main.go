@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -21,6 +22,9 @@ import (
 
 //go:embed template_head.typ
 var templateHead string
+
+//go:embed manifest.json
+var manifestJSON string
 
 // ---------- YAML front-matter ----------
 
@@ -918,23 +922,29 @@ func convert(fm frontMatter, body string) string {
 // ---------- CLI ----------
 
 func main() {
+	manifestFlag := flag.Bool("manifest", false, "output manifest JSON")
 	outputFile := flag.String("o", "", "output .typ file (default: stdout)")
 	flag.Parse()
 
+	if *manifestFlag {
+		fmt.Print(manifestJSON)
+		return
+	}
+
+	var input []byte
+	var err error
 	args := flag.Args()
-	if len(args) < 1 {
-		fmt.Fprintln(os.Stderr, "usage: md2typ [-o output.typ] input.md")
-		os.Exit(1)
+	if len(args) > 0 {
+		input, err = os.ReadFile(args[0])
+	} else {
+		input, err = io.ReadAll(os.Stdin)
 	}
-
-	inputPath := args[0]
-	data, err := os.ReadFile(inputPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error reading %s: %v\n", inputPath, err)
+		fmt.Fprintf(os.Stderr, "error reading input: %v\n", err)
 		os.Exit(1)
 	}
 
-	fm, body := parseFrontMatter(string(data))
+	fm, body := parseFrontMatter(string(input))
 	result := convert(fm, body)
 
 	if *outputFile != "" {
