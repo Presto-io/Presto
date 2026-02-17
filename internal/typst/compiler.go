@@ -44,7 +44,25 @@ func (c *Compiler) Compile(typFile string) (string, error) {
 	return pdfFile, nil
 }
 
-func (c *Compiler) CompileString(typstSource string) ([]byte, error) {
+// CompileString compiles typst source to PDF.
+// If workDir is non-empty, the temp .typ file is written there so relative
+// paths (e.g. images) resolve from the document's directory.
+func (c *Compiler) CompileString(typstSource, workDir string) ([]byte, error) {
+	if workDir != "" {
+		typFile := filepath.Join(workDir, ".presto-temp-input.typ")
+		if err := os.WriteFile(typFile, []byte(typstSource), 0644); err != nil {
+			return nil, err
+		}
+		defer os.Remove(typFile)
+
+		pdfFile, err := c.Compile(typFile)
+		if err != nil {
+			return nil, err
+		}
+		defer os.Remove(pdfFile)
+		return os.ReadFile(pdfFile)
+	}
+
 	dir, err := os.MkdirTemp("", "presto-compile-*")
 	if err != nil {
 		return nil, err
@@ -65,21 +83,35 @@ func (c *Compiler) CompileString(typstSource string) ([]byte, error) {
 }
 
 // CompileToSVG compiles typst source to SVG pages.
-// Returns a slice of SVG strings, one per page.
-func (c *Compiler) CompileToSVG(typstSource string) ([]string, error) {
-	dir, err := os.MkdirTemp("", "presto-svg-*")
-	if err != nil {
-		return nil, err
-	}
-	defer os.RemoveAll(dir)
+// If workDir is non-empty, relative paths resolve from that directory.
+func (c *Compiler) CompileToSVG(typstSource, workDir string) ([]string, error) {
+	var dir string
+	var cleanDir bool
 
-	typFile := filepath.Join(dir, "input.typ")
+	if workDir != "" {
+		dir = workDir
+	} else {
+		var err error
+		dir, err = os.MkdirTemp("", "presto-svg-*")
+		if err != nil {
+			return nil, err
+		}
+		cleanDir = true
+	}
+	if cleanDir {
+		defer os.RemoveAll(dir)
+	}
+
+	typFile := filepath.Join(dir, ".presto-temp-input.typ")
 	if err := os.WriteFile(typFile, []byte(typstSource), 0644); err != nil {
 		return nil, err
 	}
+	if !cleanDir {
+		defer os.Remove(typFile)
+	}
 
 	// typst compile --format svg outputs {name}-{page}.svg for multi-page
-	outPattern := filepath.Join(dir, "output-{n}.svg")
+	outPattern := filepath.Join(dir, ".presto-temp-output-{n}.svg")
 	args := []string{"compile", "--format", "svg"}
 	if c.Root != "" {
 		args = append(args, "--root", c.Root)
@@ -94,18 +126,25 @@ func (c *Compiler) CompileToSVG(typstSource string) ([]string, error) {
 	// Collect SVG pages
 	var pages []string
 	for i := 1; ; i++ {
-		svgFile := filepath.Join(dir, fmt.Sprintf("output-%d.svg", i))
+		svgFile := filepath.Join(dir, fmt.Sprintf(".presto-temp-output-%d.svg", i))
 		data, err := os.ReadFile(svgFile)
 		if err != nil {
 			break
 		}
 		pages = append(pages, string(data))
+		if !cleanDir {
+			os.Remove(svgFile)
+		}
 	}
 	if len(pages) == 0 {
-		// Single page: try output-1.svg or output.svg
-		data, err := os.ReadFile(filepath.Join(dir, "output.svg"))
+		// Single page: try output.svg
+		svgFile := filepath.Join(dir, ".presto-temp-output.svg")
+		data, err := os.ReadFile(svgFile)
 		if err == nil {
 			pages = append(pages, string(data))
+			if !cleanDir {
+				os.Remove(svgFile)
+			}
 		}
 	}
 	if len(pages) == 0 {

@@ -10,6 +10,7 @@ import (
 type convertRequest struct {
 	Markdown   string `json:"markdown"`
 	TemplateID string `json:"templateId"`
+	WorkDir    string `json:"workDir,omitempty"`
 }
 
 type convertResponse struct {
@@ -54,9 +55,10 @@ func (s *Server) handleCompile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[compile] typst_len=%d", len(body))
+	workDir := r.Header.Get("X-Work-Dir")
+	log.Printf("[compile] typst_len=%d workDir=%s", len(body), workDir)
 
-	pdf, err := s.compiler.CompileString(string(body))
+	pdf, err := s.compiler.CompileString(string(body), workDir)
 	if err != nil {
 		log.Printf("[compile] compile failed: %v", err)
 		http.Error(w, `{"error":"compile failed"}`, http.StatusInternalServerError)
@@ -76,9 +78,10 @@ func (s *Server) handleCompileSVG(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[compile-svg] typst_len=%d", len(body))
+	workDir := r.Header.Get("X-Work-Dir")
+	log.Printf("[compile-svg] typst_len=%d workDir=%s", len(body), workDir)
 
-	pages, err := s.compiler.CompileToSVG(string(body))
+	pages, err := s.compiler.CompileToSVG(string(body), workDir)
 	if err != nil {
 		log.Printf("[compile-svg] compile failed: %v", err)
 		http.Error(w, `{"error":"compile failed"}`, http.StatusInternalServerError)
@@ -115,7 +118,7 @@ func (s *Server) handleConvertAndCompile(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	pdf, err := s.compiler.CompileString(typstOutput)
+	pdf, err := s.compiler.CompileString(typstOutput, req.WorkDir)
 	if err != nil {
 		log.Printf("[convert-and-compile] compile failed: %v", err)
 		http.Error(w, `{"error":"compile failed"}`, http.StatusInternalServerError)

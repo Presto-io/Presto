@@ -33,7 +33,7 @@ func TestCompileFromString(t *testing.T) {
 	}
 
 	c := NewCompiler()
-	pdf, err := c.CompileString("= Hello World")
+	pdf, err := c.CompileString("= Hello World", "")
 	if err != nil {
 		t.Fatalf("compile failed: %v", err)
 	}

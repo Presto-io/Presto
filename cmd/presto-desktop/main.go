@@ -34,6 +34,11 @@ type App struct {
 	compiler *typst.Compiler
 }
 
+type OpenFileResult struct {
+	Content string `json:"content"`
+	Dir     string `json:"dir"`
+}
+
 func NewApp(manager *template.Manager, compiler *typst.Compiler) *App {
 	return &App{manager: manager, compiler: compiler}
 }
@@ -42,8 +47,8 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 }
 
-// OpenFile opens a native file dialog and returns the file content.
-func (a *App) OpenFile() (string, error) {
+// OpenFile opens a native file dialog and returns the file content and directory.
+func (a *App) OpenFile() (*OpenFileResult, error) {
 	path, err := wailsRuntime.OpenFileDialog(a.ctx, wailsRuntime.OpenDialogOptions{
 		Title: "打开 Markdown 文件",
 		Filters: []wailsRuntime.FileFilter{
@@ -51,16 +56,19 @@ func (a *App) OpenFile() (string, error) {
 		},
 	})
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if path == "" {
-		return "", nil
+		return nil, nil
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return "", fmt.Errorf("read failed: %w", err)
+		return nil, fmt.Errorf("read failed: %w", err)
 	}
-	return string(data), nil
+	return &OpenFileResult{
+		Content: string(data),
+		Dir:     filepath.Dir(path),
+	}, nil
 }
 
 func buildMenu(app *App) *menu.Menu {
@@ -86,7 +94,7 @@ func buildMenu(app *App) *menu.Menu {
 }
 
 // SavePDF converts markdown to PDF and opens a native save dialog.
-func (a *App) SavePDF(markdown string, templateId string) error {
+func (a *App) SavePDF(markdown string, templateId string, workDir string) error {
 	tpl, err := a.manager.Get(templateId)
 	if err != nil {
 		return fmt.Errorf("template not found: %w", err)
@@ -98,7 +106,7 @@ func (a *App) SavePDF(markdown string, templateId string) error {
 		return fmt.Errorf("conversion failed: %w", err)
 	}
 
-	pdf, err := a.compiler.CompileString(typstOutput)
+	pdf, err := a.compiler.CompileString(typstOutput, workDir)
 	if err != nil {
 		return fmt.Errorf("compile failed: %w", err)
 	}
