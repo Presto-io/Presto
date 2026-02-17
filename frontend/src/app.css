@@ -1,37 +1,37 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
-	--color-primary: #1E293B;
-	--color-secondary: #334155;
-	--color-cta: #22C55E;
-	--color-background: #0F172A;
-	--color-text: #F8FAFC;
-	--color-muted: #94A3B8;
-	--color-border: #1E293B;
-	--color-surface: #1E293B;
-	--color-surface-hover: #334155;
-	--color-danger: #EF4444;
+	--color-bg: #1a1b26;
+	--color-bg-elevated: #1f2133;
+	--color-surface: #24263a;
+	--color-surface-hover: #2a2d44;
+	--color-border: rgba(255, 255, 255, 0.06);
+	--color-border-subtle: rgba(255, 255, 255, 0.04);
+	--color-text: #c0caf5;
+	--color-text-bright: #e0e4f7;
+	--color-muted: #565f89;
+	--color-accent: #7aa2f7;
+	--color-accent-hover: #89b4fa;
+	--color-danger: #f7768e;
+	--color-success: #9ece6a;
 
-	--font-heading: 'JetBrains Mono', monospace;
-	--font-body: 'IBM Plex Sans', sans-serif;
-	--font-mono: 'JetBrains Mono', monospace;
+	--font-ui: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+	--font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
-	--space-xs: 0.25rem;
-	--space-sm: 0.5rem;
-	--space-md: 1rem;
-	--space-lg: 1.5rem;
-	--space-xl: 2rem;
-	--space-2xl: 3rem;
+	--space-xs: 4px;
+	--space-sm: 8px;
+	--space-md: 12px;
+	--space-lg: 16px;
+	--space-xl: 24px;
 
-	--radius-sm: 4px;
+	--radius-sm: 6px;
 	--radius-md: 8px;
 	--radius-lg: 12px;
 
-	--shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
-	--shadow-md: 0 4px 6px rgba(0, 0, 0, 0.25);
-	--shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.3);
+	--shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+	--shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
 
-	--transition: 200ms ease;
+	--transition: 150ms ease;
 }
 
 *, *::before, *::after {
@@ -40,39 +40,29 @@
 
 body {
 	margin: 0;
-	font-family: var(--font-body);
-	background: var(--color-background);
+	font-family: var(--font-ui);
+	background: var(--color-bg);
 	color: var(--color-text);
-	font-size: 16px;
-	line-height: 1.6;
+	font-size: 13px;
+	line-height: 1.5;
 	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	overflow: hidden;
 }
-
-h1, h2, h3, h4 {
-	font-family: var(--font-heading);
-	line-height: 1.3;
-}
-
-a {
-	color: var(--color-cta);
-	text-decoration: none;
-	transition: opacity var(--transition);
-}
-a:hover { opacity: 0.85; }
 
 button, .btn {
 	cursor: pointer;
-	font-family: var(--font-body);
+	font-family: var(--font-ui);
 	border: none;
 	transition: all var(--transition);
 }
 button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible {
-	outline: 2px solid var(--color-cta);
+	outline: 2px solid var(--color-accent);
 	outline-offset: 2px;
 }
 
 select {
-	font-family: var(--font-body);
+	font-family: var(--font-ui);
 	cursor: pointer;
 }
 
