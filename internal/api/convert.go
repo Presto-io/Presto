@@ -68,6 +68,28 @@ func (s *Server) handleCompile(w http.ResponseWriter, r *http.Request) {
 	w.Write(pdf)
 }
 
+func (s *Server) handleCompileSVG(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.Printf("[compile-svg] read body failed: %v", err)
+		http.Error(w, `{"error":"read failed"}`, http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("[compile-svg] typst_len=%d", len(body))
+
+	pages, err := s.compiler.CompileToSVG(string(body))
+	if err != nil {
+		log.Printf("[compile-svg] compile failed: %v", err)
+		http.Error(w, `{"error":"compile failed"}`, http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("[compile-svg] success, pages=%d", len(pages))
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"pages": pages})
+}
+
 func (s *Server) handleConvertAndCompile(w http.ResponseWriter, r *http.Request) {
 	var req convertRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
