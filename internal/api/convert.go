@@ -56,6 +56,9 @@ func (s *Server) handleCompile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	workDir := r.Header.Get("X-Work-Dir")
+	if workDir == "" {
+		workDir = r.URL.Query().Get("workDir")
+	}
 	log.Printf("[compile] typst_len=%d workDir=%s", len(body), workDir)
 
 	pdf, err := s.compiler.CompileString(string(body), workDir)
@@ -79,6 +82,9 @@ func (s *Server) handleCompileSVG(w http.ResponseWriter, r *http.Request) {
 	}
 
 	workDir := r.Header.Get("X-Work-Dir")
+	if workDir == "" {
+		workDir = r.URL.Query().Get("workDir")
+	}
 	log.Printf("[compile-svg] typst_len=%d workDir=%s", len(body), workDir)
 
 	pages, err := s.compiler.CompileToSVG(string(body), workDir)

@@ -37,7 +37,10 @@ export async function convert(markdown: string, templateId: string): Promise<str
 export async function compile(typstSource: string, workDir?: string): Promise<Blob> {
   const headers: Record<string, string> = { 'Content-Type': 'text/plain' };
   if (workDir) headers['X-Work-Dir'] = workDir;
-  const res = await fetch(`${BASE}/api/compile`, {
+  const url = workDir
+    ? `${BASE}/api/compile?workDir=${encodeURIComponent(workDir)}`
+    : `${BASE}/api/compile`;
+  const res = await fetch(url, {
     method: 'POST',
     headers,
     body: typstSource
@@ -52,7 +55,10 @@ export async function compile(typstSource: string, workDir?: string): Promise<Bl
 export async function compileSvg(typstSource: string, workDir?: string): Promise<string[]> {
   const headers: Record<string, string> = { 'Content-Type': 'text/plain' };
   if (workDir) headers['X-Work-Dir'] = workDir;
-  const res = await fetch(`${BASE}/api/compile-svg`, {
+  const url = workDir
+    ? `${BASE}/api/compile-svg?workDir=${encodeURIComponent(workDir)}`
+    : `${BASE}/api/compile-svg`;
+  const res = await fetch(url, {
     method: 'POST',
     headers,
     body: typstSource
