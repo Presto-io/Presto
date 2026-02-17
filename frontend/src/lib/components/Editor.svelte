@@ -21,15 +21,17 @@
     "replaced $ matches": "已替换 $ 个匹配",
   });
 
-  let { value = $bindable(''), onchange, onscroll }: {
+  let { value = $bindable(''), onchange, onscroll, scrollRatio = 0 }: {
     value?: string;
     onchange?: (val: string) => void;
     onscroll?: (ratio: number) => void;
+    scrollRatio?: number;
   } = $props();
 
   let container: HTMLDivElement;
-  let view: EditorView;
+  let view = $state<EditorView>();
   let internalUpdate = false;
+  let ignoreScroll = false;
 
   onMount(() => {
     view = new EditorView({
@@ -127,6 +129,7 @@
           }),
           EditorView.domEventHandlers({
             scroll(event) {
+              if (ignoreScroll) return;
               const scroller = event.target as HTMLElement;
               const maxScroll = scroller.scrollHeight - scroller.clientHeight;
               if (maxScroll > 0 && onscroll) {
@@ -148,6 +151,19 @@
         view.dispatch({
           changes: { from: 0, to: current.length, insert: value }
         });
+      }
+    }
+  });
+
+  // Sync scroll from preview
+  $effect(() => {
+    if (view && scrollRatio >= 0 && !ignoreScroll) {
+      const scroller = view.scrollDOM;
+      const maxScroll = scroller.scrollHeight - scroller.clientHeight;
+      if (maxScroll > 0) {
+        ignoreScroll = true;
+        scroller.scrollTop = scrollRatio * maxScroll;
+        requestAnimationFrame(() => { ignoreScroll = false; });
       }
     }
   });
