@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/mrered/presto/internal/template"
@@ -13,12 +14,17 @@ type Server struct {
 	compiler *typst.Compiler
 }
 
-func NewServer(templatesDir, staticDir string) http.Handler {
+func NewServer(templatesDir, staticDir, typstBin string) http.Handler {
+	compiler := typst.NewCompilerWithRoot("/")
+	compiler.BinPath = typstBin
+
 	s := &Server{
 		mux:      http.NewServeMux(),
 		manager:  template.NewManager(templatesDir),
-		compiler: typst.NewCompiler(),
+		compiler: compiler,
 	}
+
+	log.Printf("[presto] starting server, templates=%s static=%s typst=%s", templatesDir, staticDir, typstBin)
 
 	s.mux.HandleFunc("GET /api/health", s.handleHealth)
 	s.mux.HandleFunc("POST /api/convert", s.handleConvert)
@@ -35,7 +41,7 @@ func NewServer(templatesDir, staticDir string) http.Handler {
 		s.mux.Handle("/", http.FileServer(http.Dir(staticDir)))
 	}
 
-	return corsMiddleware(s.mux)
+	return loggingMiddleware(corsMiddleware(s.mux))
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
