@@ -34,10 +34,12 @@ export async function convert(markdown: string, templateId: string): Promise<str
   return data.typst;
 }
 
-export async function compile(typstSource: string): Promise<Blob> {
+export async function compile(typstSource: string, workDir?: string): Promise<Blob> {
+  const headers: Record<string, string> = { 'Content-Type': 'text/plain' };
+  if (workDir) headers['X-Work-Dir'] = workDir;
   const res = await fetch(`${BASE}/api/compile`, {
     method: 'POST',
-    headers: { 'Content-Type': 'text/plain' },
+    headers,
     body: typstSource
   });
   if (!res.ok) {
@@ -47,10 +49,12 @@ export async function compile(typstSource: string): Promise<Blob> {
   return res.blob();
 }
 
-export async function compileSvg(typstSource: string): Promise<string[]> {
+export async function compileSvg(typstSource: string, workDir?: string): Promise<string[]> {
+  const headers: Record<string, string> = { 'Content-Type': 'text/plain' };
+  if (workDir) headers['X-Work-Dir'] = workDir;
   const res = await fetch(`${BASE}/api/compile-svg`, {
     method: 'POST',
-    headers: { 'Content-Type': 'text/plain' },
+    headers,
     body: typstSource
   });
   if (!res.ok) {
@@ -63,12 +67,13 @@ export async function compileSvg(typstSource: string): Promise<string[]> {
 
 export async function convertAndCompile(
   markdown: string,
-  templateId: string
+  templateId: string,
+  workDir?: string
 ): Promise<Blob> {
   const res = await fetch(`${BASE}/api/convert-and-compile`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ markdown, templateId })
+    body: JSON.stringify({ markdown, templateId, workDir })
   });
   if (!res.ok) {
     const body = await res.text();

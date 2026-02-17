@@ -11,8 +11,8 @@
   declare global {
     interface Window {
       go?: { main: { App: {
-        SavePDF: (markdown: string, templateId: string) => Promise<void>;
-        OpenFile: () => Promise<string>;
+        SavePDF: (markdown: string, templateId: string, workDir: string) => Promise<void>;
+        OpenFile: () => Promise<{ content: string; dir: string } | null>;
       } } };
       runtime?: { EventsOn: (event: string, cb: (...args: any[]) => void) => void };
     }
@@ -27,6 +27,7 @@
   let editorScrollRatio = $state(0);
   let previewScrollRatio = $state(0);
   let scrollSource: 'editor' | 'preview' | null = $state(null);
+  let documentDir = $state('');
   let debounceTimer: ReturnType<typeof setTimeout>;
 
   function extractTypstTitle(typ: string): string {
@@ -66,7 +67,7 @@
       try {
         typstSource = await convert(md, selectedTemplate);
         // Compile to SVG for preview
-        svgPages = await compileSvg(typstSource);
+        svgPages = await compileSvg(typstSource, documentDir || undefined);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         console.error('Convert failed:', msg);
@@ -82,10 +83,10 @@
     errorMsg = '';
     try {
       if (window.go?.main?.App?.SavePDF) {
-        await window.go.main.App.SavePDF(markdown, selectedTemplate);
+        await window.go.main.App.SavePDF(markdown, selectedTemplate, documentDir);
         return;
       }
-      const blob = await convertAndCompile(markdown, selectedTemplate);
+      const blob = await convertAndCompile(markdown, selectedTemplate, documentDir || undefined);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -102,9 +103,10 @@
   async function handleOpen() {
     try {
       if (window.go?.main?.App?.OpenFile) {
-        const content = await window.go.main.App.OpenFile();
-        if (content) {
-          markdown = content;
+        const result = await window.go.main.App.OpenFile();
+        if (result) {
+          markdown = result.content;
+          documentDir = result.dir;
           handleConvert(markdown);
         }
         return;
@@ -116,6 +118,8 @@
       input.onchange = () => {
         const file = input.files?.[0];
         if (!file) return;
+        // Browser File API doesn't expose directory path
+        documentDir = '';
         const reader = new FileReader();
         reader.onload = () => {
           markdown = reader.result as string;
