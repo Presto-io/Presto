@@ -14,8 +14,11 @@ import (
 
 	"github.com/wailsapp/wails/v2"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
+	"github.com/wailsapp/wails/v2/pkg/menu"
+	"github.com/wailsapp/wails/v2/pkg/menu/keys"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	macOptions "github.com/wailsapp/wails/v2/pkg/options/mac"
 
 	"github.com/mrered/presto/internal/api"
 	"github.com/mrered/presto/internal/template"
@@ -37,6 +40,45 @@ func NewApp(manager *template.Manager, compiler *typst.Compiler) *App {
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+}
+
+// OpenFile opens a native file dialog and returns the file content.
+func (a *App) OpenFile() (string, error) {
+	path, err := wailsRuntime.OpenFileDialog(a.ctx, wailsRuntime.OpenDialogOptions{
+		Title: "打开 Markdown 文件",
+		Filters: []wailsRuntime.FileFilter{
+			{DisplayName: "Markdown", Pattern: "*.md;*.markdown;*.txt"},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+	if path == "" {
+		return "", nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("read failed: %w", err)
+	}
+	return string(data), nil
+}
+
+func buildMenu(app *App) *menu.Menu {
+	appMenu := menu.NewMenu()
+	appMenu.Append(menu.AppMenu())
+
+	fileMenu := appMenu.AddSubmenu("文件")
+	fileMenu.AddText("打开 Markdown…", keys.CmdOrCtrl("o"), func(_ *menu.CallbackData) {
+		wailsRuntime.EventsEmit(app.ctx, "menu:open")
+	})
+	fileMenu.AddSeparator()
+	fileMenu.AddText("导出 PDF…", keys.CmdOrCtrl("e"), func(_ *menu.CallbackData) {
+		wailsRuntime.EventsEmit(app.ctx, "menu:export")
+	})
+
+	appMenu.Append(menu.EditMenu())
+	appMenu.Append(menu.WindowMenu())
+	return appMenu
 }
 
 // SavePDF converts markdown to PDF and opens a native save dialog.
@@ -192,6 +234,7 @@ func main() {
 	frontendFS, _ := fs.Sub(assets, "build")
 
 	app := NewApp(manager, compiler)
+	appMenu := buildMenu(app)
 
 	err := wails.Run(&options.App{
 		Title:     "Presto",
@@ -203,9 +246,17 @@ func main() {
 			Assets:  frontendFS,
 			Handler: apiHandler,
 		},
+		Menu:      appMenu,
 		OnStartup: app.startup,
 		Bind: []interface{}{
 			app,
+		},
+		Mac: &macOptions.Options{
+			TitleBar: macOptions.TitleBarHiddenInset(),
+			About: &macOptions.AboutInfo{
+				Title:   "Presto",
+				Message: "Markdown → Typst → PDF",
+			},
 		},
 	})
 	if err != nil {

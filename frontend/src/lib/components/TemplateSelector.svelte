@@ -23,20 +23,22 @@
 
 <style>
   .template-select {
-    padding: var(--space-sm) var(--space-md);
+    padding: 5px 10px;
     background: var(--color-surface);
     color: var(--color-text);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    font-size: 0.875rem;
-    min-width: 160px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-family: var(--font-ui);
+    min-width: 140px;
     transition: border-color var(--transition);
+    -webkit-app-region: no-drag;
   }
   .template-select:hover {
-    border-color: var(--color-secondary);
+    border-color: var(--color-muted);
   }
   .template-select:focus-visible {
-    outline: 2px solid var(--color-cta);
+    outline: 2px solid var(--color-accent);
     outline-offset: 2px;
   }
 </style>
