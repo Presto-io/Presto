@@ -26,9 +26,25 @@ export async function convert(markdown: string, templateId: string): Promise<str
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ markdown, templateId })
   });
-  if (!res.ok) throw new Error(`Convert failed: ${res.status}`);
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Convert failed (${res.status}): ${body}`);
+  }
   const data = await res.json();
   return data.typst;
+}
+
+export async function compile(typstSource: string): Promise<Blob> {
+  const res = await fetch(`${BASE}/api/compile`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: typstSource
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Compile failed (${res.status}): ${body}`);
+  }
+  return res.blob();
 }
 
 export async function convertAndCompile(
@@ -40,7 +56,10 @@ export async function convertAndCompile(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ markdown, templateId })
   });
-  if (!res.ok) throw new Error(`Compile failed: ${res.status}`);
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Compile failed (${res.status}): ${body}`);
+  }
   return res.blob();
 }
 

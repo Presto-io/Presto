@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strings"
 
@@ -11,9 +12,12 @@ import (
 func (s *Server) handleListTemplates(w http.ResponseWriter, r *http.Request) {
 	templates, err := s.manager.List()
 	if err != nil {
+		log.Printf("[templates] list failed: %v", err)
 		http.Error(w, `{"error":"failed to list templates"}`, http.StatusInternalServerError)
 		return
 	}
+
+	log.Printf("[templates] found %d templates", len(templates))
 
 	type templateInfo struct {
 		Name        string `json:"name"`

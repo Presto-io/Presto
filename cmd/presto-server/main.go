@@ -25,7 +25,7 @@ func main() {
 		staticDir = "frontend/build"
 	}
 
-	srv := api.NewServer(templatesDir, staticDir)
+	srv := api.NewServer(templatesDir, staticDir, "typst")
 	fmt.Printf("Presto server listening on :%s\n", port)
 	log.Fatal(http.ListenAndServe(":"+port, srv))
 }
