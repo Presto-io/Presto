@@ -1,15 +1,56 @@
 <script lang="ts">
-  let { previewUrl = '' }: { previewUrl?: string } = $props();
+  let {
+    svgPages = [],
+    scrollRatio = 0,
+    onscroll,
+  }: {
+    svgPages?: string[];
+    scrollRatio?: number;
+    onscroll?: (ratio: number) => void;
+  } = $props();
+
+  let container: HTMLDivElement;
+  let ignoreScroll = false;
+
+  // Sync scroll from editor
+  $effect(() => {
+    if (container && scrollRatio >= 0 && !ignoreScroll) {
+      const maxScroll = container.scrollHeight - container.clientHeight;
+      if (maxScroll > 0) {
+        ignoreScroll = true;
+        container.scrollTop = scrollRatio * maxScroll;
+        requestAnimationFrame(() => { ignoreScroll = false; });
+      }
+    }
+  });
+
+  function handleScroll() {
+    if (ignoreScroll) return;
+    const maxScroll = container.scrollHeight - container.clientHeight;
+    if (maxScroll > 0 && onscroll) {
+      onscroll(container.scrollTop / maxScroll);
+    }
+  }
 </script>
 
-<div class="preview-container" role="region" aria-label="PDF 预览">
-  {#if previewUrl}
-    <object data={previewUrl} type="application/pdf" class="pdf-viewer" aria-label="PDF 文档预览">
-      <p>无法显示 PDF 预览</p>
-    </object>
+<div
+  bind:this={container}
+  class="preview-container"
+  role="region"
+  aria-label="文档预览"
+  onscroll={handleScroll}
+>
+  {#if svgPages.length > 0}
+    <div class="svg-pages">
+      {#each svgPages as svg, i}
+        <div class="svg-page" data-page={i + 1}>
+          {@html svg}
+        </div>
+      {/each}
+    </div>
   {:else}
     <div class="placeholder">
-      <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
       <p>在左侧编辑 Markdown，选择模板后预览将在此显示</p>
     </div>
   {/if}
@@ -18,14 +59,30 @@
 <style>
   .preview-container {
     height: 100%;
-    overflow: hidden;
-    background: var(--color-bg-elevated);
+    overflow-y: auto;
+    overflow-x: hidden;
+    background: #2a2a2a;
     border-left: 1px solid var(--color-border);
   }
-  .pdf-viewer {
+  .svg-pages {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+  }
+  .svg-page {
+    background: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    border-radius: 2px;
+    overflow: hidden;
     width: 100%;
-    height: 100%;
-    border: none;
+    max-width: 100%;
+  }
+  .svg-page :global(svg) {
+    display: block;
+    width: 100%;
+    height: auto;
   }
   .placeholder {
     display: flex;

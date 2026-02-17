@@ -29,6 +29,7 @@ func NewServer(templatesDir, staticDir, typstBin string) http.Handler {
 	s.mux.HandleFunc("GET /api/health", s.handleHealth)
 	s.mux.HandleFunc("POST /api/convert", s.handleConvert)
 	s.mux.HandleFunc("POST /api/compile", s.handleCompile)
+	s.mux.HandleFunc("POST /api/compile-svg", s.handleCompileSVG)
 	s.mux.HandleFunc("POST /api/convert-and-compile", s.handleConvertAndCompile)
 	s.mux.HandleFunc("POST /api/batch", s.handleBatch)
 	s.mux.HandleFunc("GET /api/templates", s.handleListTemplates)

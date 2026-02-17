@@ -47,6 +47,20 @@ export async function compile(typstSource: string): Promise<Blob> {
   return res.blob();
 }
 
+export async function compileSvg(typstSource: string): Promise<string[]> {
+  const res = await fetch(`${BASE}/api/compile-svg`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: typstSource
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`SVG compile failed (${res.status}): ${body}`);
+  }
+  const data = await res.json();
+  return data.pages;
+}
+
 export async function convertAndCompile(
   markdown: string,
   templateId: string
