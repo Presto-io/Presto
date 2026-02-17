@@ -5,6 +5,7 @@
   import { oneDark } from '@codemirror/theme-one-dark';
   import { EditorState } from '@codemirror/state';
   import { search } from '@codemirror/search';
+  import { placeholder } from '@codemirror/view';
 
   const zhPhrases = EditorState.phrases.of({
     "Find": "查找",
@@ -41,6 +42,7 @@
           EditorView.lineWrapping,
           zhPhrases,
           search({ top: true }),
+          placeholder('在此输入 Markdown 内容，或按 ⌘O 打开文件\n\n图片语法：![描述](路径)\n  打开文件后，图片路径相对于文件所在目录\n  直接编辑时，使用绝对路径\n\n快捷键：⌘O 打开 · ⌘E 导出 · ⌘F 搜索 · ⌘, 设置'),
           EditorView.theme({
             '&': { height: '100%', fontSize: '13px' },
             '.cm-scroller': { fontFamily: 'var(--font-mono)', lineHeight: '1.6' },
@@ -108,6 +110,11 @@
             },
             '.cm-search [name=close]:hover': {
               color: '#c0caf5',
+            },
+            '.cm-placeholder': {
+              color: '#565f89',
+              fontStyle: 'italic',
+              whiteSpace: 'pre-wrap',
             },
           }),
           EditorView.updateListener.of((update) => {
