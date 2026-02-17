@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { ExternalLink, Shield, Info, BookOpen } from 'lucide-svelte';
+  import { ExternalLink, Shield, Info, BookOpen, ArrowLeft } from 'lucide-svelte';
+  import { goto } from '$app/navigation';
 
   let communityEnabled = $state(false);
   let showWarning = $state(false);
@@ -26,7 +27,12 @@
 </script>
 
 <div class="page">
-  <h2>设置</h2>
+  <div class="page-header">
+    <button class="btn-back" onclick={() => goto('/')} aria-label="返回编辑器">
+      <ArrowLeft size={16} />
+    </button>
+    <h2>设置</h2>
+  </div>
 
   <section>
     <h3>通用</h3>
@@ -126,15 +132,38 @@
 <style>
   .page {
     padding: var(--space-xl);
+    padding-top: 48px;
     max-width: 700px;
     margin: 0 auto;
     overflow-y: auto;
     height: 100%;
   }
   h2 {
-    margin: 0 0 var(--space-xl);
-    font-size: 1.25rem;
+    margin: 0;
+    font-size: 1.125rem;
+    font-family: var(--font-ui);
+    color: var(--color-text-bright);
   }
+  .page-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    margin-bottom: var(--space-xl);
+  }
+  .btn-back {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    color: var(--color-text);
+    cursor: pointer;
+    transition: background var(--transition);
+  }
+  .btn-back:hover { background: var(--color-surface-hover); }
   section {
     margin-bottom: var(--space-xl);
     padding-bottom: var(--space-xl);
@@ -170,7 +199,7 @@
   .slider {
     position: absolute;
     inset: 0;
-    background: var(--color-secondary);
+    background: var(--color-surface-hover);
     border-radius: 12px;
     transition: background var(--transition);
   }
@@ -185,10 +214,10 @@
     border-radius: 50%;
     transition: transform var(--transition);
   }
-  .toggle input:checked + .slider { background: var(--color-cta); }
+  .toggle input:checked + .slider { background: var(--color-accent); }
   .toggle input:checked + .slider::before { transform: translateX(20px); }
   .toggle input:focus-visible + .slider {
-    outline: 2px solid var(--color-cta);
+    outline: 2px solid var(--color-accent);
     outline-offset: 2px;
   }
   .info-list {
@@ -261,7 +290,7 @@
     z-index: 50;
   }
   .modal {
-    background: var(--color-primary);
+    background: var(--color-bg-elevated);
     padding: var(--space-xl);
     border-radius: var(--radius-lg);
     max-width: 420px;

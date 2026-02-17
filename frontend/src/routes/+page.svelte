@@ -3,7 +3,9 @@
   import Editor from '$lib/components/Editor.svelte';
   import Preview from '$lib/components/Preview.svelte';
   import TemplateSelector from '$lib/components/TemplateSelector.svelte';
-  import { convert, compile, convertAndCompile } from '$lib/api/client';
+  import { convert, compile, compileSvg, convertAndCompile } from '$lib/api/client';
+  import { Download } from 'lucide-svelte';
+  import { goto } from '$app/navigation';
 
   // Wails runtime bindings (available when running as desktop app)
   declare global {
@@ -18,10 +20,13 @@
 
   let markdown = $state('');
   let typstSource = $state('');
-  let previewUrl = $state('');
+  let svgPages: string[] = $state([]);
   let selectedTemplate = $state('');
   let converting = $state(false);
   let errorMsg = $state('');
+  let editorScrollRatio = $state(0);
+  let previewScrollRatio = $state(0);
+  let scrollSource: 'editor' | 'preview' | null = $state(null);
   let debounceTimer: ReturnType<typeof setTimeout>;
 
   function extractTypstTitle(typ: string): string {
@@ -60,9 +65,8 @@
       converting = true;
       try {
         typstSource = await convert(md, selectedTemplate);
-        const blob = await compile(typstSource);
-        if (previewUrl) URL.revokeObjectURL(previewUrl);
-        previewUrl = URL.createObjectURL(blob);
+        // Compile to SVG for preview
+        svgPages = await compileSvg(typstSource);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         console.error('Convert failed:', msg);
@@ -131,7 +135,17 @@
     if (window.runtime?.EventsOn) {
       window.runtime.EventsOn('menu:open', handleOpen);
       window.runtime.EventsOn('menu:export', handleDownload);
+      window.runtime.EventsOn('menu:settings', () => goto('/settings'));
     }
+    // Keyboard shortcut for web: Cmd+, opens settings
+    function handleKeydown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === ',') {
+        e.preventDefault();
+        goto('/settings');
+      }
+    }
+    document.addEventListener('keydown', handleKeydown);
+    return () => document.removeEventListener('keydown', handleKeydown);
   });
 </script>
 
@@ -142,17 +156,35 @@
       <div class="status-dot"></div>
     {/if}
   </div>
-  {#if errorMsg}
-    <span class="error-msg" title={errorMsg}>{errorMsg}</span>
-  {/if}
+  <div class="toolbar-right">
+    {#if errorMsg}
+      <span class="error-msg" title={errorMsg}>{errorMsg}</span>
+    {/if}
+    <button class="btn-export" onclick={handleDownload} aria-label="导出 PDF" title="导出 PDF (⌘E)">
+      <Download size={14} />
+      <span>导出</span>
+    </button>
+  </div>
 </div>
 
 <div class="editor-layout">
   <div class="pane">
-    <Editor bind:value={markdown} onchange={handleConvert} />
+    <Editor bind:value={markdown} onchange={handleConvert} onscroll={(ratio: number) => {
+      if (scrollSource !== 'preview') {
+        scrollSource = 'editor';
+        previewScrollRatio = ratio;
+        setTimeout(() => { scrollSource = null; }, 100);
+      }
+    }} />
   </div>
   <div class="pane">
-    <Preview {previewUrl} />
+    <Preview {svgPages} scrollRatio={previewScrollRatio} onscroll={(ratio: number) => {
+      if (scrollSource !== 'editor') {
+        scrollSource = 'preview';
+        editorScrollRatio = ratio;
+        setTimeout(() => { scrollSource = null; }, 100);
+      }
+    }} />
   </div>
 </div>
 
@@ -187,12 +219,33 @@
   .error-msg {
     font-size: 12px;
     color: var(--color-danger);
-    margin-left: auto;
-    max-width: 400px;
+    max-width: 300px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-left: auto;
+    -webkit-app-region: no-drag;
+  }
+  .btn-export {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    background: var(--color-accent);
+    color: var(--color-bg);
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity var(--transition);
+  }
+  .btn-export:hover { opacity: 0.85; }
   .editor-layout {
     display: flex;
     flex: 1;

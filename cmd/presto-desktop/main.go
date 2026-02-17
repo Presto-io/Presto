@@ -75,6 +75,10 @@ func buildMenu(app *App) *menu.Menu {
 	fileMenu.AddText("导出 PDF…", keys.CmdOrCtrl("e"), func(_ *menu.CallbackData) {
 		wailsRuntime.EventsEmit(app.ctx, "menu:export")
 	})
+	fileMenu.AddSeparator()
+	fileMenu.AddText("设置…", keys.CmdOrCtrl(","), func(_ *menu.CallbackData) {
+		wailsRuntime.EventsEmit(app.ctx, "menu:settings")
+	})
 
 	appMenu.Append(menu.EditMenu())
 	appMenu.Append(menu.WindowMenu())
