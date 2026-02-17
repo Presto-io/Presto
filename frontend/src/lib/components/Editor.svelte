@@ -23,9 +23,9 @@
           markdown(),
           oneDark,
           EditorView.theme({
-            '&': { height: '100%', fontSize: '14px' },
+            '&': { height: '100%', fontSize: '13px' },
             '.cm-scroller': { fontFamily: 'var(--font-mono)', lineHeight: '1.6' },
-            '.cm-gutters': { background: 'var(--color-background)', borderRight: '1px solid var(--color-border)' },
+            '.cm-gutters': { background: 'var(--color-bg)', borderRight: '1px solid var(--color-border)' },
             '.cm-activeLineGutter': { background: 'var(--color-surface)' },
           }),
           EditorView.updateListener.of((update) => {
@@ -63,7 +63,7 @@
   .editor-container {
     height: 100%;
     overflow: auto;
-    background: var(--color-background);
+    background: var(--color-bg);
   }
   .editor-container :global(.cm-editor) {
     height: 100%;

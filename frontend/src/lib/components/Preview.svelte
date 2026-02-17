@@ -19,7 +19,7 @@
   .preview-container {
     height: 100%;
     overflow: hidden;
-    background: var(--color-primary);
+    background: var(--color-bg-elevated);
     border-left: 1px solid var(--color-border);
   }
   .pdf-viewer {
@@ -35,10 +35,12 @@
     height: 100%;
     color: var(--color-muted);
     gap: var(--space-md);
-    padding: var(--space-lg);
+    padding: var(--space-xl);
   }
   .placeholder p {
-    font-size: 0.875rem;
+    font-size: 12px;
     margin: 0;
+    text-align: center;
+    line-height: 1.6;
   }
 </style>

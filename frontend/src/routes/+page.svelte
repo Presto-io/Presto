@@ -1,14 +1,18 @@
 <script lang="ts">
+  import { onMount, onDestroy } from 'svelte';
   import Editor from '$lib/components/Editor.svelte';
   import Preview from '$lib/components/Preview.svelte';
   import TemplateSelector from '$lib/components/TemplateSelector.svelte';
   import { convert, compile, convertAndCompile } from '$lib/api/client';
-  import { Download, Upload } from 'lucide-svelte';
 
   // Wails runtime bindings (available when running as desktop app)
   declare global {
     interface Window {
-      go?: { main: { App: { SavePDF: (markdown: string, templateId: string) => Promise<void> } } };
+      go?: { main: { App: {
+        SavePDF: (markdown: string, templateId: string) => Promise<void>;
+        OpenFile: () => Promise<string>;
+      } } };
+      runtime?: { EventsOn: (event: string, cb: (...args: any[]) => void) => void };
     }
   }
 
@@ -18,7 +22,6 @@
   let selectedTemplate = $state('');
   let converting = $state(false);
   let errorMsg = $state('');
-  let fileInput: HTMLInputElement;
   let debounceTimer: ReturnType<typeof setTimeout>;
 
   function extractTypstTitle(typ: string): string {
@@ -31,7 +34,6 @@
         if (!trimmed.startsWith(prefix)) continue;
         if (level < 5 && trimmed.startsWith(deeper)) continue;
         let content = trimmed.slice(prefix.length).trim();
-        // Resolve variable references like #autoTitle.split(...)
         if (content.startsWith('#')) {
           let varName = content.slice(1);
           const cut = varName.search(/[.( ]/);
@@ -41,7 +43,7 @@
             const m = l.match(re);
             if (m) { content = m[1]; break; }
           }
-          if (content.startsWith('#')) continue; // couldn't resolve
+          if (content.startsWith('#')) continue;
         }
         const title = content.trim().replace(/[/\\:*?"<>|]/g, '_');
         if (title) return title;
@@ -58,14 +60,13 @@
       converting = true;
       try {
         typstSource = await convert(md, selectedTemplate);
-        // Compile typst to PDF for preview
         const blob = await compile(typstSource);
         if (previewUrl) URL.revokeObjectURL(previewUrl);
         previewUrl = URL.createObjectURL(blob);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         console.error('Convert failed:', msg);
-        errorMsg = `转换失败: ${msg}`;
+        errorMsg = msg;
       } finally {
         converting = false;
       }
@@ -76,12 +77,10 @@
     if (!selectedTemplate || !markdown.trim()) return;
     errorMsg = '';
     try {
-      // Use Wails native save dialog when available (desktop app)
       if (window.go?.main?.App?.SavePDF) {
         await window.go.main.App.SavePDF(markdown, selectedTemplate);
         return;
       }
-      // Fallback for browser mode
       const blob = await convertAndCompile(markdown, selectedTemplate);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -92,41 +91,59 @@
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error('Download failed:', msg);
-      errorMsg = `导出失败: ${msg}`;
+      errorMsg = msg;
     }
   }
 
-  function handleUpload(e: Event) {
-    const input = e.target as HTMLInputElement;
-    const file = input.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      markdown = reader.result as string;
-      handleConvert(markdown);
-    };
-    reader.readAsText(file);
+  async function handleOpen() {
+    try {
+      if (window.go?.main?.App?.OpenFile) {
+        const content = await window.go.main.App.OpenFile();
+        if (content) {
+          markdown = content;
+          handleConvert(markdown);
+        }
+        return;
+      }
+      // Browser fallback: use file input
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.md,.markdown,.txt';
+      input.onchange = () => {
+        const file = input.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          markdown = reader.result as string;
+          handleConvert(markdown);
+        };
+        reader.readAsText(file);
+      };
+      input.click();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      errorMsg = msg;
+    }
   }
+
+  onMount(() => {
+    // Listen for Wails menu events
+    if (window.runtime?.EventsOn) {
+      window.runtime.EventsOn('menu:open', handleOpen);
+      window.runtime.EventsOn('menu:export', handleDownload);
+    }
+  });
 </script>
 
-<div class="toolbar">
-  <TemplateSelector bind:selected={selectedTemplate} />
-  <div class="toolbar-actions">
-    <button class="btn-primary" onclick={handleDownload} aria-label="下载 PDF">
-      <Download size={16} />
-      <span>下载 PDF</span>
-    </button>
-    <button class="btn-secondary" onclick={() => fileInput?.click()} aria-label="上传 Markdown 文件">
-      <Upload size={16} />
-      <span>上传 MD</span>
-    </button>
-    <input bind:this={fileInput} type="file" accept=".md,.markdown,.txt" onchange={handleUpload} hidden />
+<div class="toolbar" style="--wails-draggable:drag">
+  <div class="toolbar-left">
+    <TemplateSelector bind:selected={selectedTemplate} />
+    {#if converting}
+      <div class="status-dot"></div>
+    {/if}
   </div>
-  {#if converting}
-    <span class="status">转换中...</span>
-  {/if}
   {#if errorMsg}
-    <span class="error-msg">{errorMsg}</span>
+    <span class="error-msg" title={errorMsg}>{errorMsg}</span>
   {/if}
 </div>
 
@@ -134,7 +151,6 @@
   <div class="pane">
     <Editor bind:value={markdown} onchange={handleConvert} />
   </div>
-  <div class="divider"></div>
   <div class="pane">
     <Preview {previewUrl} />
   </div>
@@ -146,46 +162,32 @@
     align-items: center;
     gap: var(--space-sm);
     padding: var(--space-sm) var(--space-lg);
-    background: var(--color-surface);
+    padding-top: 38px;
+    background: var(--color-bg);
     border-bottom: 1px solid var(--color-border);
     flex-shrink: 0;
+    min-height: 0;
   }
-  .toolbar-actions {
+  .toolbar-left {
     display: flex;
-    gap: var(--space-sm);
-    margin-left: auto;
-  }
-  .btn-primary, .btn-secondary {
-    display: inline-flex;
     align-items: center;
-    gap: var(--space-xs);
-    padding: var(--space-sm) var(--space-md);
-    border-radius: var(--radius-md);
-    font-size: 0.8125rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all var(--transition);
-    border: none;
+    gap: var(--space-md);
   }
-  .btn-primary {
-    background: var(--color-cta);
-    color: white;
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-accent);
+    animation: pulse 1s ease-in-out infinite;
   }
-  .btn-primary:hover { opacity: 0.9; }
-  .btn-secondary {
-    background: var(--color-secondary);
-    color: var(--color-text);
-  }
-  .btn-secondary:hover { background: var(--color-surface-hover); }
-  .status {
-    font-size: 0.75rem;
-    color: var(--color-muted);
-    margin-left: var(--space-sm);
+  @keyframes pulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
   }
   .error-msg {
-    font-size: 0.75rem;
-    color: #ef4444;
-    margin-left: var(--space-sm);
+    font-size: 12px;
+    color: var(--color-danger);
+    margin-left: auto;
     max-width: 400px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -199,9 +201,5 @@
   .pane {
     flex: 1;
     overflow: hidden;
-  }
-  .divider {
-    width: 1px;
-    background: var(--color-border);
   }
 </style>
