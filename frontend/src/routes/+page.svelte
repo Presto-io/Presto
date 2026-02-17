@@ -2,25 +2,70 @@
   import Editor from '$lib/components/Editor.svelte';
   import Preview from '$lib/components/Preview.svelte';
   import TemplateSelector from '$lib/components/TemplateSelector.svelte';
-  import { convert, convertAndCompile } from '$lib/api/client';
+  import { convert, compile, convertAndCompile } from '$lib/api/client';
   import { Download, Upload } from 'lucide-svelte';
+
+  // Wails runtime bindings (available when running as desktop app)
+  declare global {
+    interface Window {
+      go?: { main: { App: { SavePDF: (markdown: string, templateId: string) => Promise<void> } } };
+    }
+  }
 
   let markdown = $state('');
   let typstSource = $state('');
+  let previewUrl = $state('');
   let selectedTemplate = $state('');
   let converting = $state(false);
+  let errorMsg = $state('');
   let fileInput: HTMLInputElement;
   let debounceTimer: ReturnType<typeof setTimeout>;
 
+  function extractTypstTitle(typ: string): string {
+    const lines = typ.split('\n');
+    for (let level = 1; level <= 5; level++) {
+      const prefix = '='.repeat(level) + ' ';
+      const deeper = '='.repeat(level + 1);
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith(prefix)) continue;
+        if (level < 5 && trimmed.startsWith(deeper)) continue;
+        let content = trimmed.slice(prefix.length).trim();
+        // Resolve variable references like #autoTitle.split(...)
+        if (content.startsWith('#')) {
+          let varName = content.slice(1);
+          const cut = varName.search(/[.( ]/);
+          if (cut > 0) varName = varName.slice(0, cut);
+          const re = new RegExp(`#let\\s+${varName}\\s*=\\s*"([^"]*)"`);
+          for (const l of lines) {
+            const m = l.match(re);
+            if (m) { content = m[1]; break; }
+          }
+          if (content.startsWith('#')) continue; // couldn't resolve
+        }
+        const title = content.trim().replace(/[/\\:*?"<>|]/g, '_');
+        if (title) return title;
+      }
+    }
+    return 'output';
+  }
+
   async function handleConvert(md: string) {
     if (!selectedTemplate || !md.trim()) return;
+    errorMsg = '';
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(async () => {
       converting = true;
       try {
         typstSource = await convert(md, selectedTemplate);
+        // Compile typst to PDF for preview
+        const blob = await compile(typstSource);
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        previewUrl = URL.createObjectURL(blob);
       } catch (e) {
-        console.error('Convert failed:', e);
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error('Convert failed:', msg);
+        errorMsg = `转换失败: ${msg}`;
       } finally {
         converting = false;
       }
@@ -29,16 +74,25 @@
 
   async function handleDownload() {
     if (!selectedTemplate || !markdown.trim()) return;
+    errorMsg = '';
     try {
+      // Use Wails native save dialog when available (desktop app)
+      if (window.go?.main?.App?.SavePDF) {
+        await window.go.main.App.SavePDF(markdown, selectedTemplate);
+        return;
+      }
+      // Fallback for browser mode
       const blob = await convertAndCompile(markdown, selectedTemplate);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'output.pdf';
+      a.download = extractTypstTitle(typstSource) + '.pdf';
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      console.error('Download failed:', e);
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('Download failed:', msg);
+      errorMsg = `导出失败: ${msg}`;
     }
   }
 
@@ -47,7 +101,10 @@
     const file = input.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => { markdown = reader.result as string; };
+    reader.onload = () => {
+      markdown = reader.result as string;
+      handleConvert(markdown);
+    };
     reader.readAsText(file);
   }
 </script>
@@ -68,6 +125,9 @@
   {#if converting}
     <span class="status">转换中...</span>
   {/if}
+  {#if errorMsg}
+    <span class="error-msg">{errorMsg}</span>
+  {/if}
 </div>
 
 <div class="editor-layout">
@@ -76,7 +136,7 @@
   </div>
   <div class="divider"></div>
   <div class="pane">
-    <Preview {typstSource} />
+    <Preview {previewUrl} />
   </div>
 </div>
 
@@ -121,6 +181,15 @@
     font-size: 0.75rem;
     color: var(--color-muted);
     margin-left: var(--space-sm);
+  }
+  .error-msg {
+    font-size: 0.75rem;
+    color: #ef4444;
+    margin-left: var(--space-sm);
+    max-width: 400px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .editor-layout {
     display: flex;

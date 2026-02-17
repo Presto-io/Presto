@@ -1,6 +1,10 @@
 package api
 
-import "net/http"
+import (
+	"log"
+	"net/http"
+	"time"
+)
 
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -13,4 +17,23 @@ func corsMiddleware(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		lw := &loggingResponseWriter{ResponseWriter: w, status: 200}
+		next.ServeHTTP(lw, r)
+		log.Printf("[%s] %s %s → %d (%s)", r.Method, r.URL.Path, r.RemoteAddr, lw.status, time.Since(start))
+	})
+}
+
+type loggingResponseWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (lw *loggingResponseWriter) WriteHeader(code int) {
+	lw.status = code
+	lw.ResponseWriter.WriteHeader(code)
 }

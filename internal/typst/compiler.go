@@ -8,15 +8,34 @@ import (
 	"strings"
 )
 
-type Compiler struct{}
+type Compiler struct {
+	Root    string // root directory for typst path resolution
+	BinPath string // path to typst binary (empty = use PATH)
+}
 
 func NewCompiler() *Compiler {
 	return &Compiler{}
 }
 
+func NewCompilerWithRoot(root string) *Compiler {
+	return &Compiler{Root: root}
+}
+
+func (c *Compiler) typstBin() string {
+	if c.BinPath != "" {
+		return c.BinPath
+	}
+	return "typst"
+}
+
 func (c *Compiler) Compile(typFile string) (string, error) {
 	pdfFile := strings.TrimSuffix(typFile, ".typ") + ".pdf"
-	cmd := exec.Command("typst", "compile", typFile, pdfFile)
+	args := []string{"compile"}
+	if c.Root != "" {
+		args = append(args, "--root", c.Root)
+	}
+	args = append(args, typFile, pdfFile)
+	cmd := exec.Command(c.typstBin(), args...)
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {

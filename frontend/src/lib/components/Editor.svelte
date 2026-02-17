@@ -12,6 +12,7 @@
 
   let container: HTMLDivElement;
   let view: EditorView;
+  let internalUpdate = false;
 
   onMount(() => {
     view = new EditorView({
@@ -29,14 +30,28 @@
           }),
           EditorView.updateListener.of((update) => {
             if (update.docChanged) {
+              internalUpdate = true;
               value = update.state.doc.toString();
               onchange?.(value);
+              internalUpdate = false;
             }
           })
         ]
       }),
       parent: container
     });
+  });
+
+  // Sync external value changes (e.g. file upload) into CodeMirror
+  $effect(() => {
+    if (view && !internalUpdate) {
+      const current = view.state.doc.toString();
+      if (value !== current) {
+        view.dispatch({
+          changes: { from: 0, to: current.length, insert: value }
+        });
+      }
+    }
   });
 
   onDestroy(() => view?.destroy());
