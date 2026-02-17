@@ -173,7 +173,7 @@
 
 <div class="editor-layout">
   <div class="pane">
-    <Editor bind:value={markdown} onchange={handleConvert} onscroll={(ratio: number) => {
+    <Editor bind:value={markdown} onchange={handleConvert} scrollRatio={editorScrollRatio} onscroll={(ratio: number) => {
       if (scrollSource !== 'preview') {
         scrollSource = 'editor';
         previewScrollRatio = ratio;
