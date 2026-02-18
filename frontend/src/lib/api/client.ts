@@ -20,6 +20,11 @@ export async function getManifest(id: string): Promise<Manifest> {
   return api(`/api/templates/${id}/manifest`);
 }
 
+export async function getExample(id: string): Promise<string> {
+  const data = await api<{ example: string }>(`/api/templates/${id}/example`);
+  return data.example;
+}
+
 export async function convert(markdown: string, templateId: string): Promise<string> {
   const res = await fetch(`${BASE}/api/convert`, {
     method: 'POST',

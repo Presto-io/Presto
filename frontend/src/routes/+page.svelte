@@ -3,7 +3,7 @@
   import Editor from '$lib/components/Editor.svelte';
   import Preview from '$lib/components/Preview.svelte';
   import TemplateSelector from '$lib/components/TemplateSelector.svelte';
-  import { convert, compile, compileSvg, convertAndCompile } from '$lib/api/client';
+  import { convert, compile, compileSvg, convertAndCompile, getExample } from '$lib/api/client';
   import { Download } from 'lucide-svelte';
   import { goto } from '$app/navigation';
   import { editor } from '$lib/stores/editor.svelte';
@@ -26,6 +26,55 @@
   let previewScrollRatio = $state(0);
   let scrollSource: 'editor' | 'preview' | null = $state(null);
   let debounceTimer: ReturnType<typeof setTimeout>;
+
+  // Template switching confirmation
+  let pendingTemplate = $state('');
+  let confirmDialog: HTMLDialogElement;
+
+  async function loadExample(templateId: string) {
+    try {
+      const example = await getExample(templateId);
+      if (example) {
+        editor.markdown = example;
+        handleConvert(editor.markdown);
+      }
+    } catch (e) {
+      console.error('Failed to load example:', e);
+    }
+  }
+
+  async function handleTemplateChange(newId: string) {
+    if (newId === editor.selectedTemplate) return;
+
+    if (!editor.markdown.trim()) {
+      // Empty editor — switch directly and load example
+      editor.selectedTemplate = newId;
+      await loadExample(newId);
+    } else {
+      // Has content — show confirmation dialog
+      pendingTemplate = newId;
+      confirmDialog?.showModal();
+    }
+  }
+
+  function handleUseExample() {
+    confirmDialog?.close();
+    editor.selectedTemplate = pendingTemplate;
+    loadExample(pendingTemplate);
+    pendingTemplate = '';
+  }
+
+  function handleKeepContent() {
+    confirmDialog?.close();
+    editor.selectedTemplate = pendingTemplate;
+    handleConvert(editor.markdown);
+    pendingTemplate = '';
+  }
+
+  function handleCancelSwitch() {
+    confirmDialog?.close();
+    pendingTemplate = '';
+  }
 
   function extractTypstTitle(typ: string): string {
     const lines = typ.split('\n');
@@ -157,7 +206,7 @@
 
 <div class="toolbar" style="--wails-draggable:drag">
   <div class="toolbar-left">
-    <TemplateSelector bind:selected={editor.selectedTemplate} />
+    <TemplateSelector selected={editor.selectedTemplate} onbeforechange={handleTemplateChange} />
     {#if converting}
       <div class="status-dot"></div>
     {/if}
@@ -193,6 +242,16 @@
     }} />
   </div>
 </div>
+
+<dialog bind:this={confirmDialog} class="confirm-dialog">
+  <h3>切换模板</h3>
+  <p>当前编辑器中有内容，切换模板后如何处理？</p>
+  <div class="dialog-actions">
+    <button class="dialog-btn primary" onclick={handleUseExample}>使用示例内容</button>
+    <button class="dialog-btn" onclick={handleKeepContent}>保留当前内容</button>
+    <button class="dialog-btn" onclick={handleCancelSwitch}>取消</button>
+  </div>
+</dialog>
 
 <style>
   .toolbar {
@@ -260,5 +319,49 @@
   .pane {
     flex: 1;
     overflow: hidden;
+  }
+  .confirm-dialog {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md, 8px);
+    background: var(--color-surface);
+    color: var(--color-text);
+    padding: 24px;
+    max-width: 400px;
+    font-family: var(--font-ui);
+  }
+  .confirm-dialog::backdrop {
+    background: rgba(0, 0, 0, 0.4);
+  }
+  .confirm-dialog h3 {
+    margin: 0 0 8px;
+    font-size: 16px;
+    font-weight: 600;
+  }
+  .confirm-dialog p {
+    margin: 0 0 20px;
+    font-size: 13px;
+    color: var(--color-muted);
+    line-height: 1.5;
+  }
+  .dialog-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+  .dialog-btn {
+    padding: 6px 14px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-size: 12px;
+    cursor: pointer;
+    transition: opacity var(--transition);
+  }
+  .dialog-btn:hover { opacity: 0.85; }
+  .dialog-btn.primary {
+    background: var(--color-accent);
+    color: var(--color-bg);
+    border-color: var(--color-accent);
   }
 </style>

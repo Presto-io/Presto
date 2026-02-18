@@ -3,19 +3,39 @@
   import { listTemplates } from '$lib/api/client';
   import type { Template } from '$lib/api/types';
 
-  let { selected = $bindable('') }: { selected?: string } = $props();
+  let {
+    selected = $bindable(''),
+    onbeforechange
+  }: {
+    selected?: string;
+    onbeforechange?: (newValue: string) => void;
+  } = $props();
+
   let templates: Template[] = $state([]);
 
   onMount(async () => {
     const t = await listTemplates();
     templates = t ?? [];
     if (!selected && templates.length > 0) {
-      selected = templates[0].name;
+      if (onbeforechange) {
+        onbeforechange(templates[0].name);
+      } else {
+        selected = templates[0].name;
+      }
     }
   });
+
+  function handleChange(e: Event) {
+    const value = (e.currentTarget as HTMLSelectElement).value;
+    if (onbeforechange) {
+      onbeforechange(value);
+    } else {
+      selected = value;
+    }
+  }
 </script>
 
-<select bind:value={selected} aria-label="选择模板" class="template-select">
+<select value={selected} onchange={handleChange} aria-label="选择模板" class="template-select">
   {#each templates as tpl (tpl.name)}
     <option value={tpl.name}>{tpl.displayName || tpl.name}</option>
   {/each}
