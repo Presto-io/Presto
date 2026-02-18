@@ -178,13 +178,17 @@ jobs:
         if: matrix.goarch == 'arm64'
         run: |
           sudo dpkg --add-architecture arm64
-          # Pin all existing sources to amd64 only
-          sudo sed -i 's/^deb http/deb [arch=amd64] http/' /etc/apt/sources.list
-          sudo sed -i 's/^deb http/deb [arch=amd64] http/' /etc/apt/sources.list.d/*.list 2>/dev/null || true
-          # Add arm64 sources via ports.ubuntu.com
-          echo 'deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy main restricted universe multiverse' | sudo tee /etc/apt/sources.list.d/arm64.list
-          echo 'deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-updates main restricted universe multiverse' | sudo tee -a /etc/apt/sources.list.d/arm64.list
-          echo 'deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted universe multiverse' | sudo tee -a /etc/apt/sources.list.d/arm64.list
+          # Replace ALL apt sources with arch-pinned versions
+          sudo rm -f /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources
+          sudo tee /etc/apt/sources.list <<'SOURCES'
+          deb [arch=amd64] http://archive.ubuntu.com/ubuntu jammy main restricted universe multiverse
+          deb [arch=amd64] http://archive.ubuntu.com/ubuntu jammy-updates main restricted universe multiverse
+          deb [arch=amd64] http://security.ubuntu.com/ubuntu jammy-security main restricted universe multiverse
+          deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy main restricted universe multiverse
+          deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-updates main restricted universe multiverse
+          deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted universe multiverse
+          SOURCES
+          sudo sed -i 's/^          //' /etc/apt/sources.list
           sudo apt-get update -qq
           sudo apt-get install -y -qq gcc-aarch64-linux-gnu pkg-config \
             libgtk-3-dev:arm64 libwebkit2gtk-4.0-dev:arm64
