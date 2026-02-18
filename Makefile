@@ -132,29 +132,71 @@ _bundle-app:
 
 # ─── DMG (per-arch + universal) ─────────────────────────
 
-dist-dmg-arm64: dist-macos-arm64
-	@echo "==> Creating DMG (arm64)..."
+DMG_BG := packaging/macos/dmg-background.png
+DMG_WIN_W := 660
+DMG_WIN_H := 400
+DMG_ICON_SIZE := 128
+DMG_APP_X := 180
+DMG_APP_Y := 192
+DMG_LNK_X := 480
+DMG_LNK_Y := 192
+
+define CREATE_DMG
+	@echo "==> Creating DMG ($(1))..."
+	@rm -rf "$(DIST)/_dmg_stage"
+	@mkdir -p "$(DIST)/_dmg_stage"
+	@cp -R "$(DIST)/$(APP_NAME)-$(1).app" "$(DIST)/_dmg_stage/$(APP_NAME).app"
+	@ln -s /Applications "$(DIST)/_dmg_stage/Applications"
+	@mkdir -p "$(DIST)/_dmg_stage/.background"
+	@cp "$(DMG_BG)" "$(DIST)/_dmg_stage/.background/background.png"
+	@rm -f "$(DIST)/$(APP_NAME)-$(VERSION)-macOS-$(1).dmg"
+	@rm -f "$(DIST)/_tmp_rw.dmg"
 	hdiutil create -volname "$(APP_NAME)" \
-		-srcfolder "$(DIST)/$(APP_NAME)-arm64.app" \
-		-ov -format UDZO \
-		"$(DIST)/$(APP_NAME)-$(VERSION)-macOS-arm64.dmg"
-	@echo "==> $(DIST)/$(APP_NAME)-$(VERSION)-macOS-arm64.dmg"
+		-srcfolder "$(DIST)/_dmg_stage" \
+		-ov -format UDRW \
+		"$(DIST)/_tmp_rw.dmg"
+	@rm -rf "$(DIST)/_dmg_stage"
+	@DMG_DEV=$$(hdiutil attach -readwrite -noverify -noautoopen "$(DIST)/_tmp_rw.dmg" \
+		| grep '/Volumes/$(APP_NAME)' | awk '{print $$1}') && \
+	sleep 2 && \
+	osascript \
+		-e 'tell application "Finder"' \
+		-e '  tell disk "$(APP_NAME)"' \
+		-e '    open' \
+		-e '    set current view of container window to icon view' \
+		-e '    set toolbar visible of container window to false' \
+		-e '    set statusbar visible of container window to false' \
+		-e '    set the bounds of container window to {100, 100, 100 + $(DMG_WIN_W), 100 + $(DMG_WIN_H)}' \
+		-e '    set viewOptions to the icon view options of container window' \
+		-e '    set arrangement of viewOptions to not arranged' \
+		-e '    set icon size of viewOptions to $(DMG_ICON_SIZE)' \
+		-e '    set background picture of viewOptions to file ".background:background.png"' \
+		-e '    set position of item "$(APP_NAME).app" of container window to {$(DMG_APP_X), $(DMG_APP_Y)}' \
+		-e '    set position of item "Applications" of container window to {$(DMG_LNK_X), $(DMG_LNK_Y)}' \
+		-e '    close' \
+		-e '    open' \
+		-e '    update without registering applications' \
+		-e '    delay 3' \
+		-e '    close' \
+		-e '  end tell' \
+		-e 'end tell' && \
+	sync && \
+	hdiutil detach "$$DMG_DEV" -quiet
+	hdiutil convert "$(DIST)/_tmp_rw.dmg" \
+		-format UDZO -imagekey zlib-level=9 \
+		-o "$(DIST)/$(APP_NAME)-$(VERSION)-macOS-$(1).dmg"
+	@rm -f "$(DIST)/_tmp_rw.dmg"
+	@echo "==> $(DIST)/$(APP_NAME)-$(VERSION)-macOS-$(1).dmg"
+endef
+
+dist-dmg-arm64: dist-macos-arm64
+	$(call CREATE_DMG,arm64)
 
 dist-dmg-amd64: dist-macos-amd64
-	@echo "==> Creating DMG (amd64)..."
-	hdiutil create -volname "$(APP_NAME)" \
-		-srcfolder "$(DIST)/$(APP_NAME)-amd64.app" \
-		-ov -format UDZO \
-		"$(DIST)/$(APP_NAME)-$(VERSION)-macOS-amd64.dmg"
-	@echo "==> $(DIST)/$(APP_NAME)-$(VERSION)-macOS-amd64.dmg"
+	$(call CREATE_DMG,amd64)
 
 dist-dmg-universal: dist-macos-universal
-	@echo "==> Creating DMG (universal)..."
-	hdiutil create -volname "$(APP_NAME)" \
-		-srcfolder "$(DIST)/$(APP_NAME)-universal.app" \
-		-ov -format UDZO \
-		"$(DIST)/$(APP_NAME)-$(VERSION)-macOS-universal.dmg"
-	@echo "==> $(DIST)/$(APP_NAME)-$(VERSION)-macOS-universal.dmg"
+	$(call CREATE_DMG,universal)
 
 dist-dmg: dist-dmg-arm64 dist-dmg-amd64 dist-dmg-universal
 
