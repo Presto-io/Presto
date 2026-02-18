@@ -6,6 +6,14 @@
   let communityEnabled = $state(false);
   let showWarning = $state(false);
 
+  function openExternal(url: string) {
+    if ((window as any).runtime?.BrowserOpenURL) {
+      (window as any).runtime.BrowserOpenURL(url);
+    } else {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+  }
+
   onMount(() => {
     communityEnabled = localStorage.getItem('communityTemplates') === 'true';
   });
@@ -58,7 +66,7 @@
       <li>附带 manifest.json 描述模板元数据</li>
       <li>支持任意编程语言（Go、Rust、Python、JavaScript 等）</li>
       <li>
-        <a href="https://github.com/Presto-io/template-starter" target="_blank" rel="noopener noreferrer">
+        <a href="https://github.com/Presto-io/template-starter" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://github.com/Presto-io/template-starter'); }}>
           开发文档
           <ExternalLink size={12} />
         </a>
@@ -78,7 +86,7 @@
       </div>
       <div class="about-row">
         <span class="about-label">源码</span>
-        <a href="https://github.com/Presto-io/Presto" target="_blank" rel="noopener noreferrer" class="about-value">
+        <a href="https://github.com/Presto-io/Presto" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://github.com/Presto-io/Presto'); }} class="about-value">
           GitHub
           <ExternalLink size={12} />
         </a>
@@ -94,13 +102,17 @@
     <h3>开源协议声明</h3>
     <p class="section-desc">Presto 基于以下开源软件构建，感谢这些项目的贡献者。</p>
     <ul class="license-list">
-      <li><span class="lib-name">Wails</span><span class="lib-license">MIT</span></li>
-      <li><span class="lib-name">Typst</span><span class="lib-license">Apache 2.0</span></li>
-      <li><span class="lib-name">typst.ts</span><span class="lib-license">Apache 2.0</span></li>
-      <li><span class="lib-name">Goldmark</span><span class="lib-license">MIT</span></li>
-      <li><span class="lib-name">CodeMirror</span><span class="lib-license">MIT</span></li>
-      <li><span class="lib-name">Svelte</span><span class="lib-license">MIT</span></li>
-      <li><span class="lib-name">Go</span><span class="lib-license">BSD-3-Clause</span></li>
+      <li><a href="https://go.dev" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://go.dev'); }} class="lib-name">Go<ExternalLink size={10} /></a><span class="lib-license">BSD-3-Clause</span></li>
+      <li><a href="https://typst.app" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://typst.app'); }} class="lib-name">Typst<ExternalLink size={10} /></a><span class="lib-license">Apache 2.0</span></li>
+      <li><a href="https://svelte.dev" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://svelte.dev'); }} class="lib-name">Svelte<ExternalLink size={10} /></a><span class="lib-license">MIT</span></li>
+      <li><a href="https://svelte.dev/docs/kit" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://svelte.dev/docs/kit'); }} class="lib-name">SvelteKit<ExternalLink size={10} /></a><span class="lib-license">MIT</span></li>
+      <li><a href="https://vite.dev" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://vite.dev'); }} class="lib-name">Vite<ExternalLink size={10} /></a><span class="lib-license">MIT</span></li>
+      <li><a href="https://www.typescriptlang.org" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://www.typescriptlang.org'); }} class="lib-name">TypeScript<ExternalLink size={10} /></a><span class="lib-license">Apache 2.0</span></li>
+      <li><a href="https://wails.io" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://wails.io'); }} class="lib-name">Wails<ExternalLink size={10} /></a><span class="lib-license">MIT</span></li>
+      <li><a href="https://github.com/yuin/goldmark" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://github.com/yuin/goldmark'); }} class="lib-name">Goldmark<ExternalLink size={10} /></a><span class="lib-license">MIT</span></li>
+      <li><a href="https://codemirror.net" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://codemirror.net'); }} class="lib-name">CodeMirror<ExternalLink size={10} /></a><span class="lib-license">MIT</span></li>
+      <li><a href="https://lucide.dev" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://lucide.dev'); }} class="lib-name">Lucide<ExternalLink size={10} /></a><span class="lib-license">ISC</span></li>
+      <li><a href="https://github.com/go-yaml/yaml" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://github.com/go-yaml/yaml'); }} class="lib-name">yaml.v3<ExternalLink size={10} /></a><span class="lib-license">MIT / Apache 2.0</span></li>
     </ul>
   </section>
 </div>
@@ -235,6 +247,13 @@
     display: inline-flex;
     align-items: center;
     gap: var(--space-xs);
+    color: var(--color-accent);
+    text-decoration: none;
+    cursor: pointer;
+    transition: opacity var(--transition);
+  }
+  .info-list a:hover {
+    opacity: 0.8;
   }
   .about {
     display: flex;
@@ -257,6 +276,15 @@
     font-family: var(--font-mono);
     font-size: 0.8125rem;
   }
+  a.about-value {
+    color: var(--color-accent);
+    text-decoration: none;
+    cursor: pointer;
+    transition: opacity var(--transition);
+  }
+  a.about-value:hover {
+    opacity: 0.8;
+  }
   .section-desc {
     font-size: 0.8125rem;
     color: var(--color-muted);
@@ -278,7 +306,26 @@
     border-radius: var(--radius-sm);
     font-size: 0.8125rem;
   }
-  .lib-name { font-weight: 500; }
+  .lib-name {
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--color-text);
+    text-decoration: none;
+    cursor: pointer;
+    transition: color var(--transition);
+  }
+  a.lib-name:hover {
+    color: var(--color-accent);
+  }
+  a.lib-name :global(svg) {
+    opacity: 0;
+    transition: opacity var(--transition);
+  }
+  a.lib-name:hover :global(svg) {
+    opacity: 1;
+  }
   .lib-license { color: var(--color-muted); font-family: var(--font-mono); }
   .modal-overlay {
     position: fixed;

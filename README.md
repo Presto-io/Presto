@@ -351,9 +351,14 @@ make dev
 
 ## 致谢
 
+- [Go](https://go.dev) — 后端语言
 - [Typst](https://typst.app) — 现代排版引擎
+- [Svelte](https://svelte.dev) — 前端 UI 框架
+- [SvelteKit](https://svelte.dev/docs/kit) — 前端应用框架
+- [Vite](https://vite.dev) — 前端构建工具
+- [TypeScript](https://www.typescriptlang.org) — 前端类型系统
 - [Wails](https://wails.io) — Go 桌面应用框架
-- [SvelteKit](https://kit.svelte.dev) — 前端框架
-- [CodeMirror](https://codemirror.net) — 代码编辑器
 - [Goldmark](https://github.com/yuin/goldmark) — Go Markdown 解析器
+- [CodeMirror](https://codemirror.net) — 代码编辑器
 - [Lucide](https://lucide.dev) — 图标库
+- [yaml.v3](https://github.com/go-yaml/yaml) — Go YAML 解析器
