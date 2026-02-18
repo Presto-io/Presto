@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"flag"
 	"fmt"
+	"html"
 	"io"
 	"os"
 	"path/filepath"
@@ -14,7 +15,6 @@ import (
 
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
-	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
 	"github.com/yuin/goldmark/text"
 	"gopkg.in/yaml.v3"
@@ -254,7 +254,7 @@ func (c *converter) plainText(n ast.Node) string {
 			}
 			return ast.WalkSkipChildren, nil
 		} else if node.Kind() == ast.KindString {
-			buf.Write(node.(*ast.String).Value)
+			buf.WriteString(html.UnescapeString(string(node.(*ast.String).Value)))
 		}
 		return ast.WalkContinue, nil
 	})
@@ -286,7 +286,10 @@ func (c *converter) renderInline(n ast.Node) string {
 		return result
 
 	case ast.KindString:
-		return convertPunctuation(string(n.(*ast.String).Value))
+		// Unescape HTML entities (e.g. &ldquo; → ") that may be injected by
+		// goldmark extensions like Typographer, since we output Typst, not HTML.
+		raw := html.UnescapeString(string(n.(*ast.String).Value))
+		return convertPunctuation(raw)
 
 	case ast.KindCodeSpan:
 		var code strings.Builder
@@ -854,7 +857,6 @@ func convertBody(body string) string {
 	source := []byte(body)
 
 	md := goldmark.New(
-		goldmark.WithExtensions(extension.Typographer),
 		goldmark.WithParserOptions(
 			parser.WithAutoHeadingID(),
 		),
