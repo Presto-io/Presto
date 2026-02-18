@@ -93,6 +93,12 @@ func buildMenu(app *App) *menu.Menu {
 	return appMenu
 }
 
+// CompileSVG compiles typst source to SVG pages via Wails binding,
+// bypassing the HTTP layer where Wails WebView strips headers/query params.
+func (a *App) CompileSVG(typstSource string, workDir string) ([]string, error) {
+	return a.compiler.CompileToSVG(typstSource, workDir)
+}
+
 // SavePDF converts markdown to PDF and opens a native save dialog.
 func (a *App) SavePDF(markdown string, templateId string, workDir string) error {
 	tpl, err := a.manager.Get(templateId)
