@@ -37,6 +37,7 @@ func NewServer(templatesDir, staticDir, typstBin string) http.Handler {
 	s.mux.HandleFunc("POST /api/templates/{id}/install", s.handleInstallTemplate)
 	s.mux.HandleFunc("DELETE /api/templates/{id}", s.handleDeleteTemplate)
 	s.mux.HandleFunc("GET /api/templates/{id}/manifest", s.handleGetManifest)
+	s.mux.HandleFunc("GET /api/templates/{id}/example", s.handleGetExample)
 
 	if staticDir != "" {
 		s.mux.Handle("/", http.FileServer(http.Dir(staticDir)))
