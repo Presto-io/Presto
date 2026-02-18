@@ -58,7 +58,7 @@
       <li>附带 manifest.json 描述模板元数据</li>
       <li>支持任意编程语言（Go、Rust、Python、JavaScript 等）</li>
       <li>
-        <a href="https://github.com/mrered/presto" target="_blank" rel="noopener noreferrer">
+        <a href="https://github.com/Presto-io/template-starter" target="_blank" rel="noopener noreferrer">
           开发文档
           <ExternalLink size={12} />
         </a>
@@ -78,7 +78,7 @@
       </div>
       <div class="about-row">
         <span class="about-label">源码</span>
-        <a href="https://github.com/mrered/presto" target="_blank" rel="noopener noreferrer" class="about-value">
+        <a href="https://github.com/Presto-io/Presto" target="_blank" rel="noopener noreferrer" class="about-value">
           GitHub
           <ExternalLink size={12} />
         </a>
@@ -94,6 +94,7 @@
     <h3>开源协议声明</h3>
     <p class="section-desc">Presto 基于以下开源软件构建，感谢这些项目的贡献者。</p>
     <ul class="license-list">
+      <li><span class="lib-name">Wails</span><span class="lib-license">MIT</span></li>
       <li><span class="lib-name">Typst</span><span class="lib-license">Apache 2.0</span></li>
       <li><span class="lib-name">typst.ts</span><span class="lib-license">Apache 2.0</span></li>
       <li><span class="lib-name">Goldmark</span><span class="lib-license">MIT</span></li>
