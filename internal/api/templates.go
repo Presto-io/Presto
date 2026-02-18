@@ -104,3 +104,24 @@ func (s *Server) handleGetManifest(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(tpl.Manifest)
 }
+
+func (s *Server) handleGetExample(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	tpl, err := s.manager.Get(id)
+	if err != nil {
+		http.Error(w, `{"error":"not found"}`, http.StatusNotFound)
+		return
+	}
+
+	exec := s.manager.Executor(tpl)
+	example, err := exec.GetExample()
+	if err != nil {
+		// Template doesn't support --example, return empty
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"example":""}`))
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"example": example})
+}

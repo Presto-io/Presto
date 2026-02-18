@@ -41,3 +41,16 @@ func (e *Executor) GetManifest() ([]byte, error) {
 	}
 	return stdout.Bytes(), nil
 }
+
+func (e *Executor) GetExample() (string, error) {
+	cmd := exec.Command(e.BinaryPath, "--example")
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("example retrieval failed: %w\nstderr: %s", err, stderr.String())
+	}
+	return stdout.String(), nil
+}
