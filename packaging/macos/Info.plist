@@ -28,6 +28,10 @@
 	<string>6.0</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>zh_CN</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>zh-Hans</string>
+	</array>
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright © 2026 mrered. All rights reserved.</string>
 </dict>
