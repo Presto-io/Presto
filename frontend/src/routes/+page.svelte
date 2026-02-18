@@ -6,6 +6,7 @@
   import { convert, compile, compileSvg, convertAndCompile } from '$lib/api/client';
   import { Download } from 'lucide-svelte';
   import { goto } from '$app/navigation';
+  import { editor } from '$lib/stores/editor.svelte';
 
   // Wails runtime bindings (available when running as desktop app)
   declare global {
@@ -19,16 +20,11 @@
     }
   }
 
-  let markdown = $state('');
-  let typstSource = $state('');
-  let svgPages: string[] = $state([]);
-  let selectedTemplate = $state('');
   let converting = $state(false);
   let errorMsg = $state('');
   let editorScrollRatio = $state(0);
   let previewScrollRatio = $state(0);
   let scrollSource: 'editor' | 'preview' | null = $state(null);
-  let documentDir = $state('');
   let debounceTimer: ReturnType<typeof setTimeout>;
 
   function extractTypstTitle(typ: string): string {
@@ -60,19 +56,19 @@
   }
 
   async function handleConvert(md: string) {
-    if (!selectedTemplate || !md.trim()) return;
+    if (!editor.selectedTemplate || !md.trim()) return;
     errorMsg = '';
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(async () => {
       converting = true;
       try {
-        typstSource = await convert(md, selectedTemplate);
+        editor.typstSource = await convert(md, editor.selectedTemplate);
         // Compile to SVG for preview — use Wails binding when available
         // (Wails WebView strips HTTP headers/query params, so workDir gets lost via fetch)
         if (window.go?.main?.App?.CompileSVG) {
-          svgPages = await window.go.main.App.CompileSVG(typstSource, documentDir);
+          editor.svgPages = await window.go.main.App.CompileSVG(editor.typstSource, editor.documentDir);
         } else {
-          svgPages = await compileSvg(typstSource, documentDir || undefined);
+          editor.svgPages = await compileSvg(editor.typstSource, editor.documentDir || undefined);
         }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -85,18 +81,18 @@
   }
 
   async function handleDownload() {
-    if (!selectedTemplate || !markdown.trim()) return;
+    if (!editor.selectedTemplate || !editor.markdown.trim()) return;
     errorMsg = '';
     try {
       if (window.go?.main?.App?.SavePDF) {
-        await window.go.main.App.SavePDF(markdown, selectedTemplate, documentDir);
+        await window.go.main.App.SavePDF(editor.markdown, editor.selectedTemplate, editor.documentDir);
         return;
       }
-      const blob = await convertAndCompile(markdown, selectedTemplate, documentDir || undefined);
+      const blob = await convertAndCompile(editor.markdown, editor.selectedTemplate, editor.documentDir || undefined);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = extractTypstTitle(typstSource) + '.pdf';
+      a.download = extractTypstTitle(editor.typstSource) + '.pdf';
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
@@ -111,9 +107,9 @@
       if (window.go?.main?.App?.OpenFile) {
         const result = await window.go.main.App.OpenFile();
         if (result) {
-          markdown = result.content;
-          documentDir = result.dir;
-          handleConvert(markdown);
+          editor.markdown = result.content;
+          editor.documentDir = result.dir;
+          handleConvert(editor.markdown);
         }
         return;
       }
@@ -125,11 +121,11 @@
         const file = input.files?.[0];
         if (!file) return;
         // Browser File API doesn't expose directory path
-        documentDir = '';
+        editor.documentDir = '';
         const reader = new FileReader();
         reader.onload = () => {
-          markdown = reader.result as string;
-          handleConvert(markdown);
+          editor.markdown = reader.result as string;
+          handleConvert(editor.markdown);
         };
         reader.readAsText(file);
       };
@@ -161,7 +157,7 @@
 
 <div class="toolbar" style="--wails-draggable:drag">
   <div class="toolbar-left">
-    <TemplateSelector bind:selected={selectedTemplate} />
+    <TemplateSelector bind:selected={editor.selectedTemplate} />
     {#if converting}
       <div class="status-dot"></div>
     {/if}
@@ -179,7 +175,7 @@
 
 <div class="editor-layout">
   <div class="pane">
-    <Editor bind:value={markdown} onchange={handleConvert} scrollRatio={editorScrollRatio} onscroll={(ratio: number) => {
+    <Editor bind:value={editor.markdown} onchange={handleConvert} scrollRatio={editorScrollRatio} onscroll={(ratio: number) => {
       if (scrollSource !== 'preview') {
         scrollSource = 'editor';
         previewScrollRatio = ratio;
@@ -188,7 +184,7 @@
     }} />
   </div>
   <div class="pane">
-    <Preview {svgPages} scrollRatio={previewScrollRatio} onscroll={(ratio: number) => {
+    <Preview svgPages={editor.svgPages} scrollRatio={previewScrollRatio} onscroll={(ratio: number) => {
       if (scrollSource !== 'editor') {
         scrollSource = 'preview';
         editorScrollRatio = ratio;
