@@ -2,9 +2,11 @@ package typst
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -111,25 +113,40 @@ func (c *Compiler) CompileToSVG(typstSource, workDir string) ([]string, error) {
 	}
 
 	// typst compile --format svg outputs {name}-{page}.svg for multi-page
-	outPattern := filepath.Join(dir, ".presto-temp-output-{n}.svg")
+	outPattern := filepath.Join(dir, ".presto-temp-output-{p}.svg")
 	args := []string{"compile", "--format", "svg"}
 	if c.Root != "" {
 		args = append(args, "--root", c.Root)
 	}
 	args = append(args, typFile, outPattern)
 	cmd := exec.Command(c.typstBin(), args...)
+	log.Printf("[compile-svg] running: %s %s", c.typstBin(), strings.Join(args, " "))
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("typst svg compile failed: %w\noutput: %s", err, output)
 	}
+	if len(output) > 0 {
+		log.Printf("[compile-svg] typst output: %s", output)
+	}
 
-	// Collect SVG pages
+	// Collect SVG pages — use glob as primary method for robustness
+	globPattern := filepath.Join(dir, ".presto-temp-output-*.svg")
+	matches, _ := filepath.Glob(globPattern)
+	sort.Strings(matches) // lexicographic sort works for single-digit; re-sort numerically below
+
+	// Sort numerically by extracting page number
+	sort.Slice(matches, func(i, j int) bool {
+		ni, nj := 0, 0
+		fmt.Sscanf(filepath.Base(matches[i]), ".presto-temp-output-%d.svg", &ni)
+		fmt.Sscanf(filepath.Base(matches[j]), ".presto-temp-output-%d.svg", &nj)
+		return ni < nj
+	})
+
 	var pages []string
-	for i := 1; ; i++ {
-		svgFile := filepath.Join(dir, fmt.Sprintf(".presto-temp-output-%d.svg", i))
+	for _, svgFile := range matches {
 		data, err := os.ReadFile(svgFile)
 		if err != nil {
-			break
+			continue
 		}
 		pages = append(pages, string(data))
 		if !cleanDir {
@@ -137,7 +154,7 @@ func (c *Compiler) CompileToSVG(typstSource, workDir string) ([]string, error) {
 		}
 	}
 	if len(pages) == 0 {
-		// Single page: try output.svg
+		// Single page fallback: try without page number
 		svgFile := filepath.Join(dir, ".presto-temp-output.svg")
 		data, err := os.ReadFile(svgFile)
 		if err == nil {
@@ -148,7 +165,15 @@ func (c *Compiler) CompileToSVG(typstSource, workDir string) ([]string, error) {
 		}
 	}
 	if len(pages) == 0 {
-		return nil, fmt.Errorf("no SVG output produced")
+		// List directory for diagnostics
+		entries, _ := os.ReadDir(dir)
+		var names []string
+		for _, e := range entries {
+			if strings.HasSuffix(e.Name(), ".svg") {
+				names = append(names, e.Name())
+			}
+		}
+		return nil, fmt.Errorf("no SVG output produced (dir=%s, svg_files=%v, typst_output=%s)", dir, names, output)
 	}
 	return pages, nil
 }
