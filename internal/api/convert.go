@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -90,7 +91,8 @@ func (s *Server) handleCompileSVG(w http.ResponseWriter, r *http.Request) {
 	pages, err := s.compiler.CompileToSVG(string(body), workDir)
 	if err != nil {
 		log.Printf("[compile-svg] compile failed: %v", err)
-		http.Error(w, `{"error":"compile failed"}`, http.StatusInternalServerError)
+		errMsg := fmt.Sprintf(`{"error":%q}`, err.Error())
+		http.Error(w, errMsg, http.StatusInternalServerError)
 		return
 	}
 
