@@ -283,11 +283,15 @@ jobs:
           cd dist
           sha256sum Presto-* > checksums.txt
 
-      - name: Create Release
+      - name: Upload to Release
         run: |
-          gh release create "${{ github.ref_name }}" \
-            --title "Presto ${{ env.VERSION }}" \
-            --generate-notes \
-            dist/*
+          if gh release view "${{ github.ref_name }}" &>/dev/null; then
+            gh release upload "${{ github.ref_name }}" dist/* --clobber
+          else
+            gh release create "${{ github.ref_name }}" \
+              --title "Presto ${{ env.VERSION }}" \
+              --generate-notes \
+              dist/*
+          fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
