@@ -1,7 +1,7 @@
 {
   "name": "gongwen",
-  "displayName": "中国党政机关公文格式",
-  "description": "符合 GB/T 9704-2012 标准的公文排版，支持标题、作者、日期、签名等元素",
+  "displayName": "类公文模板",
+  "description": "符合 GB/T 9704-2012 标准的类公文排版，支持标题、作者、日期、签名等元素",
   "version": "1.0.0",
   "author": "mrered",
   "license": "MIT",
