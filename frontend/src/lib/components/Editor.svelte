@@ -50,69 +50,6 @@
             '.cm-scroller': { fontFamily: 'var(--font-mono)', lineHeight: '1.6' },
             '.cm-gutters': { background: 'var(--color-bg)', borderRight: '1px solid var(--color-border)' },
             '.cm-activeLineGutter': { background: 'var(--color-surface)' },
-            '.cm-panels': {
-              background: '#24263a',
-              borderBottom: '1px solid rgba(255,255,255,0.08)',
-            },
-            '.cm-panels.cm-panels-top': {
-              zIndex: '10',
-            },
-            '.cm-search': {
-              padding: '6px 12px',
-              display: 'flex',
-              flexWrap: 'wrap',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: '13px',
-              fontFamily: 'var(--font-ui)',
-            },
-            '.cm-search input': {
-              background: '#1a1b26',
-              color: '#c0caf5',
-              border: '1px solid rgba(255,255,255,0.12)',
-              borderRadius: '4px',
-              padding: '4px 8px',
-              fontSize: '13px',
-              fontFamily: 'var(--font-ui)',
-              outline: 'none',
-              minWidth: '180px',
-            },
-            '.cm-search input:focus': {
-              borderColor: '#7aa2f7',
-              boxShadow: '0 0 0 1px #7aa2f7',
-            },
-            '.cm-search button': {
-              background: '#2a2d44',
-              color: '#c0caf5',
-              border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: '4px',
-              padding: '3px 8px',
-              fontSize: '12px',
-              fontFamily: 'var(--font-ui)',
-              cursor: 'pointer',
-            },
-            '.cm-search button:hover': {
-              background: '#363952',
-            },
-            '.cm-search label': {
-              fontSize: '12px',
-              color: '#9aa5ce',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '4px',
-              cursor: 'pointer',
-            },
-            '.cm-search [name=close]': {
-              background: 'transparent',
-              border: 'none',
-              color: '#565f89',
-              fontSize: '16px',
-              padding: '2px 6px',
-              cursor: 'pointer',
-            },
-            '.cm-search [name=close]:hover': {
-              color: '#c0caf5',
-            },
             '.cm-placeholder': {
               color: '#565f89',
               fontStyle: 'italic',
@@ -184,5 +121,203 @@
   }
   .editor-container :global(.cm-focused) {
     outline: none;
+  }
+
+  /* ── Search Panel: VSCode-style ────────────────────────── */
+
+  .editor-container :global(.cm-panels) {
+    background: #252630;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  .editor-container :global(.cm-panels.cm-panels-top) {
+    z-index: 10;
+  }
+
+  /* Panel layout */
+  .editor-container :global(.cm-search) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 30px 6px 8px;
+    font-size: 13px;
+    font-family: var(--font-ui);
+    position: relative;
+  }
+
+  /* <br> as flex row break */
+  .editor-container :global(.cm-search br) {
+    flex-basis: 100%;
+    height: 0;
+    margin: 1px 0;
+    border: none;
+  }
+
+  /* Reorder: input → toggles → nav buttons (like VSCode) */
+  .editor-container :global(.cm-search input[name=search]) { order: 0; }
+  .editor-container :global(.cm-search label:has(input[name=case])) { order: 1; }
+  .editor-container :global(.cm-search label:has(input[name=re])) { order: 2; }
+  .editor-container :global(.cm-search label:has(input[name=word])) { order: 3; }
+  .editor-container :global(.cm-search button[name=prev]) { order: 4; margin-left: 4px; }
+  .editor-container :global(.cm-search button[name=next]) { order: 5; }
+  .editor-container :global(.cm-search button[name=select]) { order: 6; display: none; }
+  .editor-container :global(.cm-search br) { order: 7; }
+  .editor-container :global(.cm-search input[name=replace]) { order: 8; }
+  .editor-container :global(.cm-search button[name=replace]) { order: 9; }
+  .editor-container :global(.cm-search button[name=replaceAll]) { order: 10; }
+
+  /* Text inputs */
+  .editor-container :global(.cm-search .cm-textfield) {
+    flex: 1 1 180px;
+    background: #1a1b26;
+    color: #c0caf5;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    padding: 3px 8px;
+    font-size: 13px;
+    font-family: var(--font-mono);
+    outline: none;
+    height: 26px;
+    box-sizing: border-box;
+    margin: 0;
+  }
+  .editor-container :global(.cm-search .cm-textfield:focus) {
+    border-color: #7aa2f7;
+  }
+
+  /* ── Icon Buttons ──────────────────────────────────────── */
+
+  .editor-container :global(.cm-search .cm-button) {
+    background: transparent;
+    color: #787c99;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    padding: 0;
+    font-size: 0;
+    cursor: pointer;
+    width: 24px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin: 0;
+    transition: background 0.1s, color 0.1s;
+  }
+  .editor-container :global(.cm-search .cm-button:hover) {
+    background: rgba(255, 255, 255, 0.08);
+    color: #c0caf5;
+  }
+
+  /* Button icons via ::after */
+  .editor-container :global(.cm-search button[name=prev]::after) {
+    content: '↑';
+    font-size: 16px;
+  }
+  .editor-container :global(.cm-search button[name=next]::after) {
+    content: '↓';
+    font-size: 16px;
+  }
+  .editor-container :global(.cm-search button[name=replace]::after) {
+    content: '↦';
+    font-size: 16px;
+  }
+  .editor-container :global(.cm-search button[name=replaceAll]::after) {
+    content: '⇉';
+    font-size: 16px;
+  }
+
+  /* ── Toggle Labels (Aa, .*, ab) ────────────────────────── */
+
+  .editor-container :global(.cm-search label) {
+    font-size: 0;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 24px;
+    border-radius: 3px;
+    border: 1px solid transparent;
+    margin: 0;
+    flex-shrink: 0;
+    color: #787c99;
+    transition: background 0.1s, color 0.1s, border-color 0.1s;
+  }
+  .editor-container :global(.cm-search label:hover) {
+    background: rgba(255, 255, 255, 0.08);
+    color: #c0caf5;
+  }
+
+  /* Hide checkbox inputs */
+  .editor-container :global(.cm-search input[type=checkbox]) {
+    display: none;
+  }
+
+  /* Toggle icons */
+  .editor-container :global(.cm-search label:has(input[name=case])::after) {
+    content: 'Aa';
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .editor-container :global(.cm-search label:has(input[name=re])::after) {
+    content: '.*';
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .editor-container :global(.cm-search label:has(input[name=word])::after) {
+    content: 'ab';
+    font-size: 12px;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  /* Active toggle state */
+  .editor-container :global(.cm-search label:has(input[type=checkbox]:checked)) {
+    background: rgba(122, 162, 247, 0.15);
+    border-color: rgba(122, 162, 247, 0.4);
+    color: #7aa2f7;
+  }
+
+  /* ── Close Button ──────────────────────────────────────── */
+
+  .editor-container :global(.cm-search [name=close]) {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    background: transparent;
+    border: none;
+    color: #565f89;
+    font-size: 0;
+    padding: 0;
+    cursor: pointer;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 3px;
+    transition: background 0.1s, color 0.1s;
+  }
+  .editor-container :global(.cm-search [name=close]:hover) {
+    color: #c0caf5;
+    background: rgba(255, 255, 255, 0.08);
+  }
+  .editor-container :global(.cm-search [name=close]::after) {
+    content: '×';
+    font-size: 16px;
+  }
+
+  /* ── Search Match Highlights ───────────────────────────── */
+
+  .editor-container :global(.cm-searchMatch) {
+    background-color: rgba(255, 200, 50, 0.25);
+    outline: 1px solid rgba(255, 200, 50, 0.5);
+    border-radius: 2px;
+  }
+  .editor-container :global(.cm-searchMatch-selected) {
+    background-color: rgba(255, 150, 50, 0.4);
+    outline: 1px solid rgba(255, 150, 50, 0.7);
   }
 </style>
