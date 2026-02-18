@@ -26,6 +26,9 @@ var templateHead string
 //go:embed manifest.json
 var manifestJSON string
 
+//go:embed example.md
+var exampleMD string
+
 // ---------- YAML front-matter ----------
 
 type frontMatter struct {
@@ -925,11 +928,17 @@ func convert(fm frontMatter, body string) string {
 
 func main() {
 	manifestFlag := flag.Bool("manifest", false, "output manifest JSON")
+	exampleFlag := flag.Bool("example", false, "output example markdown")
 	outputFile := flag.String("o", "", "output .typ file (default: stdout)")
 	flag.Parse()
 
 	if *manifestFlag {
 		fmt.Print(manifestJSON)
+		return
+	}
+
+	if *exampleFlag {
+		fmt.Print(exampleMD)
 		return
 	}
 

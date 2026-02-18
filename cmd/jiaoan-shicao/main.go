@@ -27,12 +27,16 @@ import (
 //go:embed manifest.json
 var manifestJSON string
 
+//go:embed example.md
+var exampleMD string
+
 var (
 	isTemplate   bool
 	isPdf        bool
 	verbose      bool
 	help         bool
 	manifestFlag bool
+	exampleFlag  bool
 )
 
 const preamble = `// 中文字号转换函数
@@ -115,6 +119,7 @@ func init() {
 	flag.BoolVar(&verbose, "v", false, "显示详细输出信息")
 	flag.BoolVar(&help, "h", false, "显示帮助信息")
 	flag.BoolVar(&manifestFlag, "manifest", false, "output manifest JSON")
+	flag.BoolVar(&exampleFlag, "example", false, "output example markdown")
 }
 
 func printHelp() {
@@ -130,6 +135,11 @@ func main() {
 
 	if manifestFlag {
 		fmt.Print(manifestJSON)
+		return
+	}
+
+	if exampleFlag {
+		fmt.Print(exampleMD)
 		return
 	}
 
