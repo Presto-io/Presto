@@ -1,0 +1,288 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  GO_VERSION: '1.25'
+  NODE_VERSION: '22'
+  TYPST_VERSION: '0.14.2'
+
+jobs:
+  # ── macOS: arm64 + amd64 ─────────────────────────────────
+  build-macos:
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goarch: arm64
+            make_target: dist-dmg-arm64
+          - goarch: amd64
+            make_target: dist-dmg-amd64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: cd frontend && npm ci
+
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Extract version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Build DMG
+        run: make ${{ matrix.make_target }} VERSION=${{ env.VERSION }}
+
+      - name: Rename with arch suffix
+        run: mv "dist/Presto-${{ env.VERSION }}-macOS.dmg" "dist/Presto-${{ env.VERSION }}-macOS-${{ matrix.goarch }}.dmg"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-macos-${{ matrix.goarch }}
+          path: dist/Presto-${{ env.VERSION }}-macOS-${{ matrix.goarch }}.dmg
+
+  # ── Windows: amd64 + arm64 ─────────────────────────────────
+  build-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goarch: amd64
+            cc: gcc
+            typst_archive: typst-x86_64-pc-windows-msvc.zip
+          - goarch: arm64
+            cc: aarch64-w64-mingw32-gcc
+            typst_archive: typst-aarch64-pc-windows-msvc.zip
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: cd frontend && npm ci
+
+      - name: Add MSYS2 MinGW to PATH
+        run: echo "C:/msys64/mingw64/bin" >> "$GITHUB_PATH"
+
+      - name: Setup llvm-mingw for arm64 cross-compilation
+        if: matrix.goarch == 'arm64'
+        run: |
+          curl -sL "https://github.com/mstorsjo/llvm-mingw/releases/download/20250114/llvm-mingw-20250114-ucrt-x86_64.zip" -o llvm-mingw.zip
+          unzip -q llvm-mingw.zip
+          echo "$PWD/llvm-mingw-20250114-ucrt-x86_64/bin" >> "$GITHUB_PATH"
+
+      - name: Extract version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Build frontend and embed
+        run: |
+          cd frontend && npm run build && cd ..
+          cp -r frontend/build/* cmd/presto-desktop/build/
+
+      - name: Build Windows binary
+        env:
+          CGO_ENABLED: '1'
+          CC: ${{ matrix.cc }}
+          GOOS: windows
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          go build \
+            -tags "desktop,production" \
+            -ldflags "-s -w -X main.version=${{ env.VERSION }} -H windowsgui" \
+            -o "dist/Presto.exe" \
+            ./cmd/presto-desktop/
+
+      - name: Download typst
+        run: |
+          curl -sL "https://github.com/typst/typst/releases/download/v${{ env.TYPST_VERSION }}/${{ matrix.typst_archive }}" -o typst.zip
+          unzip -qo typst.zip -d typst-tmp
+          find typst-tmp -name 'typst.exe' | head -1 | xargs -I{} cp {} dist/typst.exe
+
+      - name: Package
+        run: |
+          cd dist
+          7z a "Presto-${{ env.VERSION }}-windows-${{ matrix.goarch }}.zip" Presto.exe typst.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-windows-${{ matrix.goarch }}
+          path: dist/Presto-${{ env.VERSION }}-windows-${{ matrix.goarch }}.zip
+
+  # ── Linux: amd64 + arm64 ───────────────────────────────────
+  build-linux:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goarch: amd64
+            cc: gcc
+            typst_archive: typst-x86_64-unknown-linux-musl.tar.xz
+            pkg_config_path: ''
+          - goarch: arm64
+            cc: aarch64-linux-gnu-gcc
+            typst_archive: typst-aarch64-unknown-linux-musl.tar.xz
+            pkg_config_path: /usr/lib/aarch64-linux-gnu/pkgconfig
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: cd frontend && npm ci
+
+      - name: Install native dependencies
+        if: matrix.goarch == 'amd64'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libgtk-3-dev libwebkit2gtk-4.0-dev pkg-config
+
+      - name: Setup arm64 cross-compilation
+        if: matrix.goarch == 'arm64'
+        run: |
+          sudo dpkg --add-architecture arm64
+          sudo sed -i 's/^deb http/deb [arch=amd64] http/' /etc/apt/sources.list
+          cat <<'EOF' | sudo tee /etc/apt/sources.list.d/arm64.list
+          deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy main restricted universe multiverse
+          deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-updates main restricted universe multiverse
+          deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted universe multiverse
+          EOF
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gcc-aarch64-linux-gnu pkg-config \
+            libgtk-3-dev:arm64 libwebkit2gtk-4.0-dev:arm64
+
+      - name: Extract version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Build frontend and embed
+        run: make _frontend-embed
+
+      - name: Build Linux binary
+        env:
+          CGO_ENABLED: '1'
+          CC: ${{ matrix.cc }}
+          GOOS: linux
+          GOARCH: ${{ matrix.goarch }}
+          PKG_CONFIG_LIBDIR: ${{ matrix.pkg_config_path }}
+        run: |
+          go build \
+            -tags "desktop,production" \
+            -ldflags "-s -w -X main.version=${{ env.VERSION }}" \
+            -o "dist/Presto" \
+            ./cmd/presto-desktop/
+
+      - name: Download typst
+        run: make _download-typst TYPST_ARCHIVE=${{ matrix.typst_archive }} TYPST_OUT=dist/typst
+
+      - name: Package
+        run: |
+          cd dist
+          tar czf "Presto-${{ env.VERSION }}-linux-${{ matrix.goarch }}.tar.gz" Presto typst
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-linux-${{ matrix.goarch }}
+          path: dist/Presto-${{ env.VERSION }}-linux-${{ matrix.goarch }}.tar.gz
+
+  # ── Docker: multi-arch server image ─────────────────────────
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/presto
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── GitHub Release ──────────────────────────────────────────
+  release:
+    needs: [build-macos, build-windows, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist/
+          merge-multiple: true
+
+      - name: Extract version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum Presto-* > checksums.txt
+
+      - name: Create Release
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --title "Presto ${{ env.VERSION }}" \
+            --generate-notes \
+            dist/*
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
