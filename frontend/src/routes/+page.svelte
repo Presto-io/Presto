@@ -13,6 +13,7 @@
       go?: { main: { App: {
         SavePDF: (markdown: string, templateId: string, workDir: string) => Promise<void>;
         OpenFile: () => Promise<{ content: string; dir: string } | null>;
+        CompileSVG: (typstSource: string, workDir: string) => Promise<string[]>;
       } } };
       runtime?: { EventsOn: (event: string, cb: (...args: any[]) => void) => void };
     }
@@ -66,8 +67,13 @@
       converting = true;
       try {
         typstSource = await convert(md, selectedTemplate);
-        // Compile to SVG for preview
-        svgPages = await compileSvg(typstSource, documentDir || undefined);
+        // Compile to SVG for preview — use Wails binding when available
+        // (Wails WebView strips HTTP headers/query params, so workDir gets lost via fetch)
+        if (window.go?.main?.App?.CompileSVG) {
+          svgPages = await window.go.main.App.CompileSVG(typstSource, documentDir);
+        } else {
+          svgPages = await compileSvg(typstSource, documentDir || undefined);
+        }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         console.error('Convert failed:', msg);
