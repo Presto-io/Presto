@@ -149,11 +149,9 @@ jobs:
           - goarch: amd64
             cc: gcc
             typst_archive: typst-x86_64-unknown-linux-musl.tar.xz
-            pkg_config_path: ''
           - goarch: arm64
             cc: aarch64-linux-gnu-gcc
             typst_archive: typst-aarch64-unknown-linux-musl.tar.xz
-            pkg_config_path: /usr/lib/aarch64-linux-gnu/pkgconfig
     steps:
       - uses: actions/checkout@v4
 
@@ -170,7 +168,7 @@ jobs:
       - name: Install frontend dependencies
         run: cd frontend && npm ci
 
-      - name: Install native dependencies
+      - name: Install native dependencies (amd64)
         if: matrix.goarch == 'amd64'
         run: |
           sudo apt-get update -qq
@@ -181,11 +179,12 @@ jobs:
         run: |
           sudo dpkg --add-architecture arm64
           sudo sed -i 's/^deb http/deb [arch=amd64] http/' /etc/apt/sources.list
-          cat <<'EOF' | sudo tee /etc/apt/sources.list.d/arm64.list
+          sudo tee /etc/apt/sources.list.d/arm64.list <<'EOF'
           deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy main restricted universe multiverse
           deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-updates main restricted universe multiverse
           deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted universe multiverse
           EOF
+          sudo sed -i 's/^          //' /etc/apt/sources.list.d/arm64.list
           sudo apt-get update -qq
           sudo apt-get install -y -qq gcc-aarch64-linux-gnu pkg-config \
             libgtk-3-dev:arm64 libwebkit2gtk-4.0-dev:arm64
@@ -197,13 +196,14 @@ jobs:
         run: make _frontend-embed
 
       - name: Build Linux binary
-        env:
-          CGO_ENABLED: '1'
-          CC: ${{ matrix.cc }}
-          GOOS: linux
-          GOARCH: ${{ matrix.goarch }}
-          PKG_CONFIG_LIBDIR: ${{ matrix.pkg_config_path }}
         run: |
+          export CGO_ENABLED=1
+          export CC=${{ matrix.cc }}
+          export GOOS=linux
+          export GOARCH=${{ matrix.goarch }}
+          if [ "${{ matrix.goarch }}" = "arm64" ]; then
+            export PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig
+          fi
           go build \
             -tags "desktop,production" \
             -ldflags "-s -w -X main.version=${{ env.VERSION }}" \
