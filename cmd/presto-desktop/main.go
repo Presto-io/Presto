@@ -348,7 +348,10 @@ func main() {
 	compiler.BinPath = typstBin
 
 	// Reuse existing API server as HTTP handler for /api/* routes
-	apiHandler := api.NewServer(templatesDir, "", typstBin)
+	apiHandler := api.NewServer(api.ServerOptions{
+		TemplatesDir: templatesDir,
+		TypstBin:     typstBin,
+	})
 
 	// Strip "build" prefix from embedded FS so files are at root
 	frontendFS, _ := fs.Sub(assets, "build")
