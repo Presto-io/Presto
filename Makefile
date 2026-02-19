@@ -60,13 +60,20 @@ _frontend-embed: frontend
 	cp -r frontend/build/* $(DESKTOP_EMBED)/
 
 # Download typst binary for a given platform
-# Usage: $(MAKE) _download-typst TYPST_ARCHIVE=<name> TYPST_OUT=<path>
+# Usage: $(MAKE) _download-typst TYPST_ARCHIVE=<name> TYPST_OUT=<path> [TYPST_SHA256=<hash>]
+# SEC-22: Set TYPST_SHA256 to verify integrity of downloaded binary
 _download-typst:
 	@mkdir -p $(dir $(TYPST_OUT))
 	@if [ ! -f "$(TYPST_OUT)" ]; then \
 		echo "==> Downloading typst $(TYPST_VERSION) ($(TYPST_ARCHIVE))..."; \
 		TMP=$$(mktemp -d); \
 		curl -sL "$(TYPST_BASE)/$(TYPST_ARCHIVE)" -o "$$TMP/archive"; \
+		if [ -n "$(TYPST_SHA256)" ]; then \
+			echo "$(TYPST_SHA256)  $$TMP/archive" | shasum -a 256 -c - || \
+			{ echo "ERROR: typst checksum verification failed!"; rm -rf "$$TMP"; exit 1; }; \
+		else \
+			echo "WARNING: No SHA256 provided. Set TYPST_SHA256 to verify integrity."; \
+		fi; \
 		if echo "$(TYPST_ARCHIVE)" | grep -q '\.zip$$'; then \
 			unzip -qo "$$TMP/archive" -d "$$TMP/out"; \
 		else \
