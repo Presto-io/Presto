@@ -33,6 +33,7 @@ export interface BatchFile {
   file: File;
   templateId: string;
   autoDetected: boolean;
+  workDir?: string;
 }
 
 export interface BatchResult {
@@ -46,4 +47,5 @@ export interface BatchResult {
 export interface BatchImportResult {
   templates: { name: string; displayName: string; status: string }[];
   markdownFiles: { name: string; content: string; detectedTemplate?: string }[];
+  workDir?: string;
 }

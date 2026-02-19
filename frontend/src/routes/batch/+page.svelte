@@ -176,6 +176,7 @@
           file,
           templateId,
           autoDetected,
+          workDir: result.workDir,
         });
       }
       batchFiles = [...batchFiles, ...additions];
@@ -303,7 +304,7 @@
         const bf = queue.shift()!;
         try {
           const text = await bf.file.text();
-          const blob = await convertAndCompile(text, bf.templateId);
+          const blob = await convertAndCompile(text, bf.templateId, bf.workDir);
           results = [...results, {
             fileId: bf.id,
             fileName: bf.file.name.replace(/\.\w+$/, '.pdf'),
