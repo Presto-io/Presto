@@ -93,6 +93,10 @@ func buildMenu(app *App) *menu.Menu {
 	fileMenu.AddText("设置…", keys.CmdOrCtrl(","), func(_ *menu.CallbackData) {
 		wailsRuntime.EventsEmit(app.ctx, "menu:settings")
 	})
+	fileMenu.AddSeparator()
+	fileMenu.AddText("模板管理…", keys.Combo("t", keys.CmdOrCtrlKey, keys.ShiftKey), func(_ *menu.CallbackData) {
+		wailsRuntime.EventsEmit(app.ctx, "menu:templates")
+	})
 
 	editMenu := appMenu.AddSubmenu("编辑")
 	editMenu.AddText("撤销", keys.CmdOrCtrl("z"), func(_ *menu.CallbackData) {

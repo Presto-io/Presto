@@ -1,19 +1,41 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
   import { listTemplates, discoverTemplates, installTemplate, deleteTemplate } from '$lib/api/client';
   import type { Template, GitHubRepo } from '$lib/api/types';
-  import { Package, Download, Trash2, ExternalLink, Loader } from 'lucide-svelte';
+  import { ArrowLeft, Search, Package, Download, Trash2, Loader, ExternalLink } from 'lucide-svelte';
 
   let installed: Template[] = $state([]);
   let available: GitHubRepo[] = $state([]);
   let loading = $state(true);
   let installing = $state('');
+  let activeTab: 'installed' | 'browse' = $state('installed');
+  let searchQuery = $state('');
+  let communityEnabled = $state(false);
+  let browseLoaded = $state(false);
+
+  let filteredInstalled = $derived(
+    installed.filter(tpl => {
+      const q = searchQuery.toLowerCase();
+      return !q ||
+        (tpl.displayName || tpl.name).toLowerCase().includes(q) ||
+        tpl.description.toLowerCase().includes(q);
+    })
+  );
+
+  let filteredAvailable = $derived(
+    available.filter(repo => {
+      const q = searchQuery.toLowerCase();
+      return !q ||
+        repo.name.toLowerCase().includes(q) ||
+        (repo.description || '').toLowerCase().includes(q);
+    })
+  );
 
   onMount(async () => {
+    communityEnabled = localStorage.getItem('communityTemplates') === 'true';
     try {
-      const [inst, avail] = await Promise.all([listTemplates(), discoverTemplates()]);
-      installed = inst ?? [];
-      available = avail ?? [];
+      installed = (await listTemplates()) ?? [];
     } catch {
       // silently handle
     } finally {
@@ -21,11 +43,31 @@
     }
   });
 
+  async function loadBrowse() {
+    if (browseLoaded || !communityEnabled) return;
+    loading = true;
+    try {
+      available = (await discoverTemplates()) ?? [];
+      browseLoaded = true;
+    } catch {
+      // silently handle
+    } finally {
+      loading = false;
+    }
+  }
+
+  function switchTab(tab: 'installed' | 'browse') {
+    activeTab = tab;
+    searchQuery = '';
+    if (tab === 'browse') loadBrowse();
+  }
+
   async function handleInstall(repo: GitHubRepo) {
     installing = repo.full_name;
     try {
       await installTemplate(repo.owner.login, repo.name);
       installed = await listTemplates();
+      browseLoaded = false;
     } finally {
       installing = '';
     }
@@ -39,67 +81,119 @@
 </script>
 
 <div class="page">
-  <section>
-    <h2>已安装模板</h2>
-    {#if installed.length === 0}
-      <div class="empty">
-        <Package size={32} />
-        <p>暂无已安装模板</p>
-      </div>
-    {:else}
-      <div class="grid">
-        {#each installed as tpl (tpl.name)}
-          <div class="card">
-            <div class="card-header">
-              <h3>{tpl.displayName || tpl.name}</h3>
-              <span class="version">v{tpl.version}</span>
-            </div>
-            <p class="description">{tpl.description}</p>
-            <div class="card-footer">
-              <span class="author">{tpl.author}</span>
-              <button class="btn-danger" onclick={() => handleDelete(tpl.name)} aria-label="卸载 {tpl.name}">
+  <div class="page-header">
+    <button class="btn-back" onclick={() => goto('/')} aria-label="返回编辑器">
+      <ArrowLeft size={16} />
+    </button>
+    <h2>模板管理</h2>
+  </div>
+
+  <div class="tab-bar">
+    <button
+      class="tab"
+      class:active={activeTab === 'installed'}
+      onclick={() => switchTab('installed')}
+    >
+      已安装
+      {#if installed.length > 0}
+        <span class="tab-badge">{installed.length}</span>
+      {/if}
+    </button>
+    {#if communityEnabled}
+      <button
+        class="tab"
+        class:active={activeTab === 'browse'}
+        onclick={() => switchTab('browse')}
+      >
+        浏览
+      </button>
+    {/if}
+  </div>
+
+  <div class="search-bar">
+    <Search size={14} />
+    <input
+      type="text"
+      placeholder={activeTab === 'installed' ? '搜索已安装模板…' : '搜索社区模板…'}
+      bind:value={searchQuery}
+    />
+  </div>
+
+  <div class="tab-content">
+    {#if activeTab === 'installed'}
+      {#if loading}
+        <div class="empty">
+          <Loader size={24} class="spin" />
+          <p>加载中...</p>
+        </div>
+      {:else if filteredInstalled.length === 0}
+        <div class="empty">
+          <Package size={32} />
+          <p>{searchQuery ? '没有匹配的模板' : '暂无已安装模板'}</p>
+        </div>
+      {:else}
+        <div class="template-list">
+          {#each filteredInstalled as tpl (tpl.name)}
+            <div class="template-row">
+              <div class="template-info">
+                <div class="template-name-row">
+                  <span class="template-name">{tpl.displayName || tpl.name}</span>
+                  <span class="version">v{tpl.version}</span>
+                </div>
+                <p class="template-desc">{tpl.description}</p>
+                <span class="template-author">{tpl.author}</span>
+              </div>
+              <button
+                class="btn-uninstall"
+                onclick={() => handleDelete(tpl.name)}
+                aria-label="卸载 {tpl.name}"
+              >
                 <Trash2 size={14} />
                 <span>卸载</span>
               </button>
             </div>
-          </div>
-        {/each}
-      </div>
-    {/if}
-  </section>
+          {/each}
+        </div>
+      {/if}
 
-  <section>
-    <h2>发现更多模板</h2>
-    {#if loading}
-      <div class="empty">
-        <Loader size={24} />
-        <p>加载中...</p>
-      </div>
-    {:else if available.length === 0}
-      <div class="empty">
-        <Package size={32} />
-        <p>暂无可用模板</p>
-      </div>
-    {:else}
-      <div class="grid">
-        {#each available as repo (repo.full_name)}
-          <div class="card">
-            <div class="card-header">
-              <h3>{repo.name}</h3>
-            </div>
-            <p class="description">{repo.description}</p>
-            <div class="card-footer">
-              <a href={repo.html_url} target="_blank" rel="noopener noreferrer" class="repo-link">
-                <ExternalLink size={12} />
-                <span>{repo.full_name}</span>
-              </a>
+    {:else if activeTab === 'browse'}
+      {#if loading}
+        <div class="empty">
+          <Loader size={24} class="spin" />
+          <p>加载中...</p>
+        </div>
+      {:else if filteredAvailable.length === 0}
+        <div class="empty">
+          <Package size={32} />
+          <p>{searchQuery ? '没有匹配的模板' : '暂无可用模板'}</p>
+        </div>
+      {:else}
+        <div class="template-list">
+          {#each filteredAvailable as repo (repo.full_name)}
+            <div class="template-row">
+              <div class="template-info">
+                <div class="template-name-row">
+                  <span class="template-name">{repo.name}</span>
+                  <a
+                    href={repo.html_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="repo-link"
+                    aria-label="在 GitHub 上查看"
+                  >
+                    <ExternalLink size={12} />
+                  </a>
+                </div>
+                <p class="template-desc">{repo.description}</p>
+                <span class="template-author">{repo.owner.login}</span>
+              </div>
               <button
-                class="btn-primary"
+                class="btn-install"
                 onclick={() => handleInstall(repo)}
                 disabled={installing === repo.full_name}
               >
                 {#if installing === repo.full_name}
-                  <Loader size={14} />
+                  <Loader size={14} class="spin" />
                   <span>安装中...</span>
                 {:else}
                   <Download size={14} />
@@ -107,26 +201,98 @@
                 {/if}
               </button>
             </div>
-          </div>
-        {/each}
-      </div>
+          {/each}
+        </div>
+      {/if}
     {/if}
-  </section>
+  </div>
 </div>
 
 <style>
   .page {
     padding: var(--space-xl);
-    max-width: 1000px;
+    padding-top: 48px;
+    max-width: 700px;
     margin: 0 auto;
     overflow-y: auto;
     height: 100%;
   }
-  section { margin-bottom: var(--space-2xl); }
-  h2 {
-    margin: 0 0 var(--space-lg);
-    font-size: 1.25rem;
+  .page-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    margin-bottom: var(--space-lg);
   }
+  h2 {
+    margin: 0;
+    font-size: 1.125rem;
+    font-family: var(--font-ui);
+    color: var(--color-text-bright);
+  }
+  .btn-back {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    color: var(--color-text);
+    cursor: pointer;
+    transition: background var(--transition);
+  }
+  .btn-back:hover { background: var(--color-surface-hover); }
+  .tab-bar {
+    display: flex;
+    gap: var(--space-xs);
+    margin-bottom: var(--space-md);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .tab {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-sm) var(--space-md);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--color-muted);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition);
+  }
+  .tab:hover { color: var(--color-text); }
+  .tab.active { color: var(--color-accent); border-bottom-color: var(--color-accent); }
+  .tab-badge {
+    font-size: 0.6875rem;
+    background: var(--color-surface-hover);
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-weight: 600;
+  }
+  .search-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-lg);
+    color: var(--color-muted);
+  }
+  .search-bar input {
+    flex: 1;
+    background: none;
+    border: none;
+    color: var(--color-text);
+    font-size: 0.8125rem;
+    font-family: var(--font-ui);
+    outline: none;
+  }
+  .search-bar input::placeholder { color: var(--color-muted); }
   .empty {
     display: flex;
     flex-direction: column;
@@ -136,62 +302,49 @@
     color: var(--color-muted);
   }
   .empty p { margin: 0; }
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: var(--space-md);
-  }
-  .card {
-    background: var(--color-surface);
-    padding: var(--space-lg);
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--color-border);
-    transition: border-color var(--transition);
+  .template-list {
     display: flex;
     flex-direction: column;
+    gap: var(--space-sm);
   }
-  .card:hover { border-color: var(--color-secondary); }
-  .card-header {
+  .template-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-md);
+    padding: var(--space-md) var(--space-lg);
+    background: var(--color-surface);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+    transition: border-color var(--transition);
+  }
+  .template-row:hover { border-color: var(--color-surface-hover); }
+  .template-info { flex: 1; min-width: 0; }
+  .template-name-row {
     display: flex;
     align-items: baseline;
     gap: var(--space-sm);
-    margin-bottom: var(--space-sm);
+    margin-bottom: 2px;
   }
-  .card-header h3 {
-    margin: 0;
-    font-size: 1rem;
-  }
-  .version {
-    font-size: 0.75rem;
-    color: var(--color-muted);
-    font-family: var(--font-mono);
-  }
-  .description {
-    color: var(--color-muted);
+  .template-name { font-size: 0.875rem; font-weight: 500; color: var(--color-text-bright); }
+  .version { font-size: 0.75rem; color: var(--color-muted); font-family: var(--font-mono); }
+  .template-desc {
+    margin: 0 0 2px;
     font-size: 0.8125rem;
-    margin: 0 0 var(--space-md);
-    flex: 1;
-    line-height: 1.5;
-  }
-  .card-footer {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .author {
-    font-size: 0.75rem;
     color: var(--color-muted);
+    line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
+  .template-author { font-size: 0.75rem; color: var(--color-muted); }
   .repo-link {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-xs);
-    font-size: 0.75rem;
     color: var(--color-muted);
+    text-decoration: none;
     transition: color var(--transition);
   }
-  .repo-link:hover { color: var(--color-cta); }
-  .btn-primary, .btn-danger {
+  .repo-link:hover { color: var(--color-accent); }
+  .btn-uninstall, .btn-install {
     display: inline-flex;
     align-items: center;
     gap: var(--space-xs);
@@ -201,21 +354,30 @@
     font-weight: 500;
     cursor: pointer;
     transition: all var(--transition);
-    border: none;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
-  .btn-primary {
-    background: var(--color-cta);
-    color: white;
-  }
-  .btn-primary:hover:not(:disabled) { opacity: 0.9; }
-  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-  .btn-danger {
+  .btn-uninstall {
     background: transparent;
     color: var(--color-danger);
     border: 1px solid var(--color-danger);
   }
-  .btn-danger:hover {
+  .btn-uninstall:hover {
     background: var(--color-danger);
     color: white;
+  }
+  .btn-install {
+    background: var(--color-accent);
+    color: var(--color-bg);
+    border: none;
+  }
+  .btn-install:hover:not(:disabled) { opacity: 0.9; }
+  .btn-install:disabled { opacity: 0.5; cursor: not-allowed; }
+  :global(.spin) {
+    animation: spin 1s linear infinite;
+  }
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
   }
 </style>
