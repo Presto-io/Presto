@@ -214,7 +214,7 @@
       window.runtime.EventsOn('menu:open', handleOpen);
       window.runtime.EventsOn('menu:export', handleDownload);
       window.runtime.EventsOn('menu:settings', () => goto('/settings'));
-      window.runtime.EventsOn('menu:templates', () => goto('/templates'));
+      window.runtime.EventsOn('menu:templates', () => goto('/settings'));
     }
     // Keyboard shortcut for web: Cmd+, opens settings
     function handleKeydown(e: KeyboardEvent) {
@@ -224,7 +224,7 @@
       }
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 't' || e.key === 'T')) {
         e.preventDefault();
-        goto('/templates');
+        goto('/settings');
       }
     }
     document.addEventListener('keydown', handleKeydown);
