@@ -1,10 +1,25 @@
 <script lang="ts">
-  import TemplateSelector from '$lib/components/TemplateSelector.svelte';
-  import { convertAndCompile } from '$lib/api/client';
-  import { ArrowLeft, Upload, FileText, Download, X, Loader, CheckCircle, AlertCircle } from 'lucide-svelte';
+  import { onMount } from 'svelte';
+  import { listTemplates, convertAndCompile } from '$lib/api/client';
+  import { createZip } from '$lib/utils/zip';
+  import type { Template } from '$lib/api/types';
+  import { ArrowLeft, Upload, FileText, Download, X, Loader, CheckCircle, AlertCircle, Search, Package } from 'lucide-svelte';
   import { goto } from '$app/navigation';
 
+  let templates: Template[] = $state([]);
   let selectedTemplate = $state('');
+  let tplSearch = $state('');
+  let tplLoading = $state(true);
+
+  let filteredTemplates = $derived(
+    templates.filter(tpl => {
+      const q = tplSearch.toLowerCase();
+      return !q ||
+        (tpl.displayName || tpl.name).toLowerCase().includes(q) ||
+        tpl.description.toLowerCase().includes(q);
+    })
+  );
+
   let files: File[] = $state([]);
   let results: { name: string; blob?: Blob; error?: string }[] = $state([]);
   let processing = $state(false);
@@ -13,6 +28,17 @@
 
   let successCount = $derived(results.filter(r => r.blob).length);
   let errorCount = $derived(results.filter(r => r.error).length);
+  let progress = $derived(results.length);
+
+  onMount(async () => {
+    try {
+      templates = (await listTemplates()) ?? [];
+      if (templates.length > 0) {
+        selectedTemplate = templates[0].name;
+      }
+    } catch {}
+    finally { tplLoading = false; }
+  });
 
   function handleDrop(e: DragEvent) {
     e.preventDefault();
@@ -49,26 +75,40 @@
         const blob = await convertAndCompile(text, selectedTemplate);
         results = [...results, { name: file.name.replace(/\.\w+$/, '.pdf'), blob }];
       } catch (e) {
-        results = [...results, { name: file.name, error: String(e) }];
+        results = [...results, { name: file.name, error: e instanceof Error ? e.message : String(e) }];
       }
     }
     processing = false;
   }
 
+  function triggerDownload(url: string, filename: string) {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
   function downloadOne(r: { name: string; blob?: Blob }) {
     if (!r.blob) return;
     const url = URL.createObjectURL(r.blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = r.name;
-    a.click();
-    URL.revokeObjectURL(url);
+    triggerDownload(url, r.name);
   }
 
-  function downloadAll() {
-    for (const r of results) {
-      if (r.blob) downloadOne(r);
+  async function downloadAllAsZip() {
+    const successful = results.filter(r => r.blob);
+    if (successful.length === 0) return;
+
+    const zipFiles: { name: string; data: Uint8Array }[] = [];
+    for (const r of successful) {
+      const buf = await r.blob!.arrayBuffer();
+      zipFiles.push({ name: r.name, data: new Uint8Array(buf) });
     }
+    const zipBlob = createZip(zipFiles);
+    const url = URL.createObjectURL(zipBlob);
+    triggerDownload(url, '批量转换结果.zip');
   }
 </script>
 
@@ -80,13 +120,42 @@
     <h2>批量转换</h2>
   </div>
 
-  <div class="batch-content">
-    <!-- Controls -->
-    <div class="control-bar">
-      <div class="control-left">
-        <TemplateSelector bind:selected={selectedTemplate} />
+  <div class="batch-layout">
+    <!-- Left: template list -->
+    <nav class="template-nav">
+      <div class="nav-search">
+        <Search size={14} />
+        <input type="text" placeholder="搜索模板…" bind:value={tplSearch} />
       </div>
-      <div class="control-right">
+      <div class="nav-list">
+        {#if tplLoading}
+          <div class="nav-empty"><Loader size={16} class="spin" /></div>
+        {:else if filteredTemplates.length === 0}
+          <div class="nav-empty">
+            <Package size={20} />
+            <span>{tplSearch ? '无匹配' : '暂无模板'}</span>
+          </div>
+        {:else}
+          {#each filteredTemplates as tpl (tpl.name)}
+            <button
+              class="nav-item"
+              class:active={selectedTemplate === tpl.name}
+              onclick={() => selectedTemplate = tpl.name}
+            >
+              <span class="nav-item-name">{tpl.displayName || tpl.name}</span>
+              {#if tpl.builtin}
+                <span class="badge-builtin">内置</span>
+              {/if}
+            </button>
+          {/each}
+        {/if}
+      </div>
+    </nav>
+
+    <!-- Right: batch content -->
+    <div class="batch-content">
+      <!-- Action bar -->
+      <div class="action-bar">
         <button class="btn-action" onclick={() => fileInput?.click()}>
           <Upload size={14} />
           <span>选择文件</span>
@@ -104,119 +173,119 @@
             <X size={14} />
             <span>清空</span>
           </button>
-        {/if}
-      </div>
-    </div>
-
-    <!-- Drop zone / empty state -->
-    {#if files.length === 0 && results.length === 0}
-      <div
-        class="drop-zone"
-        class:drag-over={dragOver}
-        ondrop={handleDrop}
-        ondragover={(e) => { e.preventDefault(); dragOver = true; }}
-        ondragleave={() => dragOver = false}
-        role="region"
-        aria-label="拖拽文件区域"
-      >
-        <Upload size={28} strokeWidth={1.5} />
-        <p class="drop-title">拖拽 Markdown 文件到此处</p>
-        <p class="drop-hint">支持 .md .markdown .txt 格式，可同时添加多个文件</p>
-      </div>
-    {:else}
-      <!-- Compact drop target when files exist -->
-      <div
-        class="drop-zone compact"
-        class:drag-over={dragOver}
-        ondrop={handleDrop}
-        ondragover={(e) => { e.preventDefault(); dragOver = true; }}
-        ondragleave={() => dragOver = false}
-        role="region"
-        aria-label="拖拽更多文件"
-      >
-        <Upload size={14} />
-        <span>拖拽更多文件到此处</span>
-      </div>
-    {/if}
-
-    <!-- File list -->
-    {#if files.length > 0}
-      <div class="section">
-        <div class="section-header">
-          <h3>待转换文件</h3>
-          <span class="section-count">{files.length}</span>
-        </div>
-        <div class="file-list">
-          {#each files as file, i (file.name + i)}
-            <div class="file-row">
-              <FileText size={14} />
-              <span class="file-name">{file.name}</span>
-              <span class="file-size">{(file.size / 1024).toFixed(1)} KB</span>
-              <button class="btn-icon" onclick={() => removeFile(i)} aria-label="移除 {file.name}">
-                <X size={12} />
-              </button>
-            </div>
-          {/each}
-        </div>
-      </div>
-
-      <!-- Convert button -->
-      <button
-        class="btn-convert"
-        onclick={convertAll}
-        disabled={processing || !selectedTemplate}
-      >
-        {#if processing}
-          <Loader size={14} class="spin" />
-          <span>转换中…</span>
-        {:else}
-          <span>转换全部 ({files.length} 个文件)</span>
-        {/if}
-      </button>
-    {/if}
-
-    <!-- Results -->
-    {#if results.length > 0}
-      <div class="section">
-        <div class="section-header">
-          <h3>转换结果</h3>
-          <div class="result-summary">
-            {#if successCount > 0}
-              <span class="badge success"><CheckCircle size={10} /> {successCount} 成功</span>
+          <button
+            class="btn-convert"
+            onclick={convertAll}
+            disabled={processing || !selectedTemplate}
+          >
+            {#if processing}
+              <Loader size={14} class="spin" />
+              <span>转换中 ({progress}/{files.length})</span>
+            {:else}
+              <span>转换全部 ({files.length})</span>
             {/if}
-            {#if errorCount > 0}
-              <span class="badge error"><AlertCircle size={10} /> {errorCount} 失败</span>
-            {/if}
-          </div>
-        </div>
-        <div class="file-list">
-          {#each results as r (r.name)}
-            <div class="file-row" class:has-error={!!r.error}>
-              {#if r.blob}
-                <CheckCircle size={14} />
-              {:else}
-                <AlertCircle size={14} />
-              {/if}
-              <span class="file-name">{r.name}</span>
-              {#if r.blob}
-                <button class="btn-dl" onclick={() => downloadOne(r)}>
-                  <Download size={12} />
-                  <span>下载</span>
-                </button>
-              {:else}
-                <span class="error-text" title={r.error}>{r.error}</span>
-              {/if}
-            </div>
-          {/each}
-        </div>
-        {#if successCount > 1}
-          <button class="btn-action" onclick={downloadAll} style="margin-top: var(--space-sm); align-self: flex-end;">
-            <Download size={14} />
-            <span>全部下载</span>
           </button>
         {/if}
       </div>
-    {/if}
+
+      <!-- Drop zone / empty state -->
+      {#if files.length === 0 && results.length === 0}
+        <div
+          class="drop-zone"
+          class:drag-over={dragOver}
+          ondrop={handleDrop}
+          ondragover={(e) => { e.preventDefault(); dragOver = true; }}
+          ondragleave={() => dragOver = false}
+          role="region"
+          aria-label="拖拽文件区域"
+        >
+          <Upload size={28} strokeWidth={1.5} />
+          <p class="drop-title">拖拽 Markdown 文件到此处</p>
+          <p class="drop-hint">支持 .md .markdown .txt 格式，可同时添加多个文件</p>
+        </div>
+      {:else}
+        <!-- Compact drop target -->
+        <div
+          class="drop-zone compact"
+          class:drag-over={dragOver}
+          ondrop={handleDrop}
+          ondragover={(e) => { e.preventDefault(); dragOver = true; }}
+          ondragleave={() => dragOver = false}
+          role="region"
+          aria-label="拖拽更多文件"
+        >
+          <Upload size={14} />
+          <span>拖拽更多文件到此处</span>
+        </div>
+      {/if}
+
+      <!-- File list -->
+      {#if files.length > 0 && results.length === 0}
+        <div class="section">
+          <div class="section-header">
+            <h3>待转换文件</h3>
+            <span class="section-count">{files.length}</span>
+          </div>
+          <div class="file-list">
+            {#each files as file, i (file.name + i)}
+              <div class="file-row">
+                <FileText size={14} />
+                <span class="file-name">{file.name}</span>
+                <span class="file-size">{(file.size / 1024).toFixed(1)} KB</span>
+                <button class="btn-icon" onclick={() => removeFile(i)} aria-label="移除 {file.name}">
+                  <X size={12} />
+                </button>
+              </div>
+            {/each}
+          </div>
+        </div>
+      {/if}
+
+      <!-- Results -->
+      {#if results.length > 0}
+        <div class="section">
+          <div class="section-header">
+            <h3>转换结果</h3>
+            <div class="result-summary">
+              {#if successCount > 0}
+                <span class="badge success"><CheckCircle size={10} /> {successCount} 成功</span>
+              {/if}
+              {#if errorCount > 0}
+                <span class="badge error"><AlertCircle size={10} /> {errorCount} 失败</span>
+              {/if}
+            </div>
+          </div>
+          <div class="file-list">
+            {#each results as r (r.name)}
+              <div class="file-row" class:has-error={!!r.error}>
+                {#if r.blob}
+                  <CheckCircle size={14} />
+                {:else}
+                  <AlertCircle size={14} />
+                {/if}
+                <span class="file-name">{r.name}</span>
+                {#if r.blob}
+                  <button class="btn-dl" onclick={() => downloadOne(r)}>
+                    <Download size={12} />
+                    <span>下载</span>
+                  </button>
+                {:else}
+                  <span class="error-text" title={r.error}>{r.error}</span>
+                {/if}
+              </div>
+            {/each}
+          </div>
+          {#if successCount > 0}
+            <div class="result-actions">
+              <button class="btn-zip" onclick={downloadAllAsZip}>
+                <Download size={14} />
+                <span>打包下载 ({successCount} 个 PDF)</span>
+              </button>
+            </div>
+          {/if}
+        </div>
+      {/if}
+    </div>
   </div>
 </div>
 
@@ -256,35 +325,120 @@
   }
   .btn-back:hover { background: var(--color-surface-hover); }
 
+  /* Two-column layout matching settings */
+  .batch-layout {
+    display: flex;
+    gap: var(--space-xl);
+    flex: 1;
+    min-height: 0;
+  }
+
+  /* Left: template nav */
+  .template-nav {
+    width: 160px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+  .nav-search {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    color: var(--color-muted);
+    flex-shrink: 0;
+  }
+  .nav-search input {
+    flex: 1;
+    min-width: 0;
+    background: none;
+    border: none;
+    color: var(--color-text);
+    font-size: 0.75rem;
+    font-family: var(--font-ui);
+    outline: none;
+  }
+  .nav-search input::placeholder { color: var(--color-muted); }
+  .nav-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow-y: auto;
+    flex: 1;
+  }
+  .nav-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-xl) var(--space-sm);
+    color: var(--color-muted);
+    font-size: 0.75rem;
+  }
+  .nav-item {
+    text-align: left;
+    padding: var(--space-sm) var(--space-md);
+    background: none;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--color-muted);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+  }
+  .nav-item:hover {
+    color: var(--color-text);
+    background: var(--color-surface);
+  }
+  .nav-item.active {
+    color: var(--color-accent);
+    background: var(--color-surface);
+  }
+  .nav-item-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .badge-builtin {
+    font-size: 0.5625rem;
+    font-weight: 600;
+    padding: 0 4px;
+    border-radius: 3px;
+    background: var(--color-accent);
+    color: var(--color-bg);
+    flex-shrink: 0;
+    line-height: 1.4;
+  }
+
+  /* Right: batch content */
   .batch-content {
     flex: 1;
     min-height: 0;
-    max-width: 640px;
+    max-width: 600px;
     display: flex;
     flex-direction: column;
     overflow-y: auto;
     gap: var(--space-lg);
   }
 
-  /* Control bar */
-  .control-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-md);
-    flex-shrink: 0;
-  }
-  .control-left {
-    display: flex;
-    align-items: center;
-    gap: var(--space-sm);
-  }
-  .control-right {
+  /* Action bar */
+  .action-bar {
     display: flex;
     align-items: center;
     gap: var(--space-xs);
+    flex-shrink: 0;
+    flex-wrap: wrap;
   }
-
   .btn-action {
     display: inline-flex;
     align-items: center;
@@ -303,6 +457,25 @@
   .btn-action:hover { border-color: var(--color-accent); color: var(--color-accent); }
   .btn-action.subtle { color: var(--color-muted); }
   .btn-action.subtle:hover { border-color: var(--color-danger); color: var(--color-danger); }
+
+  .btn-convert {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    height: 28px;
+    padding: 0 var(--space-lg);
+    background: var(--color-accent);
+    color: var(--color-bg);
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity var(--transition);
+    margin-left: auto;
+  }
+  .btn-convert:hover:not(:disabled) { opacity: 0.85; }
+  .btn-convert:disabled { opacity: 0.5; cursor: not-allowed; }
 
   /* Drop zone */
   .drop-zone {
@@ -364,7 +537,6 @@
     color: var(--color-muted);
     font-family: var(--font-mono);
   }
-
   .result-summary {
     display: flex;
     gap: var(--space-xs);
@@ -455,27 +627,28 @@
     max-width: 240px;
   }
 
-  /* Convert button */
-  .btn-convert {
+  /* Result actions */
+  .result-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: var(--space-sm);
+  }
+  .btn-zip {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
     gap: var(--space-xs);
-    height: 36px;
-    padding: 0 var(--space-xl);
+    height: 32px;
+    padding: 0 var(--space-lg);
     background: var(--color-accent);
     color: var(--color-bg);
     border: none;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-sm);
     font-size: 0.8125rem;
     font-weight: 500;
     cursor: pointer;
     transition: opacity var(--transition);
-    align-self: flex-start;
-    flex-shrink: 0;
   }
-  .btn-convert:hover:not(:disabled) { opacity: 0.85; }
-  .btn-convert:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-zip:hover { opacity: 0.85; }
 
   :global(.spin) {
     animation: spin 1s linear infinite;

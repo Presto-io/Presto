@@ -110,7 +110,7 @@ export async function deleteTemplate(id: string): Promise<void> {
   if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
 }
 
-export async function importTemplateZip(file: File): Promise<Template> {
+export async function importTemplateZip(file: File): Promise<Template[]> {
   const formData = new FormData();
   formData.append('file', file);
   const res = await fetch(`${BASE}/api/templates/import`, {
