@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"embed"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/fs"
@@ -199,6 +200,31 @@ func (a *App) CheckForUpdate() (*UpdateInfo, error) {
 	}
 
 	return info, nil
+}
+
+// SaveFile decodes base64 data and saves it via native save dialog.
+// Used by batch conversion page where blobs are created client-side.
+func (a *App) SaveFile(b64Data string, defaultFilename string) error {
+	data, err := base64.StdEncoding.DecodeString(b64Data)
+	if err != nil {
+		return fmt.Errorf("invalid data: %w", err)
+	}
+
+	savePath, err := wailsRuntime.SaveFileDialog(a.ctx, wailsRuntime.SaveDialogOptions{
+		DefaultFilename: defaultFilename,
+	})
+	if err != nil {
+		return fmt.Errorf("save dialog failed: %w", err)
+	}
+	if savePath == "" {
+		return nil
+	}
+
+	if err := os.WriteFile(savePath, data, 0644); err != nil {
+		return fmt.Errorf("write failed: %w", err)
+	}
+	log.Printf("[desktop] saved file %s (%d bytes)", defaultFilename, len(data))
+	return nil
 }
 
 // SavePDF converts markdown to PDF and opens a native save dialog.
