@@ -245,7 +245,7 @@
     {/if}
     <button class="btn-export" onclick={handleDownload} aria-label="导出 PDF" title="导出 PDF (⌘E)">
       <Download size={14} />
-      <span>导出</span>
+      <span>导出 PDF</span>
     </button>
   </div>
 </div>
