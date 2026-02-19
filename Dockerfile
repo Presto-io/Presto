@@ -22,33 +22,50 @@ RUN npm run build
 FROM --platform=$BUILDPLATFORM alpine:3.21 AS typst-downloader
 ARG TARGETARCH
 ARG TYPST_VERSION=0.14.2
+# SEC-22: SHA256 checksums for typst binaries (update when TYPST_VERSION changes)
+ARG TYPST_SHA256_AMD64=""
+ARG TYPST_SHA256_ARM64=""
 RUN apk add --no-cache curl && \
     if [ "$TARGETARCH" = "arm64" ]; then \
       TYPST_TRIPLE="aarch64-unknown-linux-musl"; \
+      EXPECTED_SHA256="$TYPST_SHA256_ARM64"; \
     else \
       TYPST_TRIPLE="x86_64-unknown-linux-musl"; \
+      EXPECTED_SHA256="$TYPST_SHA256_AMD64"; \
     fi && \
-    curl -sSL "https://github.com/typst/typst/releases/download/v${TYPST_VERSION}/typst-${TYPST_TRIPLE}.tar.xz" | \
-    tar -xJ --strip-components=1 -C /usr/local/bin/
+    curl -sSL "https://github.com/typst/typst/releases/download/v${TYPST_VERSION}/typst-${TYPST_TRIPLE}.tar.xz" \
+      -o /tmp/typst.tar.xz && \
+    if [ -n "$EXPECTED_SHA256" ]; then \
+      echo "${EXPECTED_SHA256}  /tmp/typst.tar.xz" | sha256sum -c -; \
+    else \
+      echo "WARNING: No SHA256 checksum provided for typst binary. Set TYPST_SHA256_AMD64/ARM64 build args."; \
+    fi && \
+    tar -xJ --strip-components=1 -C /usr/local/bin/ < /tmp/typst.tar.xz && \
+    rm /tmp/typst.tar.xz
 
 # Stage 4: Final image (target platform)
 FROM alpine:3.21
 
+# SEC-21: Create non-root user
+RUN addgroup -S presto && adduser -S -G presto presto
+
 COPY --from=typst-downloader /usr/local/bin/typst /usr/local/bin/typst
 COPY --from=go-builder /bin/presto-server /usr/local/bin/
 
-RUN mkdir -p /root/.presto/templates/gongwen /root/.presto/templates/jiaoan-shicao
+RUN mkdir -p /home/presto/.presto/templates/gongwen /home/presto/.presto/templates/jiaoan-shicao && \
+    chown -R presto:presto /home/presto/.presto
 
-COPY --from=go-builder /bin/presto-template-gongwen /root/.presto/templates/gongwen/presto-template-gongwen
-COPY cmd/gongwen/manifest.json /root/.presto/templates/gongwen/
-
-COPY --from=go-builder /bin/presto-template-jiaoan-shicao /root/.presto/templates/jiaoan-shicao/presto-template-jiaoan-shicao
-COPY cmd/jiaoan-shicao/manifest.json /root/.presto/templates/jiaoan-shicao/
+COPY --chown=presto:presto --from=go-builder /bin/presto-template-gongwen /home/presto/.presto/templates/gongwen/presto-template-gongwen
+COPY --chown=presto:presto cmd/gongwen/manifest.json /home/presto/.presto/templates/gongwen/
+COPY --chown=presto:presto --from=go-builder /bin/presto-template-jiaoan-shicao /home/presto/.presto/templates/jiaoan-shicao/presto-template-jiaoan-shicao
+COPY --chown=presto:presto cmd/jiaoan-shicao/manifest.json /home/presto/.presto/templates/jiaoan-shicao/
 
 COPY --from=frontend-builder /app/build /srv/frontend
 
 ENV PORT=8080
 ENV STATIC_DIR=/srv/frontend
+ENV HOME=/home/presto
 EXPOSE 8080
 
+USER presto
 CMD ["presto-server"]
