@@ -120,6 +120,29 @@ func (s *Server) handleDeleteTemplate(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`{"status":"deleted"}`))
 }
 
+func (s *Server) handleRenameTemplate(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
+	id := r.PathValue("id")
+
+	var req struct {
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" {
+		writeJSONError(w, "invalid request: name is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := s.manager.Rename(id, req.Name); err != nil {
+		log.Printf("[templates] rename %s → %s failed: %v", id, req.Name, err)
+		writeJSONError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("[templates] renamed template %s → %s", id, req.Name)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "renamed", "name": req.Name})
+}
+
 func (s *Server) handleGetManifest(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	tpl, err := s.manager.Get(id)

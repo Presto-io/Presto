@@ -68,8 +68,21 @@
 			const tpls = await importTemplateZip(file);
 			const names = tpls.map(t => t.displayName || t.name).join('、');
 			showToast(`模板 "${names}" 导入成功`, 'success');
-		} catch (err) {
-			showToast(err instanceof Error ? err.message : String(err), 'error');
+			window.dispatchEvent(new CustomEvent('templates-changed'));
+		} catch (err: any) {
+			if (err.conflicts) {
+				// Conflict: auto-rename and retry
+				try {
+					const tpls = await importTemplateZip(file, 'rename');
+					const names = tpls.map(t => t.displayName || t.name).join('、');
+					showToast(`模板 "${names}" 导入成功（已自动重命名）`, 'success');
+					window.dispatchEvent(new CustomEvent('templates-changed'));
+				} catch (retryErr) {
+					showToast(retryErr instanceof Error ? retryErr.message : String(retryErr), 'error');
+				}
+			} else {
+				showToast(err instanceof Error ? err.message : String(err), 'error');
+			}
 		}
 	}
 
