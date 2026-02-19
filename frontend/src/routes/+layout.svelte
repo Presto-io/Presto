@@ -1,6 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import { onMount } from 'svelte';
+	import WizardOverlay from '$lib/components/wizard/WizardOverlay.svelte';
 
 	let { children } = $props();
 
@@ -21,6 +22,7 @@
 	<main id="main-content">
 		{@render children()}
 	</main>
+	<WizardOverlay />
 </div>
 
 <style>

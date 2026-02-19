@@ -7,6 +7,7 @@
   import { Download } from 'lucide-svelte';
   import { goto } from '$app/navigation';
   import { editor } from '$lib/stores/editor.svelte';
+  import { triggerAction, shouldShowPoint } from '$lib/stores/wizard.svelte';
 
   // Wails runtime bindings (available when running as desktop app)
   declare global {
@@ -31,6 +32,7 @@
   let splitRatio = $state(0.5);
   let isDragging = $state(false);
   let layoutEl: HTMLDivElement;
+  let editCount = 0;
 
   function onDividerPointerDown(e: PointerEvent) {
     isDragging = true;
@@ -130,6 +132,13 @@
   async function handleConvert(md: string) {
     if (!editor.selectedTemplate || !md.trim()) return;
     errorMsg = '';
+
+    // Wizard: track edits and trigger contextual hints
+    editCount++;
+    if (editCount === 5) triggerAction('editor-find-replace');
+    if (editCount === 10) triggerAction('editor-undo-redo');
+    if (md.includes('![') && shouldShowPoint('image-path')) triggerAction('image-path');
+
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(async () => {
       converting = true;
@@ -155,9 +164,11 @@
   async function handleDownload() {
     if (!editor.selectedTemplate || !editor.markdown.trim()) return;
     errorMsg = '';
+    let success = false;
     try {
       if (window.go?.main?.App?.SavePDF) {
         await window.go.main.App.SavePDF(editor.markdown, editor.selectedTemplate, editor.documentDir);
+        success = true;
         return;
       }
       const blob = await convertAndCompile(editor.markdown, editor.selectedTemplate, editor.documentDir || undefined);
@@ -167,10 +178,13 @@
       a.download = extractTypstTitle(editor.typstSource) + '.pdf';
       a.click();
       URL.revokeObjectURL(url);
+      success = true;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error('Download failed:', msg);
       errorMsg = msg;
+    } finally {
+      if (success) triggerAction('import-export-shortcuts');
     }
   }
 
@@ -182,6 +196,7 @@
           editor.markdown = result.content;
           editor.documentDir = result.dir;
           handleConvert(editor.markdown);
+          triggerAction('import-export-shortcuts');
         }
         return;
       }
@@ -198,6 +213,7 @@
         reader.onload = () => {
           editor.markdown = reader.result as string;
           handleConvert(editor.markdown);
+          triggerAction('import-export-shortcuts');
         };
         reader.readAsText(file);
       };
