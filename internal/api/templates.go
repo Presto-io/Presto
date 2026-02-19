@@ -4,16 +4,24 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/mrered/presto/internal/template"
 )
 
+// isValidGitHubName validates GitHub owner/repo name format (SEC-17).
+var validGitHubNameRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]*$`)
+
+func isValidGitHubName(name string) bool {
+	return len(name) > 0 && len(name) <= 100 && validGitHubNameRe.MatchString(name)
+}
+
 func (s *Server) handleListTemplates(w http.ResponseWriter, r *http.Request) {
 	templates, err := s.manager.List()
 	if err != nil {
 		log.Printf("[templates] list failed: %v", err)
-		http.Error(w, `{"error":"failed to list templates"}`, http.StatusInternalServerError)
+		writeJSONError(w, "failed to list templates", http.StatusInternalServerError)
 		return
 	}
 
@@ -49,7 +57,8 @@ func (s *Server) handleListTemplates(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDiscoverTemplates(w http.ResponseWriter, r *http.Request) {
 	repos, err := template.DiscoverTemplates()
 	if err != nil {
-		http.Error(w, `{"error":"discovery failed"}`, http.StatusInternalServerError)
+		log.Printf("[templates] discover failed: %v", err)
+		writeJSONError(w, "discovery failed", http.StatusInternalServerError)
 		return
 	}
 
@@ -58,6 +67,7 @@ func (s *Server) handleDiscoverTemplates(w http.ResponseWriter, r *http.Request)
 }
 
 func (s *Server) handleInstallTemplate(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
 	id := r.PathValue("id")
 
 	var req struct {
@@ -70,13 +80,20 @@ func (s *Server) handleInstallTemplate(w http.ResponseWriter, r *http.Request) {
 			req.Owner = parts[0]
 			req.Repo = parts[1]
 		} else {
-			http.Error(w, `{"error":"invalid request"}`, http.StatusBadRequest)
+			writeJSONError(w, "invalid request", http.StatusBadRequest)
 			return
 		}
 	}
 
+	// SEC-17: Validate owner/repo format
+	if !isValidGitHubName(req.Owner) || !isValidGitHubName(req.Repo) {
+		writeJSONError(w, "invalid owner or repo name", http.StatusBadRequest)
+		return
+	}
+
 	if err := s.manager.Install(req.Owner, req.Repo); err != nil {
-		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
+		log.Printf("[templates] install %s/%s failed: %v", req.Owner, req.Repo, err)
+		writeJSONError(w, "install failed", http.StatusInternalServerError)
 		return
 	}
 
@@ -87,7 +104,8 @@ func (s *Server) handleInstallTemplate(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDeleteTemplate(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if err := s.manager.Uninstall(id); err != nil {
-		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
+		log.Printf("[templates] delete %s failed: %v", id, err)
+		writeJSONError(w, "delete failed", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -98,7 +116,7 @@ func (s *Server) handleGetManifest(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	tpl, err := s.manager.Get(id)
 	if err != nil {
-		http.Error(w, `{"error":"not found"}`, http.StatusNotFound)
+		writeJSONError(w, "not found", http.StatusNotFound)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -109,7 +127,7 @@ func (s *Server) handleGetExample(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	tpl, err := s.manager.Get(id)
 	if err != nil {
-		http.Error(w, `{"error":"not found"}`, http.StatusNotFound)
+		writeJSONError(w, "not found", http.StatusNotFound)
 		return
 	}
 
