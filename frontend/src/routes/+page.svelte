@@ -32,7 +32,6 @@
   let splitRatio = $state(0.5);
   let isDragging = $state(false);
   let layoutEl: HTMLDivElement;
-  let editCount = 0;
 
   function onDividerPointerDown(e: PointerEvent) {
     isDragging = true;
@@ -133,10 +132,7 @@
     if (!editor.selectedTemplate || !md.trim()) return;
     errorMsg = '';
 
-    // Wizard: track edits and trigger contextual hints
-    editCount++;
-    if (editCount === 5) triggerAction('editor-find-replace');
-    if (editCount === 10) triggerAction('editor-undo-redo');
+    // Wizard: detect image syntax
     if (md.includes('![') && shouldShowPoint('image-path')) triggerAction('image-path');
 
     clearTimeout(debounceTimer);
@@ -155,6 +151,10 @@
         const msg = e instanceof Error ? e.message : String(e);
         console.error('Convert failed:', msg);
         errorMsg = msg;
+        // Wizard: detect image-related errors and hint about path rules
+        if (/image|图片|not found|file not|读取/.test(msg.toLowerCase())) {
+          setTimeout(() => triggerAction('image-error'), 500);
+        }
       } finally {
         converting = false;
       }
@@ -164,11 +164,9 @@
   async function handleDownload() {
     if (!editor.selectedTemplate || !editor.markdown.trim()) return;
     errorMsg = '';
-    let success = false;
     try {
       if (window.go?.main?.App?.SavePDF) {
         await window.go.main.App.SavePDF(editor.markdown, editor.selectedTemplate, editor.documentDir);
-        success = true;
         return;
       }
       const blob = await convertAndCompile(editor.markdown, editor.selectedTemplate, editor.documentDir || undefined);
@@ -178,13 +176,10 @@
       a.download = extractTypstTitle(editor.typstSource) + '.pdf';
       a.click();
       URL.revokeObjectURL(url);
-      success = true;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error('Download failed:', msg);
       errorMsg = msg;
-    } finally {
-      if (success) triggerAction('import-export-shortcuts');
     }
   }
 
@@ -196,7 +191,6 @@
           editor.markdown = result.content;
           editor.documentDir = result.dir;
           handleConvert(editor.markdown);
-          triggerAction('import-export-shortcuts');
         }
         return;
       }
@@ -213,7 +207,6 @@
         reader.onload = () => {
           editor.markdown = reader.result as string;
           handleConvert(editor.markdown);
-          triggerAction('import-export-shortcuts');
         };
         reader.readAsText(file);
       };
@@ -279,11 +272,16 @@
   <div
     class="divider"
     role="separator"
+    aria-label="拖动调整宽度"
     aria-orientation="vertical"
     onpointerdown={onDividerPointerDown}
     onpointermove={onDividerPointerMove}
     onpointerup={onDividerPointerUp}
-  ></div>
+  >
+    <div class="divider-grip">
+      <span></span><span></span><span></span>
+    </div>
+  </div>
   <div class="pane" style="flex: {1 - splitRatio}">
     <Preview svgPages={editor.svgPages} scrollRatio={previewScrollRatio} onscroll={(ratio: number) => {
       if (scrollSource !== 'editor') {
@@ -381,12 +379,35 @@
     flex-shrink: 0;
     background: var(--color-border);
     cursor: col-resize;
-    transition: background 0.15s;
+    transition: background 0.15s, width 0.15s;
     touch-action: none;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   .divider:hover,
   .editor-layout.dragging .divider {
     background: var(--color-accent);
+    width: 7px;
+  }
+  .divider-grip {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+  }
+  .divider:hover .divider-grip,
+  .editor-layout.dragging .divider-grip {
+    opacity: 0.9;
+  }
+  .divider-grip span {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--color-bg);
   }
   .confirm-dialog {
     border: 1px solid var(--color-border);
