@@ -1,3 +1,7 @@
+---
+template: "jiaoan-shicao"
+---
+
 ## 教学活动设计——PLC 基本指令应用
 
 ### 认识 PLC 硬件——了解 PLC 的基本组成与接线方法
