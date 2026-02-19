@@ -1,9 +1,12 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { fly, fade } from 'svelte/transition';
+  import { cubicOut } from 'svelte/easing';
   import { ExternalLink, Shield, Info, BookOpen, ArrowLeft, RefreshCw, Search, Package, Download, Trash2, Loader } from 'lucide-svelte';
   import { goto } from '$app/navigation';
   import { listTemplates, discoverTemplates, installTemplate, deleteTemplate } from '$lib/api/client';
   import type { Template, GitHubRepo } from '$lib/api/types';
+  import { triggerAction, resetWizard } from '$lib/stores/wizard.svelte';
 
   // --- Settings state ---
   let communityEnabled = $state(false);
@@ -166,6 +169,8 @@
     communityEnabled = true;
     showWarning = false;
     localStorage.setItem('communityTemplates', 'true');
+    // Wizard: notify that community templates are now enabled
+    setTimeout(() => triggerAction('community-template-toggle'), 500);
   }
 
   function cancelCommunity() {
@@ -229,12 +234,13 @@
         </button>
       {/each}
       {#if panelTabs.length > 0}
-        <div class="nav-divider"></div>
+        <div class="nav-divider" transition:fade={{ duration: 200 }}></div>
         {#each panelTabs as tab (tab.id)}
           <button
             class="nav-item"
             class:active={activePanel === tab.id}
             onclick={() => togglePanel(tab.id)}
+            transition:fly={{ x: -12, duration: 300, easing: cubicOut }}
           >
             {tab.label}
           </button>
@@ -363,6 +369,13 @@
               >
                 <span class="slider" class:on={communityEnabled}></span>
               </button>
+            </div>
+            <div class="setting-row" style="margin-top: var(--space-sm)">
+              <div class="setting-info">
+                <span class="setting-label">新手引导</span>
+                <span class="setting-desc">重置所有引导提示，重新展示操作引导</span>
+              </div>
+              <button class="btn-reset-wizard" onclick={resetWizard}>重置引导</button>
             </div>
           </section>
 
@@ -692,6 +705,17 @@
     transition: all var(--transition);
   }
   .btn-check-update:hover { background: var(--color-surface-hover); }
+  .btn-reset-wizard {
+    background: none;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    color: var(--color-muted);
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    cursor: pointer;
+    transition: all var(--transition);
+  }
+  .btn-reset-wizard:hover { color: var(--color-accent); border-color: var(--color-accent); }
   .update-link {
     display: inline-flex;
     align-items: center;
