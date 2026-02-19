@@ -296,13 +296,13 @@
     }
   }
 
-  // --- Rename ---
+  // --- Rename (displayName) ---
   let renamingTpl = $state('');
   let renameInput = $state('');
 
-  function startRename(name: string) {
-    renamingTpl = name;
-    renameInput = name;
+  function startRename(tpl: Template) {
+    renamingTpl = tpl.name;
+    renameInput = tpl.displayName || tpl.name;
   }
 
   function cancelRename() {
@@ -311,17 +311,23 @@
   }
 
   async function confirmRename() {
-    const oldName = renamingTpl;
-    const newName = renameInput.trim();
-    if (!newName || newName === oldName) {
+    const tplName = renamingTpl;
+    const newDisplayName = renameInput.trim();
+    if (!newDisplayName) {
+      cancelRename();
+      return;
+    }
+    // Find current displayName to check if actually changed
+    const current = installed.find(t => t.name === tplName);
+    if (current && newDisplayName === (current.displayName || current.name)) {
       cancelRename();
       return;
     }
     try {
-      await renameTemplate(oldName, newName);
+      await renameTemplate(tplName, newDisplayName);
       installed = (await listTemplates()) ?? [];
       installedLoaded = true;
-      showImportToast(`模板已重命名为 "${newName}"`, 'success');
+      showImportToast(`模板已重命名为 "${newDisplayName}"`, 'success');
     } catch (err) {
       showImportToast(err instanceof Error ? err.message : String(err), 'error');
     } finally {
@@ -480,8 +486,8 @@
                         {#if renamingTpl !== tpl.name}
                           <button
                             class="btn-rename"
-                            onclick={() => startRename(tpl.name)}
-                            aria-label="重命名 {tpl.name}"
+                            onclick={() => startRename(tpl)}
+                            aria-label="重命名 {tpl.displayName || tpl.name}"
                           >
                             <Pencil size={12} />
                           </button>

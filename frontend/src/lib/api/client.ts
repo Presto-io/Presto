@@ -110,11 +110,11 @@ export async function deleteTemplate(id: string): Promise<void> {
   if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
 }
 
-export async function renameTemplate(id: string, newName: string): Promise<void> {
+export async function renameTemplate(id: string, displayName: string): Promise<void> {
   const res = await fetch(`${BASE}/api/templates/${encodeURIComponent(id)}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: newName }),
+    body: JSON.stringify({ displayName }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
