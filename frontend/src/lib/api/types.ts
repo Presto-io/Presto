@@ -27,3 +27,23 @@ export interface GitHubRepo {
   owner: { login: string };
   name: string;
 }
+
+export interface BatchFile {
+  id: string;
+  file: File;
+  templateId: string;
+  autoDetected: boolean;
+}
+
+export interface BatchResult {
+  fileId: string;
+  fileName: string;
+  templateId: string;
+  blob?: Blob;
+  error?: string;
+}
+
+export interface BatchImportResult {
+  templates: { name: string; displayName: string; status: string }[];
+  markdownFiles: { name: string; content: string; detectedTemplate?: string }[];
+}
