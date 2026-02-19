@@ -48,13 +48,19 @@ func randomSuffix() string {
 }
 
 func (c *Compiler) Compile(typFile string) (string, error) {
+	return c.compileWithRoot(typFile, c.Root)
+}
+
+// compileWithRoot compiles a .typ file to PDF using the given root directory.
+// The root must contain the source file, otherwise typst will reject it.
+func (c *Compiler) compileWithRoot(typFile, root string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), compileTimeout)
 	defer cancel()
 
 	pdfFile := strings.TrimSuffix(typFile, ".typ") + ".pdf"
 	args := []string{"compile"}
-	if c.Root != "" {
-		args = append(args, "--root", c.Root)
+	if root != "" {
+		args = append(args, "--root", root)
 	}
 	args = append(args, typFile, pdfFile)
 	cmd := exec.CommandContext(ctx, c.typstBin(), args...)
@@ -81,7 +87,8 @@ func (c *Compiler) CompileString(typstSource, workDir string) ([]byte, error) {
 		}
 		defer os.Remove(typFile)
 
-		pdfFile, err := c.Compile(typFile)
+		// Use workDir as root so the source file is inside the project root
+		pdfFile, err := c.compileWithRoot(typFile, workDir)
 		if err != nil {
 			return nil, err
 		}
@@ -100,7 +107,8 @@ func (c *Compiler) CompileString(typstSource, workDir string) ([]byte, error) {
 		return nil, err
 	}
 
-	pdfFile, err := c.Compile(typFile)
+	// Use the temp dir as root so the source file is inside the project root
+	pdfFile, err := c.compileWithRoot(typFile, dir)
 	if err != nil {
 		return nil, err
 	}
@@ -144,9 +152,9 @@ func (c *Compiler) CompileToSVG(typstSource, workDir string) ([]string, error) {
 	// typst compile --format svg outputs {name}-{page}.svg for multi-page
 	outPattern := filepath.Join(dir, fmt.Sprintf(".presto-temp-%s-{p}.svg", suffix))
 	args := []string{"compile", "--format", "svg"}
-	if c.Root != "" {
-		args = append(args, "--root", c.Root)
-	}
+	// Use the actual working directory as root so the source file
+	// is always inside the project root (typst requires this).
+	args = append(args, "--root", dir)
 	args = append(args, typFile, outPattern)
 	cmd := exec.CommandContext(ctx, c.typstBin(), args...)
 	log.Printf("[compile-svg] running: %s %s", c.typstBin(), strings.Join(args, " "))

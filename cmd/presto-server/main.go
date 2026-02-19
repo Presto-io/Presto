@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 
 	"github.com/mrered/presto/internal/api"
+	"github.com/mrered/presto/internal/template"
 )
 
 func main() {
@@ -27,6 +28,14 @@ func main() {
 	home, _ := os.UserHomeDir()
 	templatesDir := filepath.Join(home, ".presto", "templates")
 	os.MkdirAll(templatesDir, 0755)
+
+	// Auto-install bundled official templates if missing
+	mgr := template.NewManager(templatesDir)
+	exePath, _ := os.Executable()
+	if exePath != "" {
+		bundleDir := filepath.Join(filepath.Dir(exePath), "templates")
+		mgr.EnsureOfficialTemplates(bundleDir)
+	}
 
 	staticDir := os.Getenv("STATIC_DIR")
 	if staticDir == "" {

@@ -335,6 +335,31 @@ func findTypstBinary() string {
 	return "typst" // will fail at runtime with a clear error
 }
 
+// findBundledTemplatesDir locates the bundled templates directory.
+// Search order: .app/Contents/Resources/templates → next to executable/templates.
+func findBundledTemplatesDir() string {
+	exe, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	exe, _ = filepath.EvalSymlinks(exe)
+	exeDir := filepath.Dir(exe)
+
+	// macOS .app: Contents/MacOS/Presto → Contents/Resources/templates
+	resources := filepath.Join(exeDir, "..", "Resources", "templates")
+	if info, err := os.Stat(resources); err == nil && info.IsDir() {
+		return resources
+	}
+
+	// Same directory as executable
+	beside := filepath.Join(exeDir, "templates")
+	if info, err := os.Stat(beside); err == nil && info.IsDir() {
+		return beside
+	}
+
+	return ""
+}
+
 func main() {
 	home, _ := os.UserHomeDir()
 	templatesDir := filepath.Join(home, ".presto", "templates")
@@ -343,6 +368,11 @@ func main() {
 	manager := template.NewManager(templatesDir)
 	typstBin := findTypstBinary()
 	log.Printf("[presto] using typst: %s", typstBin)
+
+	// Auto-install bundled official templates if missing
+	bundleDir := findBundledTemplatesDir()
+	log.Printf("[presto] bundled templates dir: %s", bundleDir)
+	manager.EnsureOfficialTemplates(bundleDir)
 
 	// SEC-02: Use $HOME instead of "/" to restrict file access to user's home
 	compiler := typst.NewCompilerWithRoot(home)

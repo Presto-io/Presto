@@ -254,6 +254,11 @@ func (m *Manager) Uninstall(name string) error {
 		return fmt.Errorf("invalid template name: %w", err)
 	}
 
+	// Refuse to delete official built-in templates
+	if IsOfficial(name) {
+		return fmt.Errorf("cannot delete built-in template %q", name)
+	}
+
 	tplDir := filepath.Join(m.TemplatesDir, name)
 
 	// Verify resolved path is within TemplatesDir
