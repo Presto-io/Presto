@@ -438,7 +438,8 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    padding: 4px 10px;
+    height: 28px;
+    padding: 0 10px;
     background: var(--color-accent);
     color: var(--color-bg);
     border: none;
