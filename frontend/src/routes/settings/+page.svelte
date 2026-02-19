@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { ExternalLink, Shield, Info, BookOpen, ArrowLeft, RefreshCw, ChevronRight } from 'lucide-svelte';
   import { goto } from '$app/navigation';
 
@@ -9,6 +9,14 @@
   let updateInfo = $state<{ hasUpdate: boolean; latestVersion: string; downloadURL: string; releaseURL: string } | null>(null);
   let checking = $state(false);
   let updateError = $state('');
+  let activeSection = $state('general');
+
+  const sections = [
+    { id: 'general', label: '通用' },
+    { id: 'template-dev', label: '模板开发' },
+    { id: 'about', label: '关于' },
+    { id: 'licenses', label: '开源协议' },
+  ];
 
   declare global {
     interface Window {
@@ -62,9 +70,38 @@
         appVersion = await window.go.main.App.GetVersion();
       } catch {}
     }
+    // Set up scroll-based active section tracking
+    const content = document.querySelector('.settings-content') as HTMLElement;
+    if (content) {
+      content.addEventListener('scroll', handleScroll);
+    }
   });
 
-  function toggleCommunity() {
+  function handleScroll() {
+    const content = document.querySelector('.settings-content') as HTMLElement;
+    if (!content) return;
+    const scrollTop = content.scrollTop;
+    for (let i = sections.length - 1; i >= 0; i--) {
+      const el = content.querySelector(`#section-${sections[i].id}`) as HTMLElement;
+      if (el && el.offsetTop - 24 <= scrollTop) {
+        activeSection = sections[i].id;
+        return;
+      }
+    }
+    activeSection = sections[0].id;
+  }
+
+  function scrollTo(id: string) {
+    activeSection = id;
+    const content = document.querySelector('.settings-content') as HTMLElement;
+    const el = content?.querySelector(`#section-${id}`) as HTMLElement;
+    if (el && content) {
+      content.scrollTo({ top: el.offsetTop - 16, behavior: 'smooth' });
+    }
+  }
+
+  function toggleCommunity(e: MouseEvent) {
+    e.preventDefault();
     if (!communityEnabled) {
       showWarning = true;
     } else {
@@ -78,6 +115,10 @@
     showWarning = false;
     localStorage.setItem('communityTemplates', 'true');
   }
+
+  function cancelCommunity() {
+    showWarning = false;
+  }
 </script>
 
 <div class="page">
@@ -88,118 +129,134 @@
     <h2>设置</h2>
   </div>
 
-  <section>
-    <h3>通用</h3>
-    <div class="setting-row">
-      <div class="setting-info">
-        <span class="setting-label">启用社区模板</span>
-        <span class="setting-desc">允许浏览和安装第三方社区模板</span>
-      </div>
-      <label class="toggle">
-        <input type="checkbox" checked={communityEnabled} onchange={toggleCommunity} />
-        <span class="slider"></span>
-      </label>
-    </div>
-    {#if communityEnabled}
-      <div class="setting-row" style="margin-top: var(--space-sm);">
-        <div class="setting-info">
-          <span class="setting-label">社区模板</span>
-          <span class="setting-desc">浏览、安装和管理社区模板</span>
-        </div>
-        <button class="btn-manage" onclick={() => goto('/templates')}>
-          管理
-          <ChevronRight size={14} />
+  <div class="settings-layout">
+    <nav class="settings-nav">
+      {#each sections as sec (sec.id)}
+        <button
+          class="nav-item"
+          class:active={activeSection === sec.id}
+          onclick={() => scrollTo(sec.id)}
+        >
+          {sec.label}
         </button>
-      </div>
-    {/if}
-  </section>
+      {/each}
+    </nav>
 
-  <section>
-    <h3>
-      <BookOpen size={16} />
-      模板开发
-    </h3>
-    <ul class="info-list">
-      <li>模板协议：可执行文件，stdin 接收 Markdown，stdout 输出 Typst</li>
-      <li>附带 manifest.json 描述模板元数据</li>
-      <li>支持任意编程语言（Go、Rust、Python、JavaScript 等）</li>
-      <li>
-        <a href="https://github.com/Presto-io/template-starter" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://github.com/Presto-io/template-starter'); }}>
-          开发文档
-          <ExternalLink size={12} />
-        </a>
-      </li>
-    </ul>
-  </section>
+    <div class="settings-content">
+      <section id="section-general">
+        <h3>通用</h3>
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-label">启用社区模板</span>
+            <span class="setting-desc">允许浏览和安装第三方社区模板</span>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" checked={communityEnabled} onclick={toggleCommunity} />
+            <span class="slider"></span>
+          </label>
+        </div>
+        {#if communityEnabled}
+          <div class="setting-row" style="margin-top: var(--space-sm);">
+            <div class="setting-info">
+              <span class="setting-label">模板管理</span>
+              <span class="setting-desc">浏览、安装和管理模板</span>
+            </div>
+            <button class="btn-manage" onclick={() => goto('/templates')}>
+              管理
+              <ChevronRight size={14} />
+            </button>
+          </div>
+        {/if}
+      </section>
 
-  <section>
-    <h3>
-      <Info size={16} />
-      关于 Presto
-    </h3>
-    <div class="about">
-      <div class="about-row">
-        <span class="about-label">版本</span>
-        <span class="about-value">{appVersion}</span>
-      </div>
-      <div class="about-row">
-        <span class="about-label">更新</span>
-        <span class="about-value">
-          {#if checking}
-            <RefreshCw size={12} class="spin" />
-            检查中…
-          {:else if updateInfo?.hasUpdate}
-            <a href={updateInfo.downloadURL || updateInfo.releaseURL} onclick={(e: MouseEvent) => { e.preventDefault(); openExternal(updateInfo!.downloadURL || updateInfo!.releaseURL); }} class="update-link">
-              v{updateInfo.latestVersion} 可用
+      <section id="section-template-dev">
+        <h3>
+          <BookOpen size={16} />
+          模板开发
+        </h3>
+        <ul class="info-list">
+          <li>模板协议：可执行文件，stdin 接收 Markdown，stdout 输出 Typst</li>
+          <li>附带 manifest.json 描述模板元数据</li>
+          <li>支持任意编程语言（Go、Rust、Python、JavaScript 等）</li>
+          <li>
+            <a href="https://github.com/Presto-io/template-starter" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://github.com/Presto-io/template-starter'); }}>
+              开发文档
               <ExternalLink size={12} />
             </a>
-          {:else if updateInfo && !updateInfo.hasUpdate}
-            已是最新版本
-          {:else if updateError}
-            <span class="update-error" title={updateError}>检查失败</span>
-          {:else}
-            <button class="btn-check-update" onclick={checkUpdate}>检查更新</button>
-          {/if}
-        </span>
-      </div>
-      <div class="about-row">
-        <span class="about-label">源码</span>
-        <a href="https://github.com/Presto-io/Presto" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://github.com/Presto-io/Presto'); }} class="about-value">
-          GitHub
-          <ExternalLink size={12} />
-        </a>
-      </div>
-      <div class="about-row">
-        <span class="about-label">许可证</span>
-        <span class="about-value">MIT License</span>
-      </div>
-    </div>
-  </section>
+          </li>
+        </ul>
+      </section>
 
-  <section>
-    <h3>开源协议声明</h3>
-    <p class="section-desc">Presto 基于以下开源软件构建，感谢这些项目的贡献者。</p>
-    <ul class="license-list">
-      <li><a href="https://go.dev" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://go.dev'); }} class="lib-name">Go<ExternalLink size={10} /></a><span class="lib-license">BSD-3-Clause</span></li>
-      <li><a href="https://typst.app" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://typst.app'); }} class="lib-name">Typst<ExternalLink size={10} /></a><span class="lib-license">Apache 2.0</span></li>
-      <li><a href="https://svelte.dev" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://svelte.dev'); }} class="lib-name">Svelte<ExternalLink size={10} /></a><span class="lib-license">MIT</span></li>
-      <li><a href="https://svelte.dev/docs/kit" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://svelte.dev/docs/kit'); }} class="lib-name">SvelteKit<ExternalLink size={10} /></a><span class="lib-license">MIT</span></li>
-      <li><a href="https://vite.dev" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://vite.dev'); }} class="lib-name">Vite<ExternalLink size={10} /></a><span class="lib-license">MIT</span></li>
-      <li><a href="https://www.typescriptlang.org" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://www.typescriptlang.org'); }} class="lib-name">TypeScript<ExternalLink size={10} /></a><span class="lib-license">Apache 2.0</span></li>
-      <li><a href="https://wails.io" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://wails.io'); }} class="lib-name">Wails<ExternalLink size={10} /></a><span class="lib-license">MIT</span></li>
-      <li><a href="https://github.com/yuin/goldmark" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://github.com/yuin/goldmark'); }} class="lib-name">Goldmark<ExternalLink size={10} /></a><span class="lib-license">MIT</span></li>
-      <li><a href="https://codemirror.net" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://codemirror.net'); }} class="lib-name">CodeMirror<ExternalLink size={10} /></a><span class="lib-license">MIT</span></li>
-      <li><a href="https://lucide.dev" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://lucide.dev'); }} class="lib-name">Lucide<ExternalLink size={10} /></a><span class="lib-license">ISC</span></li>
-      <li><a href="https://github.com/go-yaml/yaml" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://github.com/go-yaml/yaml'); }} class="lib-name">yaml.v3<ExternalLink size={10} /></a><span class="lib-license">MIT / Apache 2.0</span></li>
-    </ul>
-  </section>
+      <section id="section-about">
+        <h3>
+          <Info size={16} />
+          关于 Presto
+        </h3>
+        <div class="about">
+          <div class="about-row">
+            <span class="about-label">版本</span>
+            <span class="about-value">{appVersion}</span>
+          </div>
+          <div class="about-row">
+            <span class="about-label">更新</span>
+            <span class="about-value">
+              {#if checking}
+                <RefreshCw size={12} class="spin" />
+                检查中…
+              {:else if updateInfo?.hasUpdate}
+                <a href={updateInfo.downloadURL || updateInfo.releaseURL} onclick={(e: MouseEvent) => { e.preventDefault(); openExternal(updateInfo!.downloadURL || updateInfo!.releaseURL); }} class="update-link">
+                  v{updateInfo.latestVersion} 可用
+                  <ExternalLink size={12} />
+                </a>
+              {:else if updateInfo && !updateInfo.hasUpdate}
+                已是最新版本
+              {:else if updateError}
+                <span class="update-error" title={updateError}>检查失败</span>
+              {:else}
+                <button class="btn-check-update" onclick={checkUpdate}>检查更新</button>
+              {/if}
+            </span>
+          </div>
+          <div class="about-row">
+            <span class="about-label">源码</span>
+            <a href="https://github.com/Presto-io/Presto" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://github.com/Presto-io/Presto'); }} class="about-value">
+              GitHub
+              <ExternalLink size={12} />
+            </a>
+          </div>
+          <div class="about-row">
+            <span class="about-label">许可证</span>
+            <span class="about-value">MIT License</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="section-licenses">
+        <h3>开源协议声明</h3>
+        <p class="section-desc">Presto 基于以下开源软件构建，感谢这些项目的贡献者。</p>
+        <ul class="license-list">
+          <li><a href="https://go.dev" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://go.dev'); }} class="lib-name">Go<ExternalLink size={10} /></a><span class="lib-license">BSD-3-Clause</span></li>
+          <li><a href="https://typst.app" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://typst.app'); }} class="lib-name">Typst<ExternalLink size={10} /></a><span class="lib-license">Apache 2.0</span></li>
+          <li><a href="https://svelte.dev" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://svelte.dev'); }} class="lib-name">Svelte<ExternalLink size={10} /></a><span class="lib-license">MIT</span></li>
+          <li><a href="https://svelte.dev/docs/kit" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://svelte.dev/docs/kit'); }} class="lib-name">SvelteKit<ExternalLink size={10} /></a><span class="lib-license">MIT</span></li>
+          <li><a href="https://vite.dev" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://vite.dev'); }} class="lib-name">Vite<ExternalLink size={10} /></a><span class="lib-license">MIT</span></li>
+          <li><a href="https://www.typescriptlang.org" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://www.typescriptlang.org'); }} class="lib-name">TypeScript<ExternalLink size={10} /></a><span class="lib-license">Apache 2.0</span></li>
+          <li><a href="https://wails.io" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://wails.io'); }} class="lib-name">Wails<ExternalLink size={10} /></a><span class="lib-license">MIT</span></li>
+          <li><a href="https://github.com/yuin/goldmark" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://github.com/yuin/goldmark'); }} class="lib-name">Goldmark<ExternalLink size={10} /></a><span class="lib-license">MIT</span></li>
+          <li><a href="https://codemirror.net" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://codemirror.net'); }} class="lib-name">CodeMirror<ExternalLink size={10} /></a><span class="lib-license">MIT</span></li>
+          <li><a href="https://lucide.dev" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://lucide.dev'); }} class="lib-name">Lucide<ExternalLink size={10} /></a><span class="lib-license">ISC</span></li>
+          <li><a href="https://github.com/go-yaml/yaml" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://github.com/go-yaml/yaml'); }} class="lib-name">yaml.v3<ExternalLink size={10} /></a><span class="lib-license">MIT / Apache 2.0</span></li>
+        </ul>
+      </section>
+    </div>
+  </div>
 </div>
 
 {#if showWarning}
   <div
     class="modal-overlay"
-    onclick={() => showWarning = false}
-    onkeydown={(e) => { if (e.key === 'Escape') showWarning = false; }}
+    onclick={cancelCommunity}
+    onkeydown={(e) => { if (e.key === 'Escape') cancelCommunity(); }}
     role="dialog"
     aria-modal="true"
     aria-label="安全警告"
@@ -213,7 +270,7 @@
       <h3>安全警告</h3>
       <p>社区模板由第三方开发者提供，未经官方审核，可能存在安全风险。请仅安装你信任的模板。</p>
       <div class="modal-actions">
-        <button class="btn-secondary" onclick={() => showWarning = false}>取消</button>
+        <button class="btn-secondary" onclick={cancelCommunity}>取消</button>
         <button class="btn-danger" onclick={confirmCommunity}>我了解风险，启用</button>
       </div>
     </div>
@@ -224,10 +281,9 @@
   .page {
     padding: var(--space-xl);
     padding-top: 48px;
-    max-width: 700px;
-    margin: 0 auto;
-    overflow-y: auto;
     height: 100%;
+    display: flex;
+    flex-direction: column;
   }
   h2 {
     margin: 0;
@@ -240,6 +296,7 @@
     align-items: center;
     gap: var(--space-md);
     margin-bottom: var(--space-xl);
+    flex-shrink: 0;
   }
   .btn-back {
     display: flex;
@@ -255,6 +312,55 @@
     transition: background var(--transition);
   }
   .btn-back:hover { background: var(--color-surface-hover); }
+
+  /* Two-column layout */
+  .settings-layout {
+    display: flex;
+    gap: var(--space-xl);
+    flex: 1;
+    min-height: 0;
+  }
+
+  .settings-nav {
+    width: 120px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+  }
+
+  .nav-item {
+    text-align: left;
+    padding: var(--space-sm) var(--space-md);
+    background: none;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--color-muted);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition);
+    white-space: nowrap;
+  }
+  .nav-item:hover {
+    color: var(--color-text);
+    background: var(--color-surface);
+  }
+  .nav-item.active {
+    color: var(--color-accent);
+    background: var(--color-surface);
+  }
+
+  .settings-content {
+    flex: 1;
+    overflow-y: auto;
+    max-width: 600px;
+    padding-right: var(--space-md);
+  }
+
   .btn-manage {
     display: inline-flex;
     align-items: center;
