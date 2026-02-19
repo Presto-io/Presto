@@ -14,6 +14,8 @@
 	--color-accent-hover: #89b4fa;
 	--color-danger: #f7768e;
 	--color-success: #9ece6a;
+	--color-cta: #22c55e;
+	--color-secondary: #2a2d44;
 
 	--font-ui: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 	--font-mono: 'JetBrains Mono', ui-monospace, monospace;
@@ -23,6 +25,7 @@
 	--space-md: 12px;
 	--space-lg: 16px;
 	--space-xl: 24px;
+	--space-2xl: 32px;
 
 	--radius-sm: 6px;
 	--radius-md: 8px;
