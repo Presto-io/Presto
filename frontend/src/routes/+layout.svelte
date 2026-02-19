@@ -4,6 +4,7 @@
 	import { Package } from 'lucide-svelte';
 	import WizardOverlay from '$lib/components/wizard/WizardOverlay.svelte';
 	import { importTemplateZip } from '$lib/api/client';
+	import { templateStore } from '$lib/stores/templates.svelte';
 
 	let { children } = $props();
 
@@ -68,7 +69,7 @@
 			const tpls = await importTemplateZip(file);
 			const names = tpls.map(t => t.displayName || t.name).join('、');
 			showToast(`模板 "${names}" 导入成功`, 'success');
-			window.dispatchEvent(new CustomEvent('templates-changed'));
+			await templateStore.refresh();
 		} catch (err: any) {
 			if (err.conflicts) {
 				// Conflict: auto-rename and retry
@@ -76,7 +77,7 @@
 					const tpls = await importTemplateZip(file, 'rename');
 					const names = tpls.map(t => t.displayName || t.name).join('、');
 					showToast(`模板 "${names}" 导入成功（已自动重命名）`, 'success');
-					window.dispatchEvent(new CustomEvent('templates-changed'));
+					await templateStore.refresh();
 				} catch (retryErr) {
 					showToast(retryErr instanceof Error ? retryErr.message : String(retryErr), 'error');
 				}
