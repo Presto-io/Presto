@@ -181,3 +181,5 @@ cd frontend && npm run check     # svelte-check + TypeScript
 - 每完成一个逻辑任务就 commit 一次（按任务粒度，不是按文件）
 - Commit 消息用中文
 - 不要自动 push，除非被明确要求
+- 当用户在对话中提出新的项目规范、架构决策或工作习惯要求时，应主动更新本文件（CLAUDE.md）以保持指南与实际一致
+- 开始任务前先检查当前可用的技能（Skills），优先使用已安装的技能来完成工作，不要忽略它们直接蛮干
