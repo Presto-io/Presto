@@ -128,6 +128,31 @@ func (m *Manager) UniqueTemplateName(name string) string {
 	}
 }
 
+// UpdateDisplayName updates the displayName field in a template's manifest.json.
+func (m *Manager) UpdateDisplayName(name, newDisplayName string) error {
+	name = filepath.Base(name)
+	if IsOfficial(name) {
+		return fmt.Errorf("cannot modify built-in template")
+	}
+	tplDir := filepath.Join(m.TemplatesDir, name)
+	manifestPath := filepath.Join(tplDir, "manifest.json")
+
+	data, err := os.ReadFile(manifestPath)
+	if err != nil {
+		return fmt.Errorf("template %q not found", name)
+	}
+	manifest, err := ParseManifest(data)
+	if err != nil {
+		return fmt.Errorf("invalid manifest: %w", err)
+	}
+	manifest.DisplayName = newDisplayName
+	out, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal manifest: %w", err)
+	}
+	return os.WriteFile(manifestPath, out, 0644)
+}
+
 // Rename renames a user-installed template (directory, manifest, binary).
 // SEC-06: Validates names and verifies paths stay within TemplatesDir.
 func (m *Manager) Rename(oldName, newName string) error {
