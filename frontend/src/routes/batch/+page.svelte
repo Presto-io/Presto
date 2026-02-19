@@ -1,17 +1,19 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { listTemplates, convertAndCompile } from '$lib/api/client';
+  import { convertAndCompile, importBatchZip } from '$lib/api/client';
   import { createZip } from '$lib/utils/zip';
-  import type { Template } from '$lib/api/types';
-  import { ArrowLeft, Upload, FileText, Download, X, Loader, CheckCircle, AlertCircle, Search, Package } from 'lucide-svelte';
+  import { templateStore } from '$lib/stores/templates.svelte';
+  import { extractTemplateName, resolveTemplate } from '$lib/utils/frontmatter';
+  import type { BatchFile, BatchResult } from '$lib/api/types';
+  import { ArrowLeft, Upload, FileText, Download, X, Loader, CheckCircle, AlertCircle, Search, Package, GripVertical } from 'lucide-svelte';
   import { goto } from '$app/navigation';
 
   const CONCURRENCY = 3;
 
-  let templates: Template[] = $state([]);
+  let templates = $derived(templateStore.templates);
   let selectedTemplate = $state('');
   let tplSearch = $state('');
-  let tplLoading = $state(true);
+  let tplLoading = $derived(templateStore.loading);
 
   let filteredTemplates = $derived(
     templates.filter(tpl => {
@@ -22,80 +24,310 @@
     })
   );
 
-  let files: File[] = $state([]);
-  let results: { name: string; blob?: Blob; error?: string }[] = $state([]);
+  let batchFiles: BatchFile[] = $state([]);
+  let results: BatchResult[] = $state([]);
   let processing = $state(false);
   let dragOver = $state(false);
   let fileInput: HTMLInputElement | undefined = $state();
 
+  // Drag-and-drop between groups
+  let selectedFileIds = $state<Set<string>>(new Set());
+  let dragOverTemplate = $state<string | null>(null);
+  let draggingFiles = $state(false);
+  let zipImporting = $state(false);
+
   let successCount = $derived(results.filter(r => r.blob).length);
   let errorCount = $derived(results.filter(r => r.error).length);
   let progress = $derived(results.length);
+  let totalFiles = $derived(batchFiles.length);
+
+  // Group files by template
+  interface TemplateGroup {
+    templateId: string;
+    displayName: string;
+    files: BatchFile[];
+  }
+
+  let groups = $derived.by(() => {
+    const map = new Map<string, BatchFile[]>();
+    for (const f of batchFiles) {
+      if (!map.has(f.templateId)) map.set(f.templateId, []);
+      map.get(f.templateId)!.push(f);
+    }
+    const result: TemplateGroup[] = [];
+    for (const [templateId, files] of map) {
+      const tpl = templates.find(t => t.name === templateId);
+      result.push({
+        templateId,
+        displayName: tpl?.displayName || tpl?.name || templateId,
+        files,
+      });
+    }
+    return result;
+  });
+
+  // Group results by template
+  let resultGroups = $derived.by(() => {
+    const map = new Map<string, BatchResult[]>();
+    for (const r of results) {
+      if (!map.has(r.templateId)) map.set(r.templateId, []);
+      map.get(r.templateId)!.push(r);
+    }
+    const out: { templateId: string; displayName: string; results: BatchResult[] }[] = [];
+    for (const [templateId, rs] of map) {
+      const tpl = templates.find(t => t.name === templateId);
+      out.push({
+        templateId,
+        displayName: tpl?.displayName || tpl?.name || templateId,
+        results: rs,
+      });
+    }
+    return out;
+  });
+
+  // Count files per template (for nav badge)
+  function groupFileCount(templateName: string): number {
+    return batchFiles.filter(f => f.templateId === templateName).length;
+  }
 
   // Wails desktop: SaveFile binding available?
   const wailsSaveFile: ((b64: string, name: string) => Promise<void>) | undefined =
     (window as any).go?.main?.App?.SaveFile;
 
   onMount(async () => {
-    try {
-      templates = (await listTemplates()) ?? [];
-      if (templates.length > 0) {
-        selectedTemplate = templates[0].name;
-      }
-    } catch {}
-    finally { tplLoading = false; }
+    await templateStore.load();
+    if (templates.length > 0 && !selectedTemplate) {
+      selectedTemplate = templates[0].name;
+    }
   });
+
+  // --- File adding with auto-detect ---
+  async function addFiles(newFiles: File[]) {
+    const additions: BatchFile[] = [];
+    for (const file of newFiles) {
+      // Read only the first 2KB for frontmatter detection
+      const headerText = await file.slice(0, 2048).text();
+      const field = extractTemplateName(headerText);
+      let templateId = selectedTemplate;
+      let autoDetected = false;
+
+      if (field) {
+        const resolved = resolveTemplate(field, templates);
+        if (resolved) {
+          templateId = resolved;
+          autoDetected = true;
+        }
+      }
+
+      additions.push({
+        id: crypto.randomUUID(),
+        file,
+        templateId,
+        autoDetected,
+      });
+    }
+    batchFiles = [...batchFiles, ...additions];
+  }
 
   function handleDrop(e: DragEvent) {
     e.preventDefault();
     dragOver = false;
-    const dropped = Array.from(e.dataTransfer?.files ?? []).filter(f =>
+
+    const droppedFiles = Array.from(e.dataTransfer?.files ?? []);
+
+    // Separate ZIPs from markdown files
+    const zipFiles = droppedFiles.filter(f => f.name.toLowerCase().endsWith('.zip'));
+    const mdFiles = droppedFiles.filter(f =>
       f.name.endsWith('.md') || f.name.endsWith('.markdown') || f.name.endsWith('.txt')
     );
-    files = [...files, ...dropped];
+
+    if (mdFiles.length > 0) addFiles(mdFiles);
+    for (const zip of zipFiles) handleZipImport(zip);
+  }
+
+  async function handleZipImport(zipFile: File) {
+    zipImporting = true;
+    try {
+      const result = await importBatchZip(zipFile);
+
+      // Refresh templates if any were imported
+      if (result.templates.length > 0) {
+        await templateStore.refresh();
+      }
+
+      // Create BatchFile entries from markdown content
+      const additions: BatchFile[] = [];
+      for (const md of result.markdownFiles) {
+        const blob = new Blob([md.content], { type: 'text/markdown' });
+        const file = new File([blob], md.name, { type: 'text/markdown' });
+
+        let templateId = selectedTemplate;
+        let autoDetected = false;
+        if (md.detectedTemplate) {
+          const resolved = resolveTemplate(md.detectedTemplate, templateStore.templates);
+          if (resolved) {
+            templateId = resolved;
+            autoDetected = true;
+          }
+        }
+
+        additions.push({
+          id: crypto.randomUUID(),
+          file,
+          templateId,
+          autoDetected,
+        });
+      }
+      batchFiles = [...batchFiles, ...additions];
+    } catch (err) {
+      console.error('ZIP import failed:', err);
+    } finally {
+      zipImporting = false;
+    }
   }
 
   function handleFileInput(e: Event) {
     const input = e.target as HTMLInputElement;
-    files = [...files, ...Array.from(input.files ?? [])];
+    addFiles(Array.from(input.files ?? []));
     input.value = '';
   }
 
-  function removeFile(index: number) {
-    files = files.filter((_, i) => i !== index);
+  function removeFile(fileId: string) {
+    batchFiles = batchFiles.filter(f => f.id !== fileId);
+    selectedFileIds.delete(fileId);
+    selectedFileIds = new Set(selectedFileIds);
   }
 
   function clearAll() {
-    files = [];
+    batchFiles = [];
     results = [];
+    selectedFileIds = new Set();
   }
 
+  // --- Multi-select ---
+  function toggleSelect(fileId: string, event: MouseEvent) {
+    if (event.metaKey || event.ctrlKey) {
+      const next = new Set(selectedFileIds);
+      if (next.has(fileId)) next.delete(fileId);
+      else next.add(fileId);
+      selectedFileIds = next;
+    } else if (event.shiftKey) {
+      // Range select within the same group
+      const file = batchFiles.find(f => f.id === fileId);
+      if (!file) return;
+      const groupFiles = batchFiles.filter(f => f.templateId === file.templateId);
+      const lastSelected = [...selectedFileIds].pop();
+      const lastFile = lastSelected ? groupFiles.find(f => f.id === lastSelected) : null;
+      if (lastFile && lastFile.templateId === file.templateId) {
+        const startIdx = groupFiles.indexOf(lastFile);
+        const endIdx = groupFiles.indexOf(file);
+        const [from, to] = startIdx < endIdx ? [startIdx, endIdx] : [endIdx, startIdx];
+        const next = new Set(selectedFileIds);
+        for (let i = from; i <= to; i++) next.add(groupFiles[i].id);
+        selectedFileIds = next;
+      } else {
+        selectedFileIds = new Set([fileId]);
+      }
+    } else {
+      selectedFileIds = new Set([fileId]);
+    }
+  }
+
+  // --- Drag-and-drop between groups ---
+  function handleFileDragStart(e: DragEvent, fileId: string) {
+    // Ensure the dragged file is in the selection
+    if (!selectedFileIds.has(fileId)) {
+      selectedFileIds = new Set([fileId]);
+    }
+    draggingFiles = true;
+    e.dataTransfer!.effectAllowed = 'move';
+    e.dataTransfer!.setData('application/x-presto-files', JSON.stringify([...selectedFileIds]));
+  }
+
+  function handleFileDragEnd() {
+    draggingFiles = false;
+    dragOverTemplate = null;
+  }
+
+  function handleTemplateDragOver(e: DragEvent, templateName: string) {
+    // Only accept internal file drags
+    if (!e.dataTransfer?.types.includes('application/x-presto-files')) return;
+    e.preventDefault();
+    e.dataTransfer!.dropEffect = 'move';
+    dragOverTemplate = templateName;
+  }
+
+  function handleTemplateDragLeave(templateName: string) {
+    if (dragOverTemplate === templateName) dragOverTemplate = null;
+  }
+
+  function handleTemplateDrop(e: DragEvent, templateName: string) {
+    e.preventDefault();
+    dragOverTemplate = null;
+    draggingFiles = false;
+
+    const data = e.dataTransfer?.getData('application/x-presto-files');
+    if (!data) return;
+
+    try {
+      const ids: string[] = JSON.parse(data);
+      const idSet = new Set(ids);
+      batchFiles = batchFiles.map(f =>
+        idSet.has(f.id) ? { ...f, templateId: templateName, autoDetected: false } : f
+      );
+      selectedFileIds = new Set();
+    } catch { /* ignore */ }
+  }
+
+  // Also support dropping onto group headers in the right panel
+  function handleGroupHeaderDrop(e: DragEvent, templateId: string) {
+    handleTemplateDrop(e, templateId);
+  }
+
+  function handleGroupHeaderDragOver(e: DragEvent) {
+    if (!e.dataTransfer?.types.includes('application/x-presto-files')) return;
+    e.preventDefault();
+    e.dataTransfer!.dropEffect = 'move';
+  }
+
+  // --- Conversion ---
   async function convertAll() {
-    if (!selectedTemplate || files.length === 0) return;
+    if (batchFiles.length === 0) return;
     processing = true;
     results = [];
 
-    const queue = [...files];
+    const queue = [...batchFiles];
 
     async function worker() {
       while (queue.length > 0) {
-        const file = queue.shift()!;
+        const bf = queue.shift()!;
         try {
-          const text = await file.text();
-          const blob = await convertAndCompile(text, selectedTemplate);
-          results = [...results, { name: file.name.replace(/\.\w+$/, '.pdf'), blob }];
+          const text = await bf.file.text();
+          const blob = await convertAndCompile(text, bf.templateId);
+          results = [...results, {
+            fileId: bf.id,
+            fileName: bf.file.name.replace(/\.\w+$/, '.pdf'),
+            templateId: bf.templateId,
+            blob,
+          }];
         } catch (e) {
-          results = [...results, { name: file.name, error: e instanceof Error ? e.message : String(e) }];
+          results = [...results, {
+            fileId: bf.id,
+            fileName: bf.file.name,
+            templateId: bf.templateId,
+            error: e instanceof Error ? e.message : String(e),
+          }];
         }
       }
     }
 
     await Promise.all(
-      Array.from({ length: Math.min(CONCURRENCY, files.length) }, () => worker())
+      Array.from({ length: Math.min(CONCURRENCY, batchFiles.length) }, () => worker())
     );
     processing = false;
   }
 
+  // --- Download ---
   function blobToBase64(blob: Blob): Promise<string> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -124,13 +356,17 @@
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
-  async function downloadOne(r: { name: string; blob?: Blob }) {
+  async function downloadOne(r: BatchResult) {
     if (!r.blob) return;
     if (wailsSaveFile) {
-      await saveViaWails(r.blob, r.name);
+      await saveViaWails(r.blob, r.fileName);
     } else {
-      saveViaDOM(r.blob, r.name);
+      saveViaDOM(r.blob, r.fileName);
     }
+  }
+
+  function sanitizePath(name: string): string {
+    return name.replace(/[/\\:*?"<>|]/g, '_').trim() || 'default';
   }
 
   async function downloadAllAsZip() {
@@ -138,12 +374,32 @@
     if (successful.length === 0) return;
 
     const zipFiles: { name: string; data: Uint8Array }[] = [];
-    for (const r of successful) {
-      const buf = await r.blob!.arrayBuffer();
-      zipFiles.push({ name: r.name, data: new Uint8Array(buf) });
-    }
-    const zipBlob = createZip(zipFiles);
+    const nameCounters = new Map<string, number>();
 
+    for (const r of successful) {
+      const tpl = templates.find(t => t.name === r.templateId);
+      const folderName = sanitizePath(tpl?.displayName || tpl?.name || r.templateId);
+
+      // Handle duplicate filenames within same folder
+      let fileName = r.fileName;
+      const key = `${folderName}/${fileName}`;
+      const count = nameCounters.get(key) ?? 0;
+      if (count > 0) {
+        const ext = fileName.lastIndexOf('.');
+        fileName = ext > 0
+          ? `${fileName.slice(0, ext)}-${count + 1}${fileName.slice(ext)}`
+          : `${fileName}-${count + 1}`;
+      }
+      nameCounters.set(key, count + 1);
+
+      const buf = await r.blob!.arrayBuffer();
+      zipFiles.push({
+        name: `${folderName}/${fileName}`,
+        data: new Uint8Array(buf),
+      });
+    }
+
+    const zipBlob = createZip(zipFiles);
     if (wailsSaveFile) {
       await saveViaWails(zipBlob, '批量转换结果.zip');
     } else {
@@ -161,7 +417,7 @@
   </div>
 
   <div class="batch-layout">
-    <!-- Left: template list -->
+    <!-- Left: template list (also drop targets) -->
     <nav class="template-nav">
       <div class="nav-search">
         <Search size={14} />
@@ -180,11 +436,19 @@
             <button
               class="nav-item"
               class:active={selectedTemplate === tpl.name}
+              class:drop-target={dragOverTemplate === tpl.name}
+              class:has-files={groupFileCount(tpl.name) > 0}
               onclick={() => selectedTemplate = tpl.name}
+              ondragover={(e) => handleTemplateDragOver(e, tpl.name)}
+              ondragleave={() => handleTemplateDragLeave(tpl.name)}
+              ondrop={(e) => handleTemplateDrop(e, tpl.name)}
             >
               <span class="nav-item-name">{tpl.displayName || tpl.name}</span>
               {#if tpl.builtin}
                 <span class="badge-builtin">内置</span>
+              {/if}
+              {#if groupFileCount(tpl.name) > 0}
+                <span class="nav-item-count">{groupFileCount(tpl.name)}</span>
               {/if}
             </button>
           {/each}
@@ -203,12 +467,12 @@
         <input
           bind:this={fileInput}
           type="file"
-          accept=".md,.markdown,.txt"
+          accept=".md,.markdown,.txt,.zip"
           multiple
           onchange={handleFileInput}
           hidden
         />
-        {#if files.length > 0}
+        {#if batchFiles.length > 0}
           <button class="btn-action subtle" onclick={clearAll}>
             <X size={14} />
             <span>清空</span>
@@ -216,20 +480,23 @@
           <button
             class="btn-convert"
             onclick={convertAll}
-            disabled={processing || !selectedTemplate}
+            disabled={processing || batchFiles.length === 0}
           >
             {#if processing}
               <Loader size={14} class="spin" />
-              <span>转换中 ({progress}/{files.length})</span>
+              <span>转换中 ({progress}/{totalFiles})</span>
             {:else}
-              <span>转换全部 ({files.length})</span>
+              <span>转换全部 ({totalFiles})</span>
             {/if}
           </button>
+        {/if}
+        {#if zipImporting}
+          <span class="zip-status"><Loader size={12} class="spin" /> 导入 ZIP…</span>
         {/if}
       </div>
 
       <!-- Drop zone / empty state -->
-      {#if files.length === 0 && results.length === 0}
+      {#if batchFiles.length === 0 && results.length === 0}
         <div
           class="drop-zone"
           class:drag-over={dragOver}
@@ -240,8 +507,8 @@
           aria-label="拖拽文件区域"
         >
           <Upload size={28} strokeWidth={1.5} />
-          <p class="drop-title">拖拽 Markdown 文件到此处</p>
-          <p class="drop-hint">支持 .md .markdown .txt 格式，可同时添加多个文件</p>
+          <p class="drop-title">拖拽文件到此处</p>
+          <p class="drop-hint">支持 .md .markdown .txt 文件和包含文档与模板的 .zip 包</p>
         </div>
       {:else}
         <!-- Compact drop target -->
@@ -255,33 +522,52 @@
           aria-label="拖拽更多文件"
         >
           <Upload size={14} />
-          <span>拖拽更多文件到此处</span>
+          <span>拖拽更多文件或 ZIP 到此处</span>
         </div>
       {/if}
 
-      <!-- File list -->
-      {#if files.length > 0 && results.length === 0}
-        <div class="section">
-          <div class="section-header">
-            <h3>待转换文件</h3>
-            <span class="section-count">{files.length}</span>
+      <!-- File list grouped by template -->
+      {#if batchFiles.length > 0 && results.length === 0}
+        {#each groups as group (group.templateId)}
+          <div class="section">
+            <div
+              class="section-header group-header"
+              ondragover={handleGroupHeaderDragOver}
+              ondrop={(e) => handleGroupHeaderDrop(e, group.templateId)}
+            >
+              <h3>{group.displayName}</h3>
+              <span class="section-count">{group.files.length}</span>
+            </div>
+            <div class="file-list">
+              {#each group.files as bf (bf.id)}
+                <div
+                  class="file-row"
+                  class:selected={selectedFileIds.has(bf.id)}
+                  onclick={(e) => toggleSelect(bf.id, e)}
+                  draggable="true"
+                  ondragstart={(e) => handleFileDragStart(e, bf.id)}
+                  ondragend={handleFileDragEnd}
+                  role="option"
+                  aria-selected={selectedFileIds.has(bf.id)}
+                >
+                  <span class="drag-handle"><GripVertical size={12} /></span>
+                  <FileText size={14} />
+                  <span class="file-name">{bf.file.name}</span>
+                  {#if bf.autoDetected}
+                    <span class="badge-auto">自动</span>
+                  {/if}
+                  <span class="file-size">{(bf.file.size / 1024).toFixed(1)} KB</span>
+                  <button class="btn-icon" onclick={(e) => { e.stopPropagation(); removeFile(bf.id); }} aria-label="移除 {bf.file.name}">
+                    <X size={12} />
+                  </button>
+                </div>
+              {/each}
+            </div>
           </div>
-          <div class="file-list">
-            {#each files as file, i (file.name + i)}
-              <div class="file-row">
-                <FileText size={14} />
-                <span class="file-name">{file.name}</span>
-                <span class="file-size">{(file.size / 1024).toFixed(1)} KB</span>
-                <button class="btn-icon" onclick={() => removeFile(i)} aria-label="移除 {file.name}">
-                  <X size={12} />
-                </button>
-              </div>
-            {/each}
-          </div>
-        </div>
+        {/each}
       {/if}
 
-      <!-- Results -->
+      <!-- Results grouped by template -->
       {#if results.length > 0}
         <div class="section">
           <div class="section-header">
@@ -295,26 +581,31 @@
               {/if}
             </div>
           </div>
-          <div class="file-list">
-            {#each results as r (r.name)}
-              <div class="file-row" class:has-error={!!r.error}>
-                {#if r.blob}
-                  <CheckCircle size={14} />
-                {:else}
-                  <AlertCircle size={14} />
-                {/if}
-                <span class="file-name">{r.name}</span>
-                {#if r.blob}
-                  <button class="btn-dl" onclick={() => downloadOne(r)}>
-                    <Download size={12} />
-                    <span>下载</span>
-                  </button>
-                {:else}
-                  <span class="error-text" title={r.error}>{r.error}</span>
-                {/if}
+          {#each resultGroups as rg (rg.templateId)}
+            <div class="result-group">
+              <div class="result-group-header">{rg.displayName}</div>
+              <div class="file-list">
+                {#each rg.results as r (r.fileId)}
+                  <div class="file-row" class:has-error={!!r.error}>
+                    {#if r.blob}
+                      <CheckCircle size={14} />
+                    {:else}
+                      <AlertCircle size={14} />
+                    {/if}
+                    <span class="file-name">{r.fileName}</span>
+                    {#if r.blob}
+                      <button class="btn-dl" onclick={() => downloadOne(r)}>
+                        <Download size={12} />
+                        <span>下载</span>
+                      </button>
+                    {:else}
+                      <span class="error-text" title={r.error}>{r.error}</span>
+                    {/if}
+                  </div>
+                {/each}
               </div>
-            {/each}
-          </div>
+            </div>
+          {/each}
           {#if successCount > 0}
             <div class="result-actions">
               <button class="btn-zip" onclick={downloadAllAsZip}>
@@ -365,7 +656,7 @@
   }
   .btn-back:hover { background: var(--color-surface-hover); }
 
-  /* Two-column layout matching settings */
+  /* Two-column layout */
   .batch-layout {
     display: flex;
     gap: var(--space-xl);
@@ -375,7 +666,7 @@
 
   /* Left: template nav */
   .template-nav {
-    width: 160px;
+    width: 180px;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
@@ -423,13 +714,13 @@
     text-align: left;
     padding: var(--space-sm) var(--space-md);
     background: none;
-    border: none;
+    border: 1.5px solid transparent;
     border-radius: var(--radius-sm);
     color: var(--color-muted);
     font-size: 0.8125rem;
     font-weight: 500;
     cursor: pointer;
-    transition: all var(--transition);
+    transition: all 150ms ease;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -445,9 +736,43 @@
     color: var(--color-accent);
     background: var(--color-surface);
   }
+  .nav-item.has-files {
+    color: var(--color-text);
+  }
+  .nav-item.drop-target {
+    border-color: var(--color-accent);
+    background: rgba(122, 162, 247, 0.1);
+    color: var(--color-accent);
+    animation: pulse-glow 0.8s ease-in-out infinite alternate;
+  }
+  @keyframes pulse-glow {
+    from {
+      border-color: var(--color-accent);
+      box-shadow: 0 0 0 0 rgba(122, 162, 247, 0);
+    }
+    to {
+      border-color: var(--color-accent);
+      box-shadow: 0 0 8px 2px rgba(122, 162, 247, 0.2);
+    }
+  }
   .nav-item-name {
     overflow: hidden;
     text-overflow: ellipsis;
+    flex: 1;
+  }
+  .nav-item-count {
+    font-size: 0.625rem;
+    min-width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: var(--color-accent);
+    color: var(--color-bg);
+    font-weight: 600;
+    flex-shrink: 0;
+    font-family: var(--font-mono);
   }
   .badge-builtin {
     font-size: 0.5625rem;
@@ -464,7 +789,7 @@
   .batch-content {
     flex: 1;
     min-height: 0;
-    max-width: 600px;
+    max-width: 640px;
     display: flex;
     flex-direction: column;
     overflow-y: auto;
@@ -517,6 +842,14 @@
   .btn-convert:hover:not(:disabled) { opacity: 0.85; }
   .btn-convert:disabled { opacity: 0.5; cursor: not-allowed; }
 
+  .zip-status {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-size: 0.6875rem;
+    color: var(--color-muted);
+  }
+
   /* Drop zone */
   .drop-zone {
     display: flex;
@@ -563,6 +896,11 @@
     justify-content: space-between;
     margin-bottom: var(--space-sm);
   }
+  .group-header {
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--radius-sm);
+    transition: background var(--transition);
+  }
   h3 {
     margin: 0;
     font-size: 0.8125rem;
@@ -591,6 +929,29 @@
   }
   .badge.success { background: rgba(158, 206, 106, 0.12); color: var(--color-success); }
   .badge.error { background: rgba(247, 118, 142, 0.12); color: var(--color-danger); }
+  .badge-auto {
+    font-size: 0.5625rem;
+    font-weight: 600;
+    padding: 0 5px;
+    border-radius: 3px;
+    background: rgba(122, 162, 247, 0.15);
+    color: var(--color-accent);
+    flex-shrink: 0;
+    line-height: 1.5;
+  }
+
+  /* Result groups */
+  .result-group {
+    margin-bottom: var(--space-md);
+  }
+  .result-group-header {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--color-muted);
+    padding: var(--space-xs) 0;
+    margin-bottom: var(--space-xs);
+    border-bottom: 1px solid var(--color-border);
+  }
 
   /* File list */
   .file-list {
@@ -608,10 +969,26 @@
     border-radius: var(--radius-sm);
     font-size: 0.8125rem;
     color: var(--color-text);
-    transition: border-color var(--transition);
+    transition: border-color var(--transition), background var(--transition);
+    cursor: default;
+    user-select: none;
   }
   .file-row:hover { border-color: var(--color-surface-hover); }
+  .file-row.selected {
+    border-color: var(--color-accent);
+    background: rgba(122, 162, 247, 0.06);
+  }
   .file-row.has-error { color: var(--color-danger); }
+  .drag-handle {
+    color: var(--color-muted);
+    cursor: grab;
+    display: flex;
+    align-items: center;
+    opacity: 0.4;
+    transition: opacity var(--transition);
+    flex-shrink: 0;
+  }
+  .file-row:hover .drag-handle { opacity: 0.8; }
   .file-name {
     flex: 1;
     min-width: 0;
