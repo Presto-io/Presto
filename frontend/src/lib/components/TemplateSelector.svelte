@@ -3,8 +3,7 @@
   import { fly } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import { ChevronDown, Search } from 'lucide-svelte';
-  import { listTemplates } from '$lib/api/client';
-  import type { Template } from '$lib/api/types';
+  import { templateStore } from '$lib/stores/templates.svelte';
 
   let {
     selected = $bindable(''),
@@ -14,7 +13,7 @@
     onbeforechange?: (newValue: string) => void;
   } = $props();
 
-  let templates: Template[] = $state([]);
+  let templates = $derived(templateStore.templates);
   let open = $state(false);
   let search = $state('');
   let highlightIndex = $state(0);
@@ -41,8 +40,7 @@
   );
 
   onMount(() => {
-    listTemplates().then(t => {
-      templates = t ?? [];
+    templateStore.load().then(() => {
       if (!selected && templates.length > 0) {
         if (onbeforechange) {
           onbeforechange(templates[0].name);

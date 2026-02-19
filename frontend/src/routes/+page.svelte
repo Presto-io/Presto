@@ -7,6 +7,8 @@
   import { Download, Settings, FolderOpen, Layers } from 'lucide-svelte';
   import { goto } from '$app/navigation';
   import { editor } from '$lib/stores/editor.svelte';
+  import { templateStore } from '$lib/stores/templates.svelte';
+  import { extractTemplateName, resolveTemplate } from '$lib/utils/frontmatter';
   import { triggerAction, shouldShowPoint } from '$lib/stores/wizard.svelte';
 
   // Wails runtime bindings (available when running as desktop app)
@@ -23,6 +25,7 @@
 
   let converting = $state(false);
   let errorMsg = $state('');
+  let autoDetectedOnce = $state(false);
   let editorScrollRatio = $state(0);
   let previewScrollRatio = $state(0);
   let scrollSource: 'editor' | 'preview' | null = $state(null);
@@ -133,6 +136,18 @@
     pendingTemplate = '';
   }
 
+  /** Auto-detect template from frontmatter (called once on file open/paste). */
+  function tryAutoDetectTemplate(md: string) {
+    if (autoDetectedOnce) return;
+    autoDetectedOnce = true;
+    const field = extractTemplateName(md);
+    if (!field) return;
+    const resolved = resolveTemplate(field, templateStore.templates);
+    if (resolved && resolved !== editor.selectedTemplate) {
+      editor.selectedTemplate = resolved;
+    }
+  }
+
   function extractTypstTitle(typ: string): string {
     const lines = typ.split('\n');
     for (let level = 1; level <= 5; level++) {
@@ -225,6 +240,8 @@
         if (result) {
           editor.markdown = result.content;
           editor.documentDir = result.dir;
+          autoDetectedOnce = false;
+          tryAutoDetectTemplate(result.content);
           handleConvert(editor.markdown);
         }
         return;
@@ -241,6 +258,8 @@
         const reader = new FileReader();
         reader.onload = () => {
           editor.markdown = reader.result as string;
+          autoDetectedOnce = false;
+          tryAutoDetectTemplate(editor.markdown);
           handleConvert(editor.markdown);
         };
         reader.readAsText(file);

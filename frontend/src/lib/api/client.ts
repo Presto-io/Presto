@@ -1,4 +1,4 @@
-import type { Template, Manifest, GitHubRepo } from './types';
+import type { Template, Manifest, GitHubRepo, BatchImportResult } from './types';
 
 const BASE = import.meta.env.VITE_API_URL || '';
 
@@ -147,6 +147,20 @@ export async function importTemplateZip(
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
     throw new Error(body.error || `Import failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function importBatchZip(file: File): Promise<BatchImportResult> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await fetch(`${BASE}/api/batch/import-zip`, {
+    method: 'POST',
+    body: formData,
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+    throw new Error(body.error || `Batch import failed: ${res.status}`);
   }
   return res.json();
 }
