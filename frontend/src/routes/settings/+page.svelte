@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { ExternalLink, Shield, Info, BookOpen, ArrowLeft, RefreshCw } from 'lucide-svelte';
+  import { ExternalLink, Shield, Info, BookOpen, ArrowLeft, RefreshCw, ChevronRight } from 'lucide-svelte';
   import { goto } from '$app/navigation';
 
   let communityEnabled = $state(false);
@@ -100,6 +100,18 @@
         <span class="slider"></span>
       </label>
     </div>
+    {#if communityEnabled}
+      <div class="setting-row" style="margin-top: var(--space-sm);">
+        <div class="setting-info">
+          <span class="setting-label">社区模板</span>
+          <span class="setting-desc">浏览、安装和管理社区模板</span>
+        </div>
+        <button class="btn-manage" onclick={() => goto('/templates')}>
+          管理
+          <ChevronRight size={14} />
+        </button>
+      </div>
+    {/if}
   </section>
 
   <section>
@@ -243,6 +255,25 @@
     transition: background var(--transition);
   }
   .btn-back:hover { background: var(--color-surface-hover); }
+  .btn-manage {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-xs) var(--space-sm);
+    background: var(--color-surface-hover);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    color: var(--color-accent);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition);
+  }
+  .btn-manage:hover {
+    background: var(--color-accent);
+    color: var(--color-bg);
+    border-color: var(--color-accent);
+  }
   section {
     margin-bottom: var(--space-xl);
     padding-bottom: var(--space-xl);
