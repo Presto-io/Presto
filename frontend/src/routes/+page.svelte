@@ -27,6 +27,27 @@
   let scrollSource: 'editor' | 'preview' | null = $state(null);
   let debounceTimer: ReturnType<typeof setTimeout>;
 
+  // Resizable split pane
+  let splitRatio = $state(0.5);
+  let isDragging = $state(false);
+  let layoutEl: HTMLDivElement;
+
+  function onDividerPointerDown(e: PointerEvent) {
+    isDragging = true;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  }
+
+  function onDividerPointerMove(e: PointerEvent) {
+    if (!isDragging || !layoutEl) return;
+    const rect = layoutEl.getBoundingClientRect();
+    const ratio = (e.clientX - rect.left) / rect.width;
+    splitRatio = Math.min(0.8, Math.max(0.2, ratio));
+  }
+
+  function onDividerPointerUp() {
+    isDragging = false;
+  }
+
   // Template switching confirmation
   let pendingTemplate = $state('');
   let confirmDialog: HTMLDialogElement;
@@ -222,8 +243,8 @@
   </div>
 </div>
 
-<div class="editor-layout">
-  <div class="pane">
+<div class="editor-layout" bind:this={layoutEl} class:dragging={isDragging}>
+  <div class="pane" style="flex: {splitRatio}">
     <Editor bind:value={editor.markdown} onchange={handleConvert} scrollRatio={editorScrollRatio} onscroll={(ratio: number) => {
       if (scrollSource !== 'preview') {
         scrollSource = 'editor';
@@ -232,7 +253,15 @@
       }
     }} />
   </div>
-  <div class="pane">
+  <div
+    class="divider"
+    role="separator"
+    aria-orientation="vertical"
+    onpointerdown={onDividerPointerDown}
+    onpointermove={onDividerPointerMove}
+    onpointerup={onDividerPointerUp}
+  ></div>
+  <div class="pane" style="flex: {1 - splitRatio}">
     <Preview svgPages={editor.svgPages} scrollRatio={previewScrollRatio} onscroll={(ratio: number) => {
       if (scrollSource !== 'editor') {
         scrollSource = 'preview';
@@ -316,9 +345,25 @@
     flex: 1;
     overflow: hidden;
   }
+  .editor-layout.dragging {
+    cursor: col-resize;
+    user-select: none;
+  }
   .pane {
-    flex: 1;
     overflow: hidden;
+    min-width: 0;
+  }
+  .divider {
+    width: 5px;
+    flex-shrink: 0;
+    background: var(--color-border);
+    cursor: col-resize;
+    transition: background 0.15s;
+    touch-action: none;
+  }
+  .divider:hover,
+  .editor-layout.dragging .divider {
+    background: var(--color-accent);
   }
   .confirm-dialog {
     border: 1px solid var(--color-border);
