@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { fly, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
-  import { ExternalLink, Shield, Info, BookOpen, ArrowLeft, RefreshCw, Search, Package, Download, Trash2, Loader, Upload } from 'lucide-svelte';
+  import { ExternalLink, Shield, Info, BookOpen, ArrowLeft, RefreshCw, Search, Package, Download, Trash2, Loader, Upload, Pencil, Check, X, AlertTriangle } from 'lucide-svelte';
   import { goto } from '$app/navigation';
-  import { listTemplates, discoverTemplates, installTemplate, deleteTemplate, importTemplateZip } from '$lib/api/client';
+  import { listTemplates, discoverTemplates, installTemplate, deleteTemplate, importTemplateZip, renameTemplate } from '$lib/api/client';
   import type { Template, GitHubRepo } from '$lib/api/types';
   import { triggerAction, resetWizard } from '$lib/stores/wizard.svelte';
 
@@ -121,6 +121,11 @@
     if (content) {
       content.addEventListener('scroll', handleScroll);
     }
+    window.addEventListener('templates-changed', onTemplatesChanged);
+  });
+
+  onDestroy(() => {
+    window.removeEventListener('templates-changed', onTemplatesChanged);
   });
 
   function handleScroll() {
@@ -235,6 +240,15 @@
   // --- ZIP import ---
   let importingZip = $state(false);
   let zipInput: HTMLInputElement | undefined = $state();
+  let conflictModal = $state<{ file: File; conflicts: string[] } | null>(null);
+  let importToast = $state<{ message: string; type: 'success' | 'error' } | null>(null);
+  let importToastTimer: ReturnType<typeof setTimeout>;
+
+  function showImportToast(message: string, type: 'success' | 'error') {
+    clearTimeout(importToastTimer);
+    importToast = { message, type };
+    importToastTimer = setTimeout(() => { importToast = null; }, 2500);
+  }
 
   function handleImportZipClick() {
     zipInput?.click();
@@ -247,14 +261,77 @@
     input.value = '';
     importingZip = true;
     try {
-      await importTemplateZip(file);
+      const tpls = await importTemplateZip(file);
       installed = (await listTemplates()) ?? [];
       installedLoaded = true;
-    } catch (err) {
-      alert(err instanceof Error ? err.message : String(err));
+      const names = tpls.map(t => t.displayName || t.name).join('、');
+      showImportToast(`模板 "${names}" 导入成功`, 'success');
+    } catch (err: any) {
+      if (err.conflicts) {
+        conflictModal = { file, conflicts: err.conflicts };
+      } else {
+        showImportToast(err instanceof Error ? err.message : String(err), 'error');
+      }
     } finally {
       importingZip = false;
     }
+  }
+
+  async function handleConflictResolve(strategy: 'overwrite' | 'skip' | 'rename') {
+    if (!conflictModal) return;
+    const { file } = conflictModal;
+    conflictModal = null;
+    importingZip = true;
+    try {
+      const tpls = await importTemplateZip(file, strategy);
+      installed = (await listTemplates()) ?? [];
+      installedLoaded = true;
+      const names = tpls.map(t => t.displayName || t.name).join('、');
+      const suffix = strategy === 'rename' ? '（已自动重命名）' : strategy === 'skip' ? '（已跳过重复）' : '（已覆盖）';
+      showImportToast(`模板 "${names}" 导入成功${suffix}`, 'success');
+    } catch (err) {
+      showImportToast(err instanceof Error ? err.message : String(err), 'error');
+    } finally {
+      importingZip = false;
+    }
+  }
+
+  // --- Rename ---
+  let renamingTpl = $state('');
+  let renameInput = $state('');
+
+  function startRename(name: string) {
+    renamingTpl = name;
+    renameInput = name;
+  }
+
+  function cancelRename() {
+    renamingTpl = '';
+    renameInput = '';
+  }
+
+  async function confirmRename() {
+    const oldName = renamingTpl;
+    const newName = renameInput.trim();
+    if (!newName || newName === oldName) {
+      cancelRename();
+      return;
+    }
+    try {
+      await renameTemplate(oldName, newName);
+      installed = (await listTemplates()) ?? [];
+      installedLoaded = true;
+      showImportToast(`模板已重命名为 "${newName}"`, 'success');
+    } catch (err) {
+      showImportToast(err instanceof Error ? err.message : String(err), 'error');
+    } finally {
+      cancelRename();
+    }
+  }
+
+  // --- Listen for external template changes (drag-drop import from layout) ---
+  function onTemplatesChanged() {
+    loadInstalled();
   }
 </script>
 
@@ -367,10 +444,25 @@
                   <div class="tpl-row">
                     <div class="tpl-info">
                       <div class="tpl-name-row">
-                        <span class="tpl-name">{tpl.displayName || tpl.name}</span>
-                        <span class="tpl-version">v{tpl.version}</span>
-                        {#if tpl.builtin}
-                          <span class="badge-builtin">内置</span>
+                        {#if renamingTpl === tpl.name}
+                          <input
+                            class="rename-input"
+                            type="text"
+                            bind:value={renameInput}
+                            onkeydown={(e) => { if (e.key === 'Enter') confirmRename(); if (e.key === 'Escape') cancelRename(); }}
+                          />
+                          <button class="btn-rename-action confirm" onclick={confirmRename} aria-label="确认重命名">
+                            <Check size={12} />
+                          </button>
+                          <button class="btn-rename-action cancel" onclick={cancelRename} aria-label="取消重命名">
+                            <X size={12} />
+                          </button>
+                        {:else}
+                          <span class="tpl-name">{tpl.displayName || tpl.name}</span>
+                          <span class="tpl-version">v{tpl.version}</span>
+                          {#if tpl.builtin}
+                            <span class="badge-builtin">内置</span>
+                          {/if}
                         {/if}
                       </div>
                       <p class="tpl-desc">{tpl.description}</p>
@@ -384,14 +476,25 @@
                       <span class="tpl-author">{tpl.author}</span>
                     </div>
                     {#if !tpl.builtin}
-                      <button
-                        class="btn-uninstall"
-                        onclick={() => handleDelete(tpl.name)}
-                        aria-label="卸载 {tpl.name}"
-                      >
-                        <Trash2 size={14} />
-                        <span>卸载</span>
-                      </button>
+                      <div class="tpl-actions">
+                        {#if renamingTpl !== tpl.name}
+                          <button
+                            class="btn-rename"
+                            onclick={() => startRename(tpl.name)}
+                            aria-label="重命名 {tpl.name}"
+                          >
+                            <Pencil size={12} />
+                          </button>
+                        {/if}
+                        <button
+                          class="btn-uninstall"
+                          onclick={() => handleDelete(tpl.name)}
+                          aria-label="卸载 {tpl.name}"
+                        >
+                          <Trash2 size={14} />
+                          <span>卸载</span>
+                        </button>
+                      </div>
                     {/if}
                   </div>
                 {/each}
@@ -583,6 +686,39 @@
         <button class="btn-danger" onclick={confirmCommunity}>我了解风险，启用</button>
       </div>
     </div>
+  </div>
+{/if}
+
+{#if conflictModal}
+  <div
+    class="modal-overlay"
+    onclick={() => conflictModal = null}
+    onkeydown={(e) => { if (e.key === 'Escape') conflictModal = null; }}
+    role="dialog"
+    aria-modal="true"
+    aria-label="模板名称冲突"
+    tabindex="-1"
+  >
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="modal" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
+      <div class="modal-icon conflict">
+        <AlertTriangle size={32} />
+      </div>
+      <h3>模板名称冲突</h3>
+      <p>以下模板已存在：{conflictModal.conflicts.join('、')}。请选择处理方式：</p>
+      <div class="modal-actions conflict-actions">
+        <button class="btn-secondary" onclick={() => conflictModal = null}>取消</button>
+        <button class="btn-secondary" onclick={() => handleConflictResolve('skip')}>跳过</button>
+        <button class="btn-secondary" onclick={() => handleConflictResolve('rename')}>自动重命名</button>
+        <button class="btn-danger" onclick={() => handleConflictResolve('overwrite')}>覆盖</button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+{#if importToast}
+  <div class="import-toast" class:toast-error={importToast.type === 'error'}>
+    {importToast.message}
   </div>
 {/if}
 
@@ -1120,4 +1256,89 @@
     color: white;
   }
   .btn-danger:hover { opacity: 0.9; }
+
+  /* --- Rename --- */
+  .tpl-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    flex-shrink: 0;
+  }
+  .rename-input {
+    flex: 1;
+    min-width: 0;
+    padding: 2px var(--space-sm);
+    background: var(--color-bg);
+    border: 1px solid var(--color-accent);
+    border-radius: var(--radius-sm);
+    color: var(--color-text);
+    font-size: 0.875rem;
+    font-family: var(--font-mono);
+    outline: none;
+  }
+  .btn-rename-action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition);
+    flex-shrink: 0;
+  }
+  .btn-rename-action.confirm {
+    background: var(--color-accent);
+    color: var(--color-bg);
+  }
+  .btn-rename-action.confirm:hover { opacity: 0.85; }
+  .btn-rename-action.cancel {
+    background: var(--color-surface);
+    color: var(--color-muted);
+  }
+  .btn-rename-action.cancel:hover { color: var(--color-danger); }
+  .btn-rename {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    background: none;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    color: var(--color-muted);
+    cursor: pointer;
+    transition: all var(--transition);
+  }
+  .btn-rename:hover {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+  }
+
+  /* --- Conflict modal --- */
+  .modal-icon.conflict { color: var(--color-warning, #e0af68); }
+  .conflict-actions { flex-wrap: wrap; }
+
+  /* --- Import toast --- */
+  .import-toast {
+    position: fixed;
+    bottom: var(--space-xl);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9001;
+    padding: var(--space-sm) var(--space-lg);
+    background: var(--color-success);
+    color: var(--color-bg);
+    border-radius: var(--radius-md);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    pointer-events: none;
+    animation: toast-in 200ms ease-out;
+  }
+  .import-toast.toast-error { background: var(--color-danger); }
+  @keyframes toast-in {
+    from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
 </style>

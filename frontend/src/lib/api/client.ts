@@ -110,13 +110,40 @@ export async function deleteTemplate(id: string): Promise<void> {
   if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
 }
 
-export async function importTemplateZip(file: File): Promise<Template[]> {
+export async function renameTemplate(id: string, newName: string): Promise<void> {
+  const res = await fetch(`${BASE}/api/templates/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: newName }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+    throw new Error(body.error || `Rename failed: ${res.status}`);
+  }
+}
+
+export interface ImportConflictError {
+  error: 'conflict';
+  conflicts: string[];
+}
+
+export async function importTemplateZip(
+  file: File,
+  onConflict?: 'overwrite' | 'skip' | 'rename',
+): Promise<Template[]> {
   const formData = new FormData();
   formData.append('file', file);
-  const res = await fetch(`${BASE}/api/templates/import`, {
+  const params = onConflict ? `?onConflict=${onConflict}` : '';
+  const res = await fetch(`${BASE}/api/templates/import${params}`, {
     method: 'POST',
     body: formData,
   });
+  if (res.status === 409) {
+    const body = await res.json();
+    const err = new Error(body.error || 'conflict') as Error & { conflicts?: string[] };
+    err.conflicts = body.conflicts;
+    throw err;
+  }
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
     throw new Error(body.error || `Import failed: ${res.status}`);

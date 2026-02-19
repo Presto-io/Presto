@@ -35,6 +35,8 @@ func (s *Server) handleImportTemplate(w http.ResponseWriter, r *http.Request) {
 	// SEC-11: Limit request body
 	r.Body = http.MaxBytesReader(w, r.Body, maxZIPUploadSize)
 
+	onConflict := r.URL.Query().Get("onConflict") // "overwrite", "skip", "rename", or "" (error)
+
 	if err := r.ParseMultipartForm(10 << 20); err != nil {
 		log.Printf("[templates] import: parse form failed: %v", err)
 		writeJSONError(w, "invalid request or file too large", http.StatusBadRequest)
@@ -83,20 +85,108 @@ func (s *Server) handleImportTemplate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var imported []importResult
+	// Pre-scan: read manifests and detect conflicts
+	type templateEntry struct {
+		root     string
+		manifest *template.Manifest
+	}
+	var entries []templateEntry
+	var conflicts []string
+
 	for _, root := range roots {
-		result, err := s.importTemplateFromZipDir(zr, root)
+		manifest, err := readManifestFromZip(zr, root)
 		if err != nil {
-			log.Printf("[templates] import: failed for root %q: %v", root, err)
+			writeJSONError(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		entries = append(entries, templateEntry{root: root, manifest: manifest})
+		if s.manager.Exists(manifest.Name) && !template.IsOfficial(manifest.Name) {
+			conflicts = append(conflicts, manifest.Name)
+		}
+	}
+
+	// If conflicts exist and no strategy specified, return 409
+	if len(conflicts) > 0 && onConflict == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		json.NewEncoder(w).Encode(map[string]any{
+			"error":     "conflict",
+			"conflicts": conflicts,
+		})
+		return
+	}
+
+	var imported []importResult
+	for _, entry := range entries {
+		name := entry.manifest.Name
+
+		if s.manager.Exists(name) {
+			switch onConflict {
+			case "overwrite":
+				if template.IsOfficial(name) {
+					writeJSONError(w, "cannot overwrite built-in template", http.StatusBadRequest)
+					return
+				}
+				if err := s.manager.Uninstall(name); err != nil {
+					log.Printf("[templates] import: uninstall %q for overwrite failed: %v", name, err)
+					writeJSONError(w, fmt.Sprintf("failed to remove existing template %q", name), http.StatusInternalServerError)
+					return
+				}
+			case "skip":
+				log.Printf("[templates] import: skipping existing template %q", name)
+				continue
+			case "rename":
+				name = s.manager.UniqueTemplateName(name)
+				log.Printf("[templates] import: auto-renaming to %q", name)
+			default:
+				writeJSONError(w, fmt.Sprintf("template %q already exists", name), http.StatusConflict)
+				return
+			}
+		}
+
+		result, err := s.importTemplateFromZipDir(zr, entry.root, name)
+		if err != nil {
+			log.Printf("[templates] import: failed for root %q: %v", entry.root, err)
 			writeJSONError(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		imported = append(imported, *result)
 	}
 
+	if imported == nil {
+		imported = []importResult{}
+	}
+
 	log.Printf("[templates] imported %d template(s) from ZIP", len(imported))
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(imported)
+}
+
+// readManifestFromZip reads and parses manifest.json from a ZIP directory.
+func readManifestFromZip(zr *zip.Reader, prefix string) (*template.Manifest, error) {
+	files := filesInPrefix(zr, prefix)
+	for _, f := range files {
+		if path.Base(f.Name) == "manifest.json" {
+			rc, err := f.Open()
+			if err != nil {
+				return nil, fmt.Errorf("failed to read manifest.json")
+			}
+			data, err := io.ReadAll(io.LimitReader(rc, 1<<20))
+			rc.Close()
+			if err != nil {
+				return nil, fmt.Errorf("failed to read manifest.json")
+			}
+			manifest, err := template.ParseManifest(data)
+			if err != nil {
+				return nil, fmt.Errorf("invalid manifest.json: %v", err)
+			}
+			if manifest.Name == "" {
+				return nil, fmt.Errorf("manifest.json must have a 'name' field")
+			}
+			return manifest, nil
+		}
+	}
+	return nil, fmt.Errorf("no manifest.json found in %q", prefix)
 }
 
 // findTemplateRoots discovers all directories containing manifest.json in the ZIP.
@@ -150,7 +240,9 @@ func filesInPrefix(zr *zip.Reader, prefix string) []*zip.File {
 	return result
 }
 
-func (s *Server) importTemplateFromZipDir(zr *zip.Reader, prefix string) (*importResult, error) {
+// importTemplateFromZipDir installs a single template from a ZIP directory.
+// installName allows overriding the name from manifest (for rename-on-conflict).
+func (s *Server) importTemplateFromZipDir(zr *zip.Reader, prefix string, installName string) (*importResult, error) {
 	files := filesInPrefix(zr, prefix)
 
 	var manifestData []byte
@@ -184,13 +276,13 @@ func (s *Server) importTemplateFromZipDir(zr *zip.Reader, prefix string) (*impor
 	if err != nil {
 		return nil, fmt.Errorf("invalid manifest.json: %v", err)
 	}
-	if manifest.Name == "" {
-		return nil, fmt.Errorf("manifest.json must have a 'name' field")
-	}
+
+	// Use installName (may differ from manifest name for rename-on-conflict)
+	name := installName
 
 	// SEC-06: Validate template name
-	name := filepath.Base(manifest.Name)
-	if name != manifest.Name || strings.Contains(name, "..") {
+	safeName := filepath.Base(name)
+	if safeName != name || strings.Contains(name, "..") {
 		return nil, fmt.Errorf("invalid template name in manifest")
 	}
 
@@ -208,6 +300,15 @@ func (s *Server) importTemplateFromZipDir(zr *zip.Reader, prefix string) (*impor
 
 	if err := os.MkdirAll(tplDir, 0700); err != nil {
 		return nil, fmt.Errorf("failed to create template directory")
+	}
+
+	// Update manifest name if it was renamed
+	if name != manifest.Name {
+		manifest.Name = name
+		manifestData, err = json.MarshalIndent(manifest, "", "  ")
+		if err != nil {
+			return nil, fmt.Errorf("failed to update manifest")
+		}
 	}
 
 	if err := os.WriteFile(filepath.Join(tplDir, "manifest.json"), manifestData, 0644); err != nil {

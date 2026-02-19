@@ -52,6 +52,7 @@ func NewServer(opts ServerOptions) http.Handler {
 	s.mux.HandleFunc("GET /api/templates", s.handleListTemplates)
 	s.mux.HandleFunc("GET /api/templates/discover", s.handleDiscoverTemplates)
 	s.mux.HandleFunc("POST /api/templates/{id}/install", s.handleInstallTemplate)
+	s.mux.HandleFunc("PATCH /api/templates/{id}", s.handleRenameTemplate)
 	s.mux.HandleFunc("DELETE /api/templates/{id}", s.handleDeleteTemplate)
 	s.mux.HandleFunc("GET /api/templates/{id}/manifest", s.handleGetManifest)
 	s.mux.HandleFunc("GET /api/templates/{id}/example", s.handleGetExample)
