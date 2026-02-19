@@ -28,12 +28,13 @@ func (s *Server) handleListTemplates(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[templates] found %d templates", len(templates))
 
 	type templateInfo struct {
-		Name        string `json:"name"`
-		DisplayName string `json:"displayName"`
-		Description string `json:"description"`
-		Version     string `json:"version"`
-		Author      string `json:"author"`
-		Builtin     bool   `json:"builtin"`
+		Name        string   `json:"name"`
+		DisplayName string   `json:"displayName"`
+		Description string   `json:"description"`
+		Version     string   `json:"version"`
+		Author      string   `json:"author"`
+		Builtin     bool     `json:"builtin"`
+		Keywords    []string `json:"keywords"`
 	}
 
 	var result []templateInfo
@@ -45,6 +46,7 @@ func (s *Server) handleListTemplates(w http.ResponseWriter, r *http.Request) {
 			Version:     t.Manifest.Version,
 			Author:      t.Manifest.Author,
 			Builtin:     template.IsOfficial(t.Manifest.Name),
+			Keywords:    t.Manifest.Keywords,
 		})
 	}
 
