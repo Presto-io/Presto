@@ -3,13 +3,16 @@ package main
 import (
 	"context"
 	"embed"
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 
 	"github.com/wailsapp/wails/v2"
@@ -24,6 +27,9 @@ import (
 	"github.com/mrered/presto/internal/template"
 	"github.com/mrered/presto/internal/typst"
 )
+
+// version is set at build time via -ldflags "-X main.version=..."
+var version string
 
 //go:embed all:build
 var assets embed.FS
@@ -125,6 +131,70 @@ func buildMenu(app *App) *menu.Menu {
 // bypassing the HTTP layer where Wails WebView strips headers/query params.
 func (a *App) CompileSVG(typstSource string, workDir string) ([]string, error) {
 	return a.compiler.CompileToSVG(typstSource, workDir)
+}
+
+// GetVersion returns the current app version.
+func (a *App) GetVersion() string {
+	if version == "" {
+		return "dev"
+	}
+	return version
+}
+
+// UpdateInfo holds the result of a version check against GitHub releases.
+type UpdateInfo struct {
+	HasUpdate      bool   `json:"hasUpdate"`
+	CurrentVersion string `json:"currentVersion"`
+	LatestVersion  string `json:"latestVersion"`
+	DownloadURL    string `json:"downloadURL"`
+	ReleaseURL     string `json:"releaseURL"`
+}
+
+// CheckForUpdate queries GitHub for the latest release and compares with the current version.
+func (a *App) CheckForUpdate() (*UpdateInfo, error) {
+	current := a.GetVersion()
+	info := &UpdateInfo{CurrentVersion: current}
+
+	resp, err := http.Get("https://api.github.com/repos/Presto-io/Presto/releases/latest")
+	if err != nil {
+		return nil, fmt.Errorf("failed to check update: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var release struct {
+		TagName string `json:"tag_name"`
+		HTMLURL string `json:"html_url"`
+		Assets  []struct {
+			Name               string `json:"name"`
+			BrowserDownloadURL string `json:"browser_download_url"`
+		} `json:"assets"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return nil, fmt.Errorf("failed to parse release: %w", err)
+	}
+
+	latest := strings.TrimPrefix(release.TagName, "v")
+	info.LatestVersion = latest
+	info.ReleaseURL = release.HTMLURL
+
+	if latest != current && current != "dev" {
+		info.HasUpdate = true
+	}
+
+	// Find a matching asset for the current platform
+	pattern := fmt.Sprintf("%s-%s", runtime.GOOS, runtime.GOARCH)
+	// Normalize: darwin -> macOS for asset naming
+	if runtime.GOOS == "darwin" {
+		pattern = fmt.Sprintf("macOS-%s", runtime.GOARCH)
+	}
+	for _, asset := range release.Assets {
+		if strings.Contains(asset.Name, pattern) {
+			info.DownloadURL = asset.BrowserDownloadURL
+			break
+		}
+	}
+
+	return info, nil
 }
 
 // SavePDF converts markdown to PDF and opens a native save dialog.

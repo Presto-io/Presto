@@ -1,10 +1,23 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { ExternalLink, Shield, Info, BookOpen, ArrowLeft } from 'lucide-svelte';
+  import { ExternalLink, Shield, Info, BookOpen, ArrowLeft, RefreshCw } from 'lucide-svelte';
   import { goto } from '$app/navigation';
 
   let communityEnabled = $state(false);
   let showWarning = $state(false);
+  let appVersion = $state('0.1.0');
+  let updateInfo = $state<{ hasUpdate: boolean; latestVersion: string; downloadURL: string; releaseURL: string } | null>(null);
+  let checking = $state(false);
+  let updateError = $state('');
+
+  declare global {
+    interface Window {
+      go?: { main: { App: {
+        GetVersion: () => Promise<string>;
+        CheckForUpdate: () => Promise<{ hasUpdate: boolean; currentVersion: string; latestVersion: string; downloadURL: string; releaseURL: string }>;
+      } } };
+    }
+  }
 
   function openExternal(url: string) {
     if ((window as any).runtime?.BrowserOpenURL) {
@@ -14,8 +27,41 @@
     }
   }
 
-  onMount(() => {
+  async function checkUpdate() {
+    checking = true;
+    updateError = '';
+    updateInfo = null;
+    try {
+      if (window.go?.main?.App?.CheckForUpdate) {
+        const info = await window.go.main.App.CheckForUpdate();
+        updateInfo = info;
+      } else {
+        // Browser fallback: call GitHub API directly
+        const resp = await fetch('https://api.github.com/repos/Presto-io/Presto/releases/latest');
+        if (!resp.ok) throw new Error(`GitHub API error: ${resp.status}`);
+        const release = await resp.json();
+        const latest = (release.tag_name as string).replace(/^v/, '');
+        updateInfo = {
+          hasUpdate: latest !== appVersion && appVersion !== 'dev',
+          latestVersion: latest,
+          downloadURL: release.html_url,
+          releaseURL: release.html_url,
+        };
+      }
+    } catch (e) {
+      updateError = e instanceof Error ? e.message : String(e);
+    } finally {
+      checking = false;
+    }
+  }
+
+  onMount(async () => {
     communityEnabled = localStorage.getItem('communityTemplates') === 'true';
+    if (window.go?.main?.App?.GetVersion) {
+      try {
+        appVersion = await window.go.main.App.GetVersion();
+      } catch {}
+    }
   });
 
   function toggleCommunity() {
@@ -82,7 +128,27 @@
     <div class="about">
       <div class="about-row">
         <span class="about-label">版本</span>
-        <span class="about-value">0.1.0</span>
+        <span class="about-value">{appVersion}</span>
+      </div>
+      <div class="about-row">
+        <span class="about-label">更新</span>
+        <span class="about-value">
+          {#if checking}
+            <RefreshCw size={12} class="spin" />
+            检查中…
+          {:else if updateInfo?.hasUpdate}
+            <a href={updateInfo.downloadURL || updateInfo.releaseURL} onclick={(e: MouseEvent) => { e.preventDefault(); openExternal(updateInfo!.downloadURL || updateInfo!.releaseURL); }} class="update-link">
+              v{updateInfo.latestVersion} 可用
+              <ExternalLink size={12} />
+            </a>
+          {:else if updateInfo && !updateInfo.hasUpdate}
+            已是最新版本
+          {:else if updateError}
+            <span class="update-error" title={updateError}>检查失败</span>
+          {:else}
+            <button class="btn-check-update" onclick={checkUpdate}>检查更新</button>
+          {/if}
+        </span>
       </div>
       <div class="about-row">
         <span class="about-label">源码</span>
@@ -284,6 +350,40 @@
   }
   a.about-value:hover {
     opacity: 0.8;
+  }
+  .btn-check-update {
+    background: none;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    color: var(--color-accent);
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    cursor: pointer;
+    transition: all var(--transition);
+  }
+  .btn-check-update:hover {
+    background: var(--color-surface-hover);
+  }
+  .update-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    color: var(--color-accent);
+    text-decoration: none;
+    cursor: pointer;
+    font-weight: 500;
+  }
+  .update-link:hover { opacity: 0.8; }
+  .update-error {
+    color: var(--color-danger);
+    font-size: 0.75rem;
+  }
+  :global(.spin) {
+    animation: spin 1s linear infinite;
+  }
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
   }
   .section-desc {
     font-size: 0.8125rem;
