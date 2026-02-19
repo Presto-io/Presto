@@ -6,6 +6,8 @@
   import { ArrowLeft, Upload, FileText, Download, X, Loader, CheckCircle, AlertCircle, Search, Package } from 'lucide-svelte';
   import { goto } from '$app/navigation';
 
+  const CONCURRENCY = 3;
+
   let templates: Template[] = $state([]);
   let selectedTemplate = $state('');
   let tplSearch = $state('');
@@ -29,6 +31,10 @@
   let successCount = $derived(results.filter(r => r.blob).length);
   let errorCount = $derived(results.filter(r => r.error).length);
   let progress = $derived(results.length);
+
+  // Wails desktop: SaveFile binding available?
+  const wailsSaveFile: ((b64: string, name: string) => Promise<void>) | undefined =
+    (window as any).go?.main?.App?.SaveFile;
 
   onMount(async () => {
     try {
@@ -69,19 +75,46 @@
     processing = true;
     results = [];
 
-    for (const file of files) {
-      try {
-        const text = await file.text();
-        const blob = await convertAndCompile(text, selectedTemplate);
-        results = [...results, { name: file.name.replace(/\.\w+$/, '.pdf'), blob }];
-      } catch (e) {
-        results = [...results, { name: file.name, error: e instanceof Error ? e.message : String(e) }];
+    const queue = [...files];
+
+    async function worker() {
+      while (queue.length > 0) {
+        const file = queue.shift()!;
+        try {
+          const text = await file.text();
+          const blob = await convertAndCompile(text, selectedTemplate);
+          results = [...results, { name: file.name.replace(/\.\w+$/, '.pdf'), blob }];
+        } catch (e) {
+          results = [...results, { name: file.name, error: e instanceof Error ? e.message : String(e) }];
+        }
       }
     }
+
+    await Promise.all(
+      Array.from({ length: Math.min(CONCURRENCY, files.length) }, () => worker())
+    );
     processing = false;
   }
 
-  function triggerDownload(url: string, filename: string) {
+  function blobToBase64(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        resolve(dataUrl.split(',')[1]);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  async function saveViaWails(blob: Blob, filename: string) {
+    const b64 = await blobToBase64(blob);
+    await wailsSaveFile!(b64, filename);
+  }
+
+  function saveViaDOM(blob: Blob, filename: string) {
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
@@ -91,10 +124,13 @@
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
-  function downloadOne(r: { name: string; blob?: Blob }) {
+  async function downloadOne(r: { name: string; blob?: Blob }) {
     if (!r.blob) return;
-    const url = URL.createObjectURL(r.blob);
-    triggerDownload(url, r.name);
+    if (wailsSaveFile) {
+      await saveViaWails(r.blob, r.name);
+    } else {
+      saveViaDOM(r.blob, r.name);
+    }
   }
 
   async function downloadAllAsZip() {
@@ -107,8 +143,12 @@
       zipFiles.push({ name: r.name, data: new Uint8Array(buf) });
     }
     const zipBlob = createZip(zipFiles);
-    const url = URL.createObjectURL(zipBlob);
-    triggerDownload(url, '批量转换结果.zip');
+
+    if (wailsSaveFile) {
+      await saveViaWails(zipBlob, '批量转换结果.zip');
+    } else {
+      saveViaDOM(zipBlob, '批量转换结果.zip');
+    }
   }
 </script>
 
