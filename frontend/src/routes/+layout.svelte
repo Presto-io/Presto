@@ -65,8 +65,9 @@
 		e.preventDefault();
 
 		try {
-			const tpl = await importTemplateZip(file);
-			showToast(`模板 "${tpl.displayName || tpl.name}" 导入成功`, 'success');
+			const tpls = await importTemplateZip(file);
+			const names = tpls.map(t => t.displayName || t.name).join('、');
+			showToast(`模板 "${names}" 导入成功`, 'success');
 		} catch (err) {
 			showToast(err instanceof Error ? err.message : String(err), 'error');
 		}
