@@ -125,22 +125,22 @@ func (s *Server) handleRenameTemplate(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
 	var req struct {
-		Name string `json:"name"`
+		DisplayName string `json:"displayName"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" {
-		writeJSONError(w, "invalid request: name is required", http.StatusBadRequest)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.DisplayName == "" {
+		writeJSONError(w, "invalid request: displayName is required", http.StatusBadRequest)
 		return
 	}
 
-	if err := s.manager.Rename(id, req.Name); err != nil {
-		log.Printf("[templates] rename %s → %s failed: %v", id, req.Name, err)
+	if err := s.manager.UpdateDisplayName(id, req.DisplayName); err != nil {
+		log.Printf("[templates] update displayName %s → %q failed: %v", id, req.DisplayName, err)
 		writeJSONError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	log.Printf("[templates] renamed template %s → %s", id, req.Name)
+	log.Printf("[templates] updated template %s displayName → %q", id, req.DisplayName)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "renamed", "name": req.Name})
+	json.NewEncoder(w).Encode(map[string]string{"status": "renamed", "displayName": req.DisplayName})
 }
 
 func (s *Server) handleGetManifest(w http.ResponseWriter, r *http.Request) {
