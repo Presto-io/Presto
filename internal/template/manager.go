@@ -2,6 +2,8 @@ package template
 
 import (
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -82,4 +84,71 @@ func (m *Manager) Get(name string) (*InstalledTemplate, error) {
 
 func (m *Manager) Executor(t *InstalledTemplate) *Executor {
 	return NewExecutor(t.BinaryPath)
+}
+
+// EnsureOfficialTemplates copies bundled official templates from bundleDir
+// to the user's templates directory if they are missing.
+// bundleDir should contain subdirectories for each official template,
+// e.g. bundleDir/gongwen/manifest.json and bundleDir/gongwen/presto-template-gongwen.
+func (m *Manager) EnsureOfficialTemplates(bundleDir string) {
+	if bundleDir == "" {
+		return
+	}
+	for name := range OfficialTemplates {
+		tplDir := filepath.Join(m.TemplatesDir, name)
+		binaryName := fmt.Sprintf("presto-template-%s", name)
+		if runtime.GOOS == "windows" {
+			binaryName += ".exe"
+		}
+
+		// Skip if already properly installed (both manifest and binary exist)
+		manifestDst := filepath.Join(tplDir, "manifest.json")
+		binaryDst := filepath.Join(tplDir, binaryName)
+		if _, err := os.Stat(manifestDst); err == nil {
+			if _, err := os.Stat(binaryDst); err == nil {
+				continue
+			}
+		}
+
+		// Source paths in the bundle
+		manifestSrc := filepath.Join(bundleDir, name, "manifest.json")
+		binarySrc := filepath.Join(bundleDir, name, binaryName)
+		if _, err := os.Stat(manifestSrc); err != nil {
+			log.Printf("[templates] bundled template %s not found at %s", name, bundleDir)
+			continue
+		}
+		if _, err := os.Stat(binarySrc); err != nil {
+			log.Printf("[templates] bundled binary %s not found at %s", binaryName, bundleDir)
+			continue
+		}
+
+		if err := os.MkdirAll(tplDir, 0755); err != nil {
+			log.Printf("[templates] failed to create dir for %s: %v", name, err)
+			continue
+		}
+		if err := copyFile(manifestSrc, manifestDst, 0644); err != nil {
+			log.Printf("[templates] failed to copy manifest for %s: %v", name, err)
+			continue
+		}
+		if err := copyFile(binarySrc, binaryDst, 0755); err != nil {
+			log.Printf("[templates] failed to copy binary for %s: %v", name, err)
+			continue
+		}
+		log.Printf("[templates] installed bundled template: %s", name)
+	}
+}
+
+func copyFile(src, dst string, perm os.FileMode) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, perm)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	_, err = io.Copy(out, in)
+	return err
 }

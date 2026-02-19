@@ -4,6 +4,7 @@ export interface Template {
   description: string;
   version: string;
   author: string;
+  builtin: boolean;
 }
 
 export interface FieldSchema {
