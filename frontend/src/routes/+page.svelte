@@ -111,7 +111,9 @@
           let varName = content.slice(1);
           const cut = varName.search(/[.( ]/);
           if (cut > 0) varName = varName.slice(0, cut);
-          const re = new RegExp(`#let\\s+${varName}\\s*=\\s*"([^"]*)"`);
+          // SEC-26: Escape regex metacharacters to prevent ReDoS
+          const escaped = varName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const re = new RegExp(`#let\\s+${escaped}\\s*=\\s*"([^"]*)"`);
           for (const l of lines) {
             const m = l.match(re);
             if (m) { content = m[1]; break; }
