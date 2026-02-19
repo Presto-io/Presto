@@ -344,7 +344,8 @@ func main() {
 	typstBin := findTypstBinary()
 	log.Printf("[presto] using typst: %s", typstBin)
 
-	compiler := typst.NewCompilerWithRoot("/")
+	// SEC-02: Use $HOME instead of "/" to restrict file access to user's home
+	compiler := typst.NewCompilerWithRoot(home)
 	compiler.BinPath = typstBin
 
 	// Reuse existing API server as HTTP handler for /api/* routes
