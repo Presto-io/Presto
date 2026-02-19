@@ -59,6 +59,15 @@ run-desktop: desktop install-templates
 _frontend-embed: frontend
 	cp -r frontend/build/* $(DESKTOP_EMBED)/
 
+# Build template binaries for a given platform
+# Usage: $(MAKE) _build-templates TPL_GOOS=<os> TPL_GOARCH=<arch> TPL_SUFFIX=<suffix>
+_build-templates:
+	@mkdir -p $(DIST)/_bin
+	GOOS=$(TPL_GOOS) GOARCH=$(TPL_GOARCH) CGO_ENABLED=0 \
+		go build -ldflags "-s -w" -o $(DIST)/_bin/presto-template-gongwen-$(TPL_SUFFIX) ./cmd/gongwen/
+	GOOS=$(TPL_GOOS) GOARCH=$(TPL_GOARCH) CGO_ENABLED=0 \
+		go build -ldflags "-s -w" -o $(DIST)/_bin/presto-template-jiaoan-shicao-$(TPL_SUFFIX) ./cmd/jiaoan-shicao/
+
 # Download typst binary for a given platform
 # Usage: $(MAKE) _download-typst TYPST_ARCHIVE=<name> TYPST_OUT=<path> [TYPST_SHA256=<hash>]
 # SEC-22: Set TYPST_SHA256 to verify integrity of downloaded binary
@@ -94,6 +103,7 @@ dist-macos-arm64: _frontend-embed
 		go build -tags "$(WAILS_TAGS)" -ldflags "$(LDFLAGS)" \
 		-o $(DIST)/_bin/presto-darwin-arm64 $(DESKTOP_SRC)/
 	@$(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_DARWIN_ARM64) TYPST_OUT=$(DIST)/_bin/typst-darwin-arm64
+	@$(MAKE) _build-templates TPL_GOOS=darwin TPL_GOARCH=arm64 TPL_SUFFIX=darwin-arm64
 	@$(MAKE) _bundle-app GOARCH=arm64 TYPST_BIN=$(DIST)/_bin/typst-darwin-arm64
 
 dist-macos-amd64: _frontend-embed
@@ -103,6 +113,7 @@ dist-macos-amd64: _frontend-embed
 		go build -tags "$(WAILS_TAGS)" -ldflags "$(LDFLAGS)" \
 		-o $(DIST)/_bin/presto-darwin-amd64 $(DESKTOP_SRC)/
 	@$(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_DARWIN_AMD64) TYPST_OUT=$(DIST)/_bin/typst-darwin-amd64
+	@$(MAKE) _build-templates TPL_GOOS=darwin TPL_GOARCH=amd64 TPL_SUFFIX=darwin-amd64
 	@$(MAKE) _bundle-app GOARCH=amd64 TYPST_BIN=$(DIST)/_bin/typst-darwin-amd64
 
 dist-macos-universal: dist-macos-arm64 dist-macos-amd64
@@ -110,6 +121,8 @@ dist-macos-universal: dist-macos-arm64 dist-macos-amd64
 	@mkdir -p "$(DIST)/$(APP_NAME).app/Contents/MacOS"
 	@mkdir -p "$(DIST)/$(APP_NAME).app/Contents/Resources"
 	@mkdir -p "$(DIST)/$(APP_NAME).app/Contents/Resources/zh-Hans.lproj"
+	@mkdir -p "$(DIST)/$(APP_NAME).app/Contents/Resources/templates/gongwen"
+	@mkdir -p "$(DIST)/$(APP_NAME).app/Contents/Resources/templates/jiaoan-shicao"
 	lipo -create \
 		$(DIST)/_bin/presto-darwin-arm64 \
 		$(DIST)/_bin/presto-darwin-amd64 \
@@ -118,6 +131,16 @@ dist-macos-universal: dist-macos-arm64 dist-macos-amd64
 		$(DIST)/_bin/typst-darwin-arm64 \
 		$(DIST)/_bin/typst-darwin-amd64 \
 		-output "$(DIST)/$(APP_NAME).app/Contents/Resources/typst"
+	lipo -create \
+		$(DIST)/_bin/presto-template-gongwen-darwin-arm64 \
+		$(DIST)/_bin/presto-template-gongwen-darwin-amd64 \
+		-output "$(DIST)/$(APP_NAME).app/Contents/Resources/templates/gongwen/presto-template-gongwen"
+	cp cmd/gongwen/manifest.json "$(DIST)/$(APP_NAME).app/Contents/Resources/templates/gongwen/"
+	lipo -create \
+		$(DIST)/_bin/presto-template-jiaoan-shicao-darwin-arm64 \
+		$(DIST)/_bin/presto-template-jiaoan-shicao-darwin-amd64 \
+		-output "$(DIST)/$(APP_NAME).app/Contents/Resources/templates/jiaoan-shicao/presto-template-jiaoan-shicao"
+	cp cmd/jiaoan-shicao/manifest.json "$(DIST)/$(APP_NAME).app/Contents/Resources/templates/jiaoan-shicao/"
 	cp packaging/macos/Info.plist "$(DIST)/$(APP_NAME).app/Contents/"
 	@if [ -f packaging/macos/icon.icns ]; then \
 		cp packaging/macos/icon.icns "$(DIST)/$(APP_NAME).app/Contents/Resources/"; \
@@ -131,9 +154,19 @@ _bundle-app:
 	@mkdir -p "$(DIST)/$(APP_NAME).app/Contents/MacOS"
 	@mkdir -p "$(DIST)/$(APP_NAME).app/Contents/Resources"
 	@mkdir -p "$(DIST)/$(APP_NAME).app/Contents/Resources/zh-Hans.lproj"
+	@mkdir -p "$(DIST)/$(APP_NAME).app/Contents/Resources/templates/gongwen"
+	@mkdir -p "$(DIST)/$(APP_NAME).app/Contents/Resources/templates/jiaoan-shicao"
 	cp $(DIST)/_bin/presto-darwin-$(GOARCH) \
 		"$(DIST)/$(APP_NAME).app/Contents/MacOS/$(APP_NAME)"
 	cp $(TYPST_BIN) "$(DIST)/$(APP_NAME).app/Contents/Resources/typst"
+	cp $(DIST)/_bin/presto-template-gongwen-darwin-$(GOARCH) \
+		"$(DIST)/$(APP_NAME).app/Contents/Resources/templates/gongwen/presto-template-gongwen"
+	cp cmd/gongwen/manifest.json \
+		"$(DIST)/$(APP_NAME).app/Contents/Resources/templates/gongwen/"
+	cp $(DIST)/_bin/presto-template-jiaoan-shicao-darwin-$(GOARCH) \
+		"$(DIST)/$(APP_NAME).app/Contents/Resources/templates/jiaoan-shicao/presto-template-jiaoan-shicao"
+	cp cmd/jiaoan-shicao/manifest.json \
+		"$(DIST)/$(APP_NAME).app/Contents/Resources/templates/jiaoan-shicao/"
 	cp packaging/macos/Info.plist "$(DIST)/$(APP_NAME).app/Contents/"
 	@if [ -f packaging/macos/icon.icns ]; then \
 		cp packaging/macos/icon.icns "$(DIST)/$(APP_NAME).app/Contents/Resources/"; \
@@ -196,7 +229,13 @@ dist-windows-amd64: _frontend-embed
 		go build -tags "$(WAILS_TAGS)" -ldflags "$(LDFLAGS) -H windowsgui" \
 		-o "$(DIST)/$(APP_NAME)-$(VERSION)-windows.exe" $(DESKTOP_SRC)/
 	@$(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_WINDOWS_AMD64) TYPST_OUT=$(DIST)/typst.exe
-	@echo "==> $(DIST)/$(APP_NAME)-$(VERSION)-windows.exe + typst.exe"
+	@$(MAKE) _build-templates TPL_GOOS=windows TPL_GOARCH=amd64 TPL_SUFFIX=windows-amd64
+	@mkdir -p "$(DIST)/templates/gongwen" "$(DIST)/templates/jiaoan-shicao"
+	cp $(DIST)/_bin/presto-template-gongwen-windows-amd64 "$(DIST)/templates/gongwen/presto-template-gongwen.exe"
+	cp cmd/gongwen/manifest.json "$(DIST)/templates/gongwen/"
+	cp $(DIST)/_bin/presto-template-jiaoan-shicao-windows-amd64 "$(DIST)/templates/jiaoan-shicao/presto-template-jiaoan-shicao.exe"
+	cp cmd/jiaoan-shicao/manifest.json "$(DIST)/templates/jiaoan-shicao/"
+	@echo "==> $(DIST)/$(APP_NAME)-$(VERSION)-windows.exe + typst.exe + templates/"
 
 dist-windows: dist-windows-amd64
 
@@ -217,9 +256,16 @@ dist-linux-amd64: frontend
 			apt-get install -y -qq libgtk-3-dev libwebkit2gtk-4.0-dev pkg-config > /dev/null 2>&1 && \
 			cp -r frontend/build/* cmd/presto-desktop/build/ && \
 			go build -tags "$(WAILS_TAGS)" -ldflags "$(LDFLAGS)" \
-				-o dist/$(APP_NAME)-$(VERSION)-linux $(DESKTOP_SRC)/'
+				-o dist/$(APP_NAME)-$(VERSION)-linux $(DESKTOP_SRC)/ && \
+			CGO_ENABLED=0 go build -ldflags "-s -w" -o dist/_bin/presto-template-gongwen-linux-amd64 ./cmd/gongwen/ && \
+			CGO_ENABLED=0 go build -ldflags "-s -w" -o dist/_bin/presto-template-jiaoan-shicao-linux-amd64 ./cmd/jiaoan-shicao/'
 	@$(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_LINUX_AMD64) TYPST_OUT=$(DIST)/typst-linux
-	@echo "==> $(DIST)/$(APP_NAME)-$(VERSION)-linux + typst-linux"
+	@mkdir -p "$(DIST)/templates/gongwen" "$(DIST)/templates/jiaoan-shicao"
+	cp $(DIST)/_bin/presto-template-gongwen-linux-amd64 "$(DIST)/templates/gongwen/presto-template-gongwen"
+	cp cmd/gongwen/manifest.json "$(DIST)/templates/gongwen/"
+	cp $(DIST)/_bin/presto-template-jiaoan-shicao-linux-amd64 "$(DIST)/templates/jiaoan-shicao/presto-template-jiaoan-shicao"
+	cp cmd/jiaoan-shicao/manifest.json "$(DIST)/templates/jiaoan-shicao/"
+	@echo "==> $(DIST)/$(APP_NAME)-$(VERSION)-linux + typst-linux + templates/"
 
 dist-linux: dist-linux-amd64
 

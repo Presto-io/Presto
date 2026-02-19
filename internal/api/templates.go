@@ -33,6 +33,7 @@ func (s *Server) handleListTemplates(w http.ResponseWriter, r *http.Request) {
 		Description string `json:"description"`
 		Version     string `json:"version"`
 		Author      string `json:"author"`
+		Builtin     bool   `json:"builtin"`
 	}
 
 	var result []templateInfo
@@ -43,6 +44,7 @@ func (s *Server) handleListTemplates(w http.ResponseWriter, r *http.Request) {
 			Description: t.Manifest.Description,
 			Version:     t.Manifest.Version,
 			Author:      t.Manifest.Author,
+			Builtin:     template.IsOfficial(t.Manifest.Name),
 		})
 	}
 
@@ -103,6 +105,10 @@ func (s *Server) handleInstallTemplate(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleDeleteTemplate(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	if template.IsOfficial(id) {
+		writeJSONError(w, "cannot delete built-in template", http.StatusForbidden)
+		return
+	}
 	if err := s.manager.Uninstall(id); err != nil {
 		log.Printf("[templates] delete %s failed: %v", id, err)
 		writeJSONError(w, "delete failed", http.StatusInternalServerError)
