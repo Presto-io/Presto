@@ -3,6 +3,7 @@ title: "关于开展2025年度安全生产专项检查工作的通知"
 author: "安全生产管理处"
 date: "2025-03-15"
 signature: true
+template: "gongwen"
 ---
 
 各部门、各单位：
