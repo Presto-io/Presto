@@ -4,7 +4,7 @@
   import Preview from '$lib/components/Preview.svelte';
   import TemplateSelector from '$lib/components/TemplateSelector.svelte';
   import { convert, compile, compileSvg, convertAndCompile, getExample } from '$lib/api/client';
-  import { Download } from 'lucide-svelte';
+  import { Download, Settings, FolderOpen, Layers } from 'lucide-svelte';
   import { goto } from '$app/navigation';
   import { editor } from '$lib/stores/editor.svelte';
   import { triggerAction, shouldShowPoint } from '$lib/stores/wizard.svelte';
@@ -32,6 +32,41 @@
   let splitRatio = $state(0.5);
   let isDragging = $state(false);
   let layoutEl: HTMLDivElement;
+
+  // Proximity reveal toolbar buttons
+  let toolbarRightEl: HTMLDivElement;
+  let hiddenButtonsVisible = $state(false);
+  let hideTimer: ReturnType<typeof setTimeout>;
+
+  function handleToolbarRightEnter() {
+    clearTimeout(hideTimer);
+    hiddenButtonsVisible = true;
+  }
+
+  function handleToolbarRightLeave() {
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => { hiddenButtonsVisible = false; }, 800);
+  }
+
+  function handleToolbarMouseMove(e: MouseEvent) {
+    if (!toolbarRightEl) return;
+    const rect = toolbarRightEl.getBoundingClientRect();
+    const proximity = 60;
+    const inRange = (
+      e.clientX >= rect.left - proximity &&
+      e.clientX <= rect.right + proximity &&
+      e.clientY >= rect.top - proximity &&
+      e.clientY <= rect.bottom + proximity
+    );
+    if (inRange) {
+      handleToolbarRightEnter();
+    } else if (hiddenButtonsVisible) {
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => { hiddenButtonsVisible = false; }, 800);
+    }
+  }
+
+  onDestroy(() => { clearTimeout(hideTimer); });
 
   function onDividerPointerDown(e: PointerEvent) {
     isDragging = true;
@@ -241,17 +276,33 @@
   });
 </script>
 
-<div class="toolbar" style="--wails-draggable:drag">
+<div class="toolbar" style="--wails-draggable:drag" onmousemove={handleToolbarMouseMove}>
   <div class="toolbar-left">
     <TemplateSelector selected={editor.selectedTemplate} onbeforechange={handleTemplateChange} />
     {#if converting}
       <div class="status-dot"></div>
     {/if}
   </div>
-  <div class="toolbar-right">
+  <div
+    class="toolbar-right"
+    bind:this={toolbarRightEl}
+    onmouseenter={handleToolbarRightEnter}
+    onmouseleave={handleToolbarRightLeave}
+  >
     {#if errorMsg}
       <span class="error-msg" title={errorMsg}>{errorMsg}</span>
     {/if}
+    <div class="toolbar-hidden-group" class:visible={hiddenButtonsVisible}>
+      <button class="btn-toolbar" onclick={() => goto('/settings')} aria-label="设置" title="设置 (⌘,)">
+        <Settings size={14} />
+      </button>
+      <button class="btn-toolbar" onclick={handleOpen} aria-label="打开文件" title="打开文件 (⌘O)">
+        <FolderOpen size={14} />
+      </button>
+      <button class="btn-toolbar" onclick={() => goto('/batch')} aria-label="批量转换" title="批量转换">
+        <Layers size={14} />
+      </button>
+    </div>
     <button class="btn-export" onclick={handleDownload} aria-label="导出 PDF" title="导出 PDF (⌘E)">
       <Download size={14} />
       <span>导出 PDF</span>
@@ -345,6 +396,43 @@
     gap: var(--space-sm);
     margin-left: auto;
     -webkit-app-region: no-drag;
+  }
+  .toolbar-hidden-group {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 200ms ease;
+  }
+  .toolbar-hidden-group.visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .btn-toolbar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: var(--color-surface);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition);
+    flex-shrink: 0;
+  }
+  .btn-toolbar:hover {
+    background: var(--color-surface-hover);
+    border-color: var(--color-muted);
+    color: var(--color-accent);
+  }
+  @media (hover: none) {
+    .toolbar-hidden-group {
+      opacity: 1;
+      pointer-events: auto;
+    }
   }
   .btn-export {
     display: inline-flex;

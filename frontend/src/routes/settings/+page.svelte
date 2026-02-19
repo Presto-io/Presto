@@ -2,9 +2,9 @@
   import { onMount } from 'svelte';
   import { fly, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
-  import { ExternalLink, Shield, Info, BookOpen, ArrowLeft, RefreshCw, Search, Package, Download, Trash2, Loader } from 'lucide-svelte';
+  import { ExternalLink, Shield, Info, BookOpen, ArrowLeft, RefreshCw, Search, Package, Download, Trash2, Loader, Upload } from 'lucide-svelte';
   import { goto } from '$app/navigation';
-  import { listTemplates, discoverTemplates, installTemplate, deleteTemplate } from '$lib/api/client';
+  import { listTemplates, discoverTemplates, installTemplate, deleteTemplate, importTemplateZip } from '$lib/api/client';
   import type { Template, GitHubRepo } from '$lib/api/types';
   import { triggerAction, resetWizard } from '$lib/stores/wizard.svelte';
 
@@ -26,13 +26,22 @@
   let tplSearch = $state('');
   let browseLoaded = $state(false);
   let installedLoaded = $state(false);
+  let selectedKeywords: string[] = $state([]);
+
+  let allKeywords = $derived(
+    [...new Set(installed.flatMap(tpl => tpl.keywords ?? []))].sort()
+  );
 
   let filteredInstalled = $derived(
     installed.filter(tpl => {
       const q = tplSearch.toLowerCase();
-      return !q ||
+      const matchesSearch = !q ||
         (tpl.displayName || tpl.name).toLowerCase().includes(q) ||
-        tpl.description.toLowerCase().includes(q);
+        tpl.description.toLowerCase().includes(q) ||
+        (tpl.keywords ?? []).some(k => k.toLowerCase().includes(q));
+      const matchesKeywords = selectedKeywords.length === 0 ||
+        selectedKeywords.every(k => (tpl.keywords ?? []).includes(k));
+      return matchesSearch && matchesKeywords;
     })
   );
 
@@ -144,12 +153,22 @@
     if (activePanel === id) {
       activePanel = null;
       tplSearch = '';
+      selectedKeywords = [];
     } else {
       activePanel = id;
       activeSection = '';
       tplSearch = '';
+      selectedKeywords = [];
       if (id === 'tpl-manage' && !installedLoaded) loadInstalled();
       if (id === 'tpl-search' && !browseLoaded) loadBrowse();
+    }
+  }
+
+  function toggleKeyword(keyword: string) {
+    if (selectedKeywords.includes(keyword)) {
+      selectedKeywords = selectedKeywords.filter(k => k !== keyword);
+    } else {
+      selectedKeywords = [...selectedKeywords, keyword];
     }
   }
 
@@ -212,6 +231,31 @@
     await deleteTemplate(name);
     installed = await listTemplates();
   }
+
+  // --- ZIP import ---
+  let importingZip = $state(false);
+  let zipInput: HTMLInputElement | undefined = $state();
+
+  function handleImportZipClick() {
+    zipInput?.click();
+  }
+
+  async function handleZipFileSelected(e: Event) {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    input.value = '';
+    importingZip = true;
+    try {
+      await importTemplateZip(file);
+      installed = (await listTemplates()) ?? [];
+      installedLoaded = true;
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err));
+    } finally {
+      importingZip = false;
+    }
+  }
 </script>
 
 <div class="page">
@@ -251,16 +295,62 @@
     <div class="settings-content-wrapper">
       {#if activePanel}
         <div class="panel-overlay">
-          <div class="panel-search">
-            <Search size={14} />
-            <input
-              type="text"
-              placeholder={activePanel === 'tpl-manage' ? '搜索已安装模板…' : '搜索社区模板…'}
-              bind:value={tplSearch}
-            />
-          </div>
+          {#if activePanel === 'tpl-manage'}
+            <div class="panel-header">
+              <div class="panel-search">
+                <Search size={14} />
+                <input
+                  type="text"
+                  placeholder="搜索已安装模板…"
+                  bind:value={tplSearch}
+                />
+              </div>
+              <button
+                class="btn-import"
+                onclick={handleImportZipClick}
+                disabled={importingZip}
+                title="从 ZIP 文件导入模板"
+              >
+                {#if importingZip}
+                  <Loader size={14} class="spin" />
+                {:else}
+                  <Upload size={14} />
+                {/if}
+                <span>从 ZIP 导入</span>
+              </button>
+              <input
+                bind:this={zipInput}
+                type="file"
+                accept=".zip"
+                onchange={handleZipFileSelected}
+                hidden
+              />
+            </div>
+          {:else}
+            <div class="panel-search">
+              <Search size={14} />
+              <input
+                type="text"
+                placeholder="搜索社区模板…"
+                bind:value={tplSearch}
+              />
+            </div>
+          {/if}
 
           {#if activePanel === 'tpl-manage'}
+            {#if allKeywords.length > 0}
+              <div class="keyword-filter-bar">
+                {#each allKeywords as kw (kw)}
+                  <button
+                    class="keyword-chip"
+                    class:active={selectedKeywords.includes(kw)}
+                    onclick={() => toggleKeyword(kw)}
+                  >
+                    {kw}
+                  </button>
+                {/each}
+              </div>
+            {/if}
             {#if tplLoading && !installedLoaded}
               <div class="panel-empty">
                 <Loader size={24} class="spin" />
@@ -284,6 +374,13 @@
                         {/if}
                       </div>
                       <p class="tpl-desc">{tpl.description}</p>
+                      {#if tpl.keywords && tpl.keywords.length > 0}
+                        <div class="tpl-keywords">
+                          {#each tpl.keywords as kw (kw)}
+                            <span class="keyword-badge">{kw}</span>
+                          {/each}
+                        </div>
+                      {/if}
                       <span class="tpl-author">{tpl.author}</span>
                     </div>
                     {#if !tpl.builtin}
@@ -785,6 +882,33 @@
     flex-direction: column;
     overflow: hidden;
   }
+  .panel-header {
+    display: flex;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-md);
+    flex-shrink: 0;
+  }
+  .panel-header .panel-search {
+    flex: 1;
+    margin-bottom: 0;
+  }
+  .btn-import {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all var(--transition);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .btn-import:hover { border-color: var(--color-accent); color: var(--color-accent); }
+  .btn-import:disabled { opacity: 0.5; cursor: not-allowed; }
   .panel-search {
     display: flex;
     align-items: center;
@@ -822,7 +946,7 @@
     gap: var(--space-sm);
     overflow-y: auto;
     flex: 1;
-    padding-right: var(--space-md);
+    scrollbar-gutter: stable;
   }
   .tpl-row {
     display: flex;
@@ -864,6 +988,45 @@
     white-space: nowrap;
   }
   .tpl-author { font-size: 0.75rem; color: var(--color-muted); }
+  .keyword-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    margin-bottom: var(--space-md);
+    flex-shrink: 0;
+  }
+  .keyword-chip {
+    padding: 2px 8px;
+    border-radius: 10px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-muted);
+    font-size: 0.6875rem;
+    cursor: pointer;
+    transition: all var(--transition);
+  }
+  .keyword-chip:hover {
+    border-color: var(--color-accent);
+    color: var(--color-text);
+  }
+  .keyword-chip.active {
+    background: var(--color-accent);
+    color: var(--color-bg);
+    border-color: var(--color-accent);
+  }
+  .tpl-keywords {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    margin: 2px 0;
+  }
+  .keyword-badge {
+    padding: 1px 6px;
+    border-radius: 8px;
+    background: var(--color-surface-hover);
+    color: var(--color-muted);
+    font-size: 0.625rem;
+  }
   .repo-link {
     color: var(--color-muted);
     text-decoration: none;

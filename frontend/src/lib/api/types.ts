@@ -5,6 +5,7 @@ export interface Template {
   version: string;
   author: string;
   builtin: boolean;
+  keywords?: string[];
 }
 
 export interface FieldSchema {
