@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"net/http"
@@ -16,6 +18,12 @@ func main() {
 		port = "8080"
 	}
 
+	// SEC-14: Default to localhost instead of all interfaces
+	host := os.Getenv("HOST")
+	if host == "" {
+		host = "127.0.0.1"
+	}
+
 	home, _ := os.UserHomeDir()
 	templatesDir := filepath.Join(home, ".presto", "templates")
 	os.MkdirAll(templatesDir, 0755)
@@ -25,7 +33,25 @@ func main() {
 		staticDir = "frontend/build"
 	}
 
-	srv := api.NewServer(templatesDir, staticDir, "typst")
-	fmt.Printf("Presto server listening on :%s\n", port)
-	log.Fatal(http.ListenAndServe(":"+port, srv))
+	// SEC-09: API key authentication
+	apiKey := os.Getenv("PRESTO_API_KEY")
+	if apiKey == "" {
+		b := make([]byte, 32)
+		if _, err := rand.Read(b); err != nil {
+			log.Fatal("failed to generate API key: ", err)
+		}
+		apiKey = hex.EncodeToString(b)
+	}
+
+	srv := api.NewServer(api.ServerOptions{
+		TemplatesDir: templatesDir,
+		StaticDir:    staticDir,
+		TypstBin:     "typst",
+		APIKey:       apiKey,
+	})
+
+	addr := fmt.Sprintf("%s:%s", host, port)
+	fmt.Printf("Presto server listening on %s\n", addr)
+	fmt.Printf("API Key: %s\n", apiKey)
+	log.Fatal(http.ListenAndServe(addr, srv))
 }

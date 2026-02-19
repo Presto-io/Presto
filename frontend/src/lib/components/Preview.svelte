@@ -1,4 +1,6 @@
 <script lang="ts">
+  import DOMPurify from 'dompurify';
+
   let {
     svgPages = [],
     scrollRatio = 0,
@@ -8,6 +10,15 @@
     scrollRatio?: number;
     onscroll?: (ratio: number) => void;
   } = $props();
+
+  // SEC-04: Sanitize SVG to prevent XSS via <script>, <foreignObject>, event handlers
+  function sanitizeSvg(svg: string): string {
+    return DOMPurify.sanitize(svg, {
+      USE_PROFILES: { svg: true, svgFilters: true },
+      ADD_TAGS: ['use'],
+      ADD_ATTR: ['xlink:href', 'clip-path', 'fill-rule', 'transform'],
+    });
+  }
 
   let container: HTMLDivElement;
   let ignoreScroll = false;
@@ -44,7 +55,7 @@
     <div class="svg-pages">
       {#each svgPages as svg, i}
         <div class="svg-page" data-page={i + 1}>
-          {@html svg}
+          {@html sanitizeSvg(svg)}
         </div>
       {/each}
     </div>
