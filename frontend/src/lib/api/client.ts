@@ -109,3 +109,17 @@ export async function deleteTemplate(id: string): Promise<void> {
   const res = await fetch(`${BASE}/api/templates/${id}`, { method: 'DELETE' });
   if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
 }
+
+export async function importTemplateZip(file: File): Promise<Template> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await fetch(`${BASE}/api/templates/import`, {
+    method: 'POST',
+    body: formData,
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+    throw new Error(body.error || `Import failed: ${res.status}`);
+  }
+  return res.json();
+}

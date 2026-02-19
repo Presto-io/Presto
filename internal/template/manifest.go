@@ -16,6 +16,7 @@ type Manifest struct {
 	Author            string                 `json:"author"`
 	License           string                 `json:"license"`
 	MinPrestoVersion  string                 `json:"minPrestoVersion"`
+	Keywords          []string               `json:"keywords"`
 	FrontmatterSchema map[string]FieldSchema `json:"frontmatterSchema"`
 }
 
