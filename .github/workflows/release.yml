@@ -295,3 +295,80 @@ jobs:
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── Homebrew Cask: 推送到 brewforge/chinese ────────────────
+  update-homebrew:
+    needs: release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Extract version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Download DMGs from release
+        run: |
+          curl -sL -o "Presto-arm64.dmg" \
+            "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/Presto-${{ env.VERSION }}-macOS-arm64.dmg"
+          curl -sL -o "Presto-amd64.dmg" \
+            "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/Presto-${{ env.VERSION }}-macOS-amd64.dmg"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Calculate SHA256
+        run: |
+          echo "SHA256_ARM64=$(sha256sum Presto-arm64.dmg | cut -d ' ' -f 1)" >> "$GITHUB_ENV"
+          echo "SHA256_AMD64=$(sha256sum Presto-amd64.dmg | cut -d ' ' -f 1)" >> "$GITHUB_ENV"
+
+      - name: Clone Homebrew tap
+        uses: actions/checkout@v4
+        with:
+          repository: brewforge/homebrew-more
+          path: homebrew-more
+          token: ${{ secrets.BREWFORGE_PAT }}
+
+      - name: Generate Cask file
+        run: |
+          mkdir -p homebrew-more/Casks
+          cat > homebrew-more/Casks/presto.rb << 'CASK'
+          cask "presto" do
+            version "VERSION_PLACEHOLDER"
+
+            on_arm do
+              sha256 "SHA256_ARM64_PLACEHOLDER"
+              url "https://github.com/Presto-io/Presto/releases/download/v#{version}/Presto-#{version}-macOS-arm64.dmg"
+            end
+
+            on_intel do
+              sha256 "SHA256_AMD64_PLACEHOLDER"
+              url "https://github.com/Presto-io/Presto/releases/download/v#{version}/Presto-#{version}-macOS-amd64.dmg"
+            end
+
+            name "Presto"
+            desc "Typst-based document editor for Chinese government and education"
+            homepage "https://github.com/Presto-io/Presto"
+
+            depends_on macos: ">= :big_sur"
+
+            app "Presto.app"
+          end
+          CASK
+          sed -i "s/VERSION_PLACEHOLDER/${{ env.VERSION }}/" homebrew-more/Casks/presto.rb
+          sed -i "s/SHA256_ARM64_PLACEHOLDER/${{ env.SHA256_ARM64 }}/" homebrew-more/Casks/presto.rb
+          sed -i "s/SHA256_AMD64_PLACEHOLDER/${{ env.SHA256_AMD64 }}/" homebrew-more/Casks/presto.rb
+          sed -i 's/^          //' homebrew-more/Casks/presto.rb
+
+      - name: Create Pull Request
+        run: |
+          cd homebrew-more
+          git config user.name github-actions
+          git config user.email "${{ secrets.COMMIT_EMAIL }}"
+          git add Casks/presto.rb
+          git commit -m "presto ${{ env.VERSION }}"
+          git push origin HEAD:presto-${{ github.ref_name }}
+          gh pr create \
+            --title "presto ${{ env.VERSION }}" \
+            --body "更新 Presto Cask 到版本 ${{ env.VERSION }}" \
+            --base main \
+            --head presto-${{ github.ref_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.BREWFORGE_PAT }}
