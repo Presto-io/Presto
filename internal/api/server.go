@@ -57,6 +57,7 @@ func NewServer(opts ServerOptions) http.Handler {
 	s.mux.HandleFunc("GET /api/templates/{id}/manifest", s.handleGetManifest)
 	s.mux.HandleFunc("GET /api/templates/{id}/example", s.handleGetExample)
 	s.mux.HandleFunc("POST /api/templates/import", s.handleImportTemplate)
+	s.mux.HandleFunc("POST /api/batch/import-zip", s.handleBatchImportZip)
 
 	if opts.StaticDir != "" {
 		// SEC-27: Filter hidden files from static file server
