@@ -7,7 +7,7 @@
 # ─── Config ──────────────────────────────────────────────
 APP_NAME     := Presto
 APP_ID       := com.mrered.presto
-VERSION      := 0.1.0
+VERSION      ?= $(shell git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo "0.0.0-dev")
 TYPST_VERSION:= 0.14.2
 WAILS_TAGS   := desktop,production
 LDFLAGS      := -s -w -X main.version=$(VERSION)
@@ -33,7 +33,7 @@ server: frontend
 desktop: frontend
 	cp -r frontend/build/* $(DESKTOP_EMBED)/
 	CGO_LDFLAGS="-framework UniformTypeIdentifiers" \
-		go build -tags "$(WAILS_TAGS)" -o bin/presto-desktop $(DESKTOP_SRC)/
+		go build -tags "$(WAILS_TAGS)" -ldflags "$(LDFLAGS)" -o bin/presto-desktop $(DESKTOP_SRC)/
 
 templates:
 	go build -o bin/presto-template-gongwen ./cmd/gongwen/
@@ -163,6 +163,7 @@ dist-macos-universal: _build-macos-arm64 _build-macos-amd64
 		-output "$(DIST)/$(APP_NAME).app/Contents/Resources/templates/jiaoan-shicao/presto-template-jiaoan-shicao"
 	cp cmd/jiaoan-shicao/manifest.json "$(DIST)/$(APP_NAME).app/Contents/Resources/templates/jiaoan-shicao/"
 	cp packaging/macos/Info.plist "$(DIST)/$(APP_NAME).app/Contents/"
+	sed -i '' 's/0\.1\.0/$(VERSION)/g' "$(DIST)/$(APP_NAME).app/Contents/Info.plist"
 	@if [ -f packaging/macos/icon.icns ]; then \
 		cp packaging/macos/icon.icns "$(DIST)/$(APP_NAME).app/Contents/Resources/"; \
 	fi
@@ -189,6 +190,7 @@ _bundle-app:
 	cp cmd/jiaoan-shicao/manifest.json \
 		"$(DIST)/$(APP_NAME).app/Contents/Resources/templates/jiaoan-shicao/"
 	cp packaging/macos/Info.plist "$(DIST)/$(APP_NAME).app/Contents/"
+	sed -i '' 's/0\.1\.0/$(VERSION)/g' "$(DIST)/$(APP_NAME).app/Contents/Info.plist"
 	@if [ -f packaging/macos/icon.icns ]; then \
 		cp packaging/macos/icon.icns "$(DIST)/$(APP_NAME).app/Contents/Resources/"; \
 	fi
