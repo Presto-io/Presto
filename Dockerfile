@@ -63,6 +63,7 @@ COPY --chown=presto:presto cmd/jiaoan-shicao/manifest.json /home/presto/.presto/
 COPY --from=frontend-builder /app/build /srv/frontend
 
 ENV PORT=8080
+ENV HOST=0.0.0.0
 ENV STATIC_DIR=/srv/frontend
 ENV HOME=/home/presto
 EXPOSE 8080
