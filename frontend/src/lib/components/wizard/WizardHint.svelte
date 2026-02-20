@@ -147,7 +147,7 @@
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
     padding: var(--space-md);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(122, 162, 247, 0.08);
+    box-shadow: var(--shadow-md), 0 0 0 1px var(--color-accent-bg-subtle);
     font-family: var(--font-ui);
     pointer-events: auto;
   }

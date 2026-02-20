@@ -191,7 +191,7 @@
 		position: fixed;
 		inset: 0;
 		z-index: 9000;
-		background: rgba(26, 27, 38, 0.85);
+		background: var(--color-overlay-bg);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -241,7 +241,7 @@
 		font-family: var(--font-ui);
 	}
 	.confirm-dialog::backdrop {
-		background: rgba(0, 0, 0, 0.4);
+		background: var(--color-backdrop);
 	}
 	.confirm-dialog h3 {
 		margin: 0 0 8px;

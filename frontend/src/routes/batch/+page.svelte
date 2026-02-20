@@ -822,7 +822,7 @@
   }
   .nav-item.drop-target {
     border-color: var(--color-accent);
-    background: rgba(122, 162, 247, 0.1);
+    background: var(--color-accent-bg-subtle);
     color: var(--color-accent);
     animation: pulse-glow 0.8s ease-in-out infinite alternate;
   }
@@ -833,7 +833,7 @@
     }
     to {
       border-color: var(--color-accent);
-      box-shadow: 0 0 8px 2px rgba(122, 162, 247, 0.2);
+      box-shadow: 0 0 8px 2px var(--color-accent-glow);
     }
   }
   .nav-item-name {
@@ -1004,14 +1004,14 @@
     padding: 1px 7px;
     border-radius: 10px;
   }
-  .badge.success { background: rgba(158, 206, 106, 0.12); color: var(--color-success); }
-  .badge.error { background: rgba(247, 118, 142, 0.12); color: var(--color-danger); }
+  .badge.success { background: var(--color-success-bg); color: var(--color-success); }
+  .badge.error { background: var(--color-danger-bg); color: var(--color-danger); }
   .badge-auto {
     font-size: 0.5625rem;
     font-weight: 600;
     padding: 0 5px;
     border-radius: 3px;
-    background: rgba(122, 162, 247, 0.15);
+    background: var(--color-accent-bg);
     color: var(--color-accent);
     flex-shrink: 0;
     line-height: 1.5;
@@ -1053,7 +1053,7 @@
   .file-row:hover { border-color: var(--color-surface-hover); }
   .file-row.selected {
     border-color: var(--color-accent);
-    background: rgba(122, 162, 247, 0.06);
+    background: var(--color-accent-bg-subtle);
   }
   .file-row.has-error { color: var(--color-danger); }
   .drag-handle {
@@ -1093,7 +1093,7 @@
     transition: all var(--transition);
     flex-shrink: 0;
   }
-  .btn-icon:hover { color: var(--color-danger); background: rgba(247, 118, 142, 0.08); }
+  .btn-icon:hover { color: var(--color-danger); background: var(--color-danger-bg-subtle); }
 
   .btn-dl {
     display: inline-flex;
