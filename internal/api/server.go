@@ -2,9 +2,12 @@ package api
 
 import (
 	"encoding/json"
+	"html"
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/mrered/presto/internal/template"
 	"github.com/mrered/presto/internal/typst"
@@ -62,7 +65,13 @@ func NewServer(opts ServerOptions) http.Handler {
 	if opts.StaticDir != "" {
 		// SEC-27: Filter hidden files from static file server
 		fs := http.FileServer(http.Dir(opts.StaticDir))
-		s.mux.Handle("/", dotfileFilterHandler(fs))
+		var static http.Handler
+		if opts.APIKey != "" {
+			static = apiKeyInjectionHandler(opts.StaticDir, opts.APIKey, fs)
+		} else {
+			static = fs
+		}
+		s.mux.Handle("/", dotfileFilterHandler(static))
 	}
 
 	// Middleware chain: logging → CORS → auth → rateLimit → handler
@@ -86,4 +95,30 @@ func writeJSONError(w http.ResponseWriter, msg string, code int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	json.NewEncoder(w).Encode(map[string]string{"error": msg})
+}
+
+// apiKeyInjectionHandler intercepts HTML responses and injects the API key
+// as a <meta> tag so the embedded frontend can authenticate API requests.
+func apiKeyInjectionHandler(staticDir, apiKey string, fallback http.Handler) http.Handler {
+	metaTag := `<meta name="api-key" content="` + html.EscapeString(apiKey) + `">`
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		p := r.URL.Path
+		if p != "/" && !strings.HasSuffix(p, ".html") {
+			fallback.ServeHTTP(w, r)
+			return
+		}
+		fileName := p
+		if p == "/" {
+			fileName = "/index.html"
+		}
+		filePath := filepath.Join(staticDir, filepath.Clean(fileName))
+		data, err := os.ReadFile(filePath)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		modified := strings.Replace(string(data), "</head>", metaTag+"\n</head>", 1)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write([]byte(modified))
+	})
 }
