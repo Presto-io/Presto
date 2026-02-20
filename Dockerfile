@@ -60,7 +60,7 @@ COPY --from=go-builder /bin/presto-template-jiaoan-shicao /usr/local/bin/templat
 COPY cmd/jiaoan-shicao/manifest.json /usr/local/bin/templates/jiaoan-shicao/
 
 # Create user data dir (will be overlaid by volume mount, server populates on startup)
-RUN mkdir -p /home/presto/.presto && chown presto:presto /home/presto/.presto
+RUN mkdir -p /home/presto/.presto/fonts && chown -R presto:presto /home/presto/.presto
 
 COPY --from=frontend-builder /app/build /srv/frontend
 

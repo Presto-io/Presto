@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/mrered/presto/internal/api"
 	"github.com/mrered/presto/internal/template"
@@ -52,11 +53,22 @@ func main() {
 		apiKey = hex.EncodeToString(b)
 	}
 
+	// Font paths: default to ~/.presto/fonts, can override with FONT_PATHS (colon-separated)
+	fontsDir := filepath.Join(home, ".presto", "fonts")
+	os.MkdirAll(fontsDir, 0755)
+	var fontPaths []string
+	if fp := os.Getenv("FONT_PATHS"); fp != "" {
+		fontPaths = strings.Split(fp, ":")
+	} else {
+		fontPaths = []string{fontsDir}
+	}
+
 	srv := api.NewServer(api.ServerOptions{
 		TemplatesDir: templatesDir,
 		StaticDir:    staticDir,
 		TypstBin:     "typst",
 		APIKey:       apiKey,
+		FontPaths:    fontPaths,
 	})
 
 	addr := fmt.Sprintf("%s:%s", host, port)
