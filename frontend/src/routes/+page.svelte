@@ -26,6 +26,9 @@
     }
   }
 
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgent);
+  const mod = isMac ? '⌘' : 'Ctrl+';
+
   let converting = $state(false);
   let errorMsg = $state('');
   let autoDetectedOnce = $state(false);
@@ -340,17 +343,17 @@
       <span class="error-msg" title={errorMsg}>{errorMsg}</span>
     {/if}
     <div class="toolbar-hidden-group" class:visible={hiddenButtonsVisible}>
-      <button class="btn-toolbar" onclick={() => goto('/settings')} aria-label="设置" title="设置 (⌘,)">
+      <button class="btn-toolbar" onclick={() => goto('/settings')} aria-label="设置" title="设置 ({mod},)">
         <Settings size={14} />
       </button>
-      <button class="btn-toolbar" onclick={handleOpen} aria-label="打开文件" title="打开文件 (⌘O)">
+      <button class="btn-toolbar" onclick={handleOpen} aria-label="打开文件" title="打开文件 ({mod}O)">
         <FolderOpen size={14} />
       </button>
       <button class="btn-toolbar" onclick={() => goto('/batch')} aria-label="批量转换" title="批量转换">
         <Layers size={14} />
       </button>
     </div>
-    <button class="btn-export" onclick={handleDownload} aria-label="导出 PDF" title="导出 PDF (⌘E)">
+    <button class="btn-export" onclick={handleDownload} aria-label="导出 PDF" title="导出 PDF ({mod}E)">
       <Download size={14} />
       <span>导出 PDF</span>
     </button>

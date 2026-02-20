@@ -8,6 +8,9 @@
   import type { Template, GitHubRepo } from '$lib/api/types';
   import { triggerAction, resetWizard } from '$lib/stores/wizard.svelte';
 
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgent);
+  const mod = isMac ? '⌘' : 'Ctrl';
+
   // --- Settings state ---
   let communityEnabled = $state(false);
   let showWarning = $state(false);
@@ -638,31 +641,31 @@
             <div class="shortcut-list">
               <div class="shortcut-row">
                 <span class="shortcut-action">打开文件</span>
-                <span class="shortcut-key">⌘O</span>
+                <span class="shortcut-keys"><kbd>{mod}</kbd><kbd>O</kbd></span>
               </div>
               <div class="shortcut-row">
                 <span class="shortcut-action">导出 PDF</span>
-                <span class="shortcut-key">⌘E</span>
+                <span class="shortcut-keys"><kbd>{mod}</kbd><kbd>E</kbd></span>
               </div>
               <div class="shortcut-row">
                 <span class="shortcut-action">打开设置</span>
-                <span class="shortcut-key">⌘,</span>
+                <span class="shortcut-keys"><kbd>{mod}</kbd><kbd>,</kbd></span>
               </div>
               <div class="shortcut-row">
                 <span class="shortcut-action">模板管理</span>
-                <span class="shortcut-key">⌘⇧T</span>
+                <span class="shortcut-keys"><kbd>{mod}</kbd><kbd>⇧</kbd><kbd>T</kbd></span>
               </div>
               <div class="shortcut-row">
                 <span class="shortcut-action">搜索 / 替换</span>
-                <span class="shortcut-key">⌘F</span>
+                <span class="shortcut-keys"><kbd>{mod}</kbd><kbd>F</kbd></span>
               </div>
               <div class="shortcut-row">
                 <span class="shortcut-action">撤销</span>
-                <span class="shortcut-key">⌘Z</span>
+                <span class="shortcut-keys"><kbd>{mod}</kbd><kbd>Z</kbd></span>
               </div>
               <div class="shortcut-row">
                 <span class="shortcut-action">重做</span>
-                <span class="shortcut-key">⌘⇧Z</span>
+                <span class="shortcut-keys"><kbd>{mod}</kbd><kbd>⇧</kbd><kbd>Z</kbd></span>
               </div>
             </div>
 
@@ -1134,19 +1137,36 @@
   }
   .shortcut-row {
     display: flex;
+    align-items: center;
     justify-content: space-between;
     padding: var(--space-sm) var(--space-md);
     background: var(--color-surface);
     border-radius: var(--radius-sm);
     font-size: 0.8125rem;
   }
-  .shortcut-key {
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-    color: var(--color-muted);
-  }
   .shortcut-action {
     color: var(--color-text);
+  }
+  .shortcut-keys {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .shortcut-keys kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 5px;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    font-family: var(--font-ui);
+    font-size: 0.6875rem;
+    color: var(--color-muted);
+    box-shadow: 0 1px 0 var(--color-border);
+    line-height: 1;
   }
   .license-list {
     list-style: none;

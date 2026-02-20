@@ -35,6 +35,8 @@
 
   const themeCompartment = new Compartment();
   let mqCleanup: (() => void) | undefined;
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgent);
+  const mod = isMac ? '⌘' : 'Ctrl+';
 
   onMount(() => {
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
@@ -50,7 +52,7 @@
           EditorView.lineWrapping,
           zhPhrases,
           search({ top: true }),
-          placeholder('在此输入 Markdown 内容，或按 ⌘O 打开文件\n\n图片语法：![描述](路径)\n  打开文件后，图片路径相对于文件所在目录\n  直接编辑时，使用绝对路径\n\n快捷键：⌘O 打开 · ⌘E 导出 · ⌘F 搜索 · ⌘, 设置'),
+          placeholder(`在此输入 Markdown 内容，或按 ${mod}O 打开文件\n\n图片语法：![描述](路径)\n  打开文件后，图片路径相对于文件所在目录\n  直接编辑时，使用绝对路径\n\n快捷键：${mod}O 打开 · ${mod}E 导出 · ${mod}F 搜索 · ${mod}, 设置`),
           EditorView.theme({
             '&': { height: '100%', fontSize: '13px' },
             '.cm-scroller': { fontFamily: 'var(--font-mono)', lineHeight: '1.6' },
