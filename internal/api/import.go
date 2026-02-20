@@ -144,7 +144,7 @@ func (s *Server) handleImportTemplate(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		result, err := s.importTemplateFromZipDir(zr, entry.root, name)
+		result, err := importTemplateFromZipDir(zr, entry.root, name, s.manager)
 		if err != nil {
 			log.Printf("[templates] import: failed for root %q: %v", entry.root, err)
 			writeJSONError(w, err.Error(), http.StatusBadRequest)
@@ -242,7 +242,7 @@ func filesInPrefix(zr *zip.Reader, prefix string) []*zip.File {
 
 // importTemplateFromZipDir installs a single template from a ZIP directory.
 // installName allows overriding the name from manifest (for rename-on-conflict).
-func (s *Server) importTemplateFromZipDir(zr *zip.Reader, prefix string, installName string) (*importResult, error) {
+func importTemplateFromZipDir(zr *zip.Reader, prefix string, installName string, mgr *template.Manager) (*importResult, error) {
 	files := filesInPrefix(zr, prefix)
 
 	var manifestData []byte
@@ -291,8 +291,8 @@ func (s *Server) importTemplateFromZipDir(zr *zip.Reader, prefix string, install
 	}
 
 	// SEC-06: Verify resolved path is within TemplatesDir
-	tplDir := filepath.Join(s.manager.TemplatesDir, name)
-	absTemplatesDir, _ := filepath.Abs(s.manager.TemplatesDir)
+	tplDir := filepath.Join(mgr.TemplatesDir, name)
+	absTemplatesDir, _ := filepath.Abs(mgr.TemplatesDir)
 	absTplDir, _ := filepath.Abs(tplDir)
 	if !strings.HasPrefix(absTplDir, absTemplatesDir+string(filepath.Separator)) {
 		return nil, fmt.Errorf("template directory escapes base")

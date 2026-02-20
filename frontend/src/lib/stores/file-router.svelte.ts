@@ -3,6 +3,7 @@
  * Handles ZIP template installation, markdown routing, toast + confirm UI state.
  */
 import { importBatchZip } from '$lib/api/client';
+import type { BatchImportResult } from '$lib/api/types';
 import { templateStore } from '$lib/stores/templates.svelte';
 import { editor } from '$lib/stores/editor.svelte';
 import { pendingDrop } from '$lib/stores/pending-drop.svelte';
@@ -77,16 +78,18 @@ export const fileRouter = {
    * Core file processing function.
    * Called by both layout drag-drop and the Open button.
    *
-   * @param files - File objects (markdown and/or ZIP)
+   * @param files - File objects (markdown only when zipResults provided)
    * @param currentPath - Current route path (e.g. '/', '/batch', '/settings')
    * @param documentDirs - Optional map of filename → directory (desktop mode)
+   * @param zipResults - Pre-processed ZIP results from Wails binding (desktop mode)
    */
   async processFiles(
     files: File[],
     currentPath: string,
     documentDirs?: Map<string, string>,
+    zipResults?: BatchImportResult[],
   ): Promise<void> {
-    if (files.length === 0) return;
+    if (files.length === 0 && (!zipResults || zipResults.length === 0)) return;
     _processing = true;
 
     try {
@@ -107,30 +110,45 @@ export const fileRouter = {
         }
       }
 
-      for (const zip of zipFiles) {
-        try {
-          const result = await importBatchZip(zip);
-
-          // Collect imported templates
+      // Use pre-processed ZIP results if provided (Wails binding, bypasses HTTP)
+      if (zipResults && zipResults.length > 0) {
+        for (const result of zipResults) {
           importedTemplates.push(...result.templates);
-
-          // Record workDir for image resolution (fallback)
           if (result.workDir) workDir = result.workDir;
-
-          // Create File objects from extracted markdown
           for (const md of result.markdownFiles) {
             const blob = new Blob([md.content], { type: 'text/markdown' });
             allMarkdown.push(new File([blob], md.name, { type: 'text/markdown' }));
-            // Per-file workDir (nested ZIP dirs) takes priority over top-level workDir
             const dir = md.workDir || result.workDir;
             if (dir) perFileDirs.set(md.name, dir);
           }
-        } catch (err) {
-          console.error('ZIP import failed:', err);
-          fileRouter.showToast(
-            err instanceof Error ? err.message : 'ZIP 导入失败',
-            'error',
-          );
+        }
+      } else {
+        // Browser mode: upload ZIPs via FormData (HTTP)
+        for (const zip of zipFiles) {
+          try {
+            const result = await importBatchZip(zip);
+
+            // Collect imported templates
+            importedTemplates.push(...result.templates);
+
+            // Record workDir for image resolution (fallback)
+            if (result.workDir) workDir = result.workDir;
+
+            // Create File objects from extracted markdown
+            for (const md of result.markdownFiles) {
+              const blob = new Blob([md.content], { type: 'text/markdown' });
+              allMarkdown.push(new File([blob], md.name, { type: 'text/markdown' }));
+              // Per-file workDir (nested ZIP dirs) takes priority over top-level workDir
+              const dir = md.workDir || result.workDir;
+              if (dir) perFileDirs.set(md.name, dir);
+            }
+          } catch (err) {
+            console.error('ZIP import failed:', err);
+            fileRouter.showToast(
+              err instanceof Error ? err.message : 'ZIP 导入失败',
+              'error',
+            );
+          }
         }
       }
 
