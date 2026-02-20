@@ -23,6 +23,7 @@ Thumbs.db
 # Presto data
 .presto/
 cache/
+_fonts/
 
 # Generated
 /design-system/
