@@ -1,4 +1,5 @@
 .PHONY: frontend server desktop templates install-templates build dev run-desktop clean \
+       _build-macos-arm64 _build-macos-amd64 \
        dist-macos dist-macos-arm64 dist-macos-amd64 dist-macos-universal \
        dist-dmg dist-dmg-arm64 dist-dmg-amd64 dist-dmg-universal \
        dist-windows dist-linux dist
@@ -56,8 +57,13 @@ run-desktop: desktop install-templates
 # ─── Shared ──────────────────────────────────────────────
 
 .PHONY: _frontend-embed
+ifdef SKIP_FRONTEND
+_frontend-embed:
+	@echo "==> Frontend pre-built (SKIP_FRONTEND=1), skipping..."
+else
 _frontend-embed: frontend
 	cp -r frontend/build/* $(DESKTOP_EMBED)/
+endif
 
 # Build template binaries for a given platform
 # Usage: $(MAKE) _build-templates TPL_GOOS=<os> TPL_GOARCH=<arch> TPL_SUFFIX=<suffix>
@@ -96,27 +102,42 @@ _download-typst:
 
 # ─── macOS Distribution ─────────────────────────────────
 
-dist-macos-arm64: _frontend-embed
+# Build binaries only (no .app bundle) — parallel execution
+_build-macos-arm64: _frontend-embed
 	@mkdir -p $(DIST)/_bin
-	GOOS=darwin GOARCH=arm64 CGO_ENABLED=1 \
+	@( GOOS=darwin GOARCH=arm64 CGO_ENABLED=1 \
 		CGO_LDFLAGS="-framework UniformTypeIdentifiers" \
 		go build -tags "$(WAILS_TAGS)" -ldflags "$(LDFLAGS)" \
-		-o $(DIST)/_bin/presto-darwin-arm64 $(DESKTOP_SRC)/
-	@$(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_DARWIN_ARM64) TYPST_OUT=$(DIST)/_bin/typst-darwin-arm64
-	@$(MAKE) _build-templates TPL_GOOS=darwin TPL_GOARCH=arm64 TPL_SUFFIX=darwin-arm64
+		-o $(DIST)/_bin/presto-darwin-arm64 $(DESKTOP_SRC)/ ) & PID_GO=$$!; \
+	( $(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_DARWIN_ARM64) \
+		TYPST_OUT=$(DIST)/_bin/typst-darwin-arm64 ) & PID_TYPST=$$!; \
+	( $(MAKE) _build-templates TPL_GOOS=darwin TPL_GOARCH=arm64 \
+		TPL_SUFFIX=darwin-arm64 ) & PID_TPL=$$!; \
+	wait $$PID_GO || exit 1; \
+	wait $$PID_TYPST || exit 1; \
+	wait $$PID_TPL || exit 1
+
+_build-macos-amd64: _frontend-embed
+	@mkdir -p $(DIST)/_bin
+	@( GOOS=darwin GOARCH=amd64 CGO_ENABLED=1 \
+		CGO_LDFLAGS="-framework UniformTypeIdentifiers" \
+		go build -tags "$(WAILS_TAGS)" -ldflags "$(LDFLAGS)" \
+		-o $(DIST)/_bin/presto-darwin-amd64 $(DESKTOP_SRC)/ ) & PID_GO=$$!; \
+	( $(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_DARWIN_AMD64) \
+		TYPST_OUT=$(DIST)/_bin/typst-darwin-amd64 ) & PID_TYPST=$$!; \
+	( $(MAKE) _build-templates TPL_GOOS=darwin TPL_GOARCH=amd64 \
+		TPL_SUFFIX=darwin-amd64 ) & PID_TPL=$$!; \
+	wait $$PID_GO || exit 1; \
+	wait $$PID_TYPST || exit 1; \
+	wait $$PID_TPL || exit 1
+
+dist-macos-arm64: _build-macos-arm64
 	@$(MAKE) _bundle-app GOARCH=arm64 TYPST_BIN=$(DIST)/_bin/typst-darwin-arm64
 
-dist-macos-amd64: _frontend-embed
-	@mkdir -p $(DIST)/_bin
-	GOOS=darwin GOARCH=amd64 CGO_ENABLED=1 \
-		CGO_LDFLAGS="-framework UniformTypeIdentifiers" \
-		go build -tags "$(WAILS_TAGS)" -ldflags "$(LDFLAGS)" \
-		-o $(DIST)/_bin/presto-darwin-amd64 $(DESKTOP_SRC)/
-	@$(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_DARWIN_AMD64) TYPST_OUT=$(DIST)/_bin/typst-darwin-amd64
-	@$(MAKE) _build-templates TPL_GOOS=darwin TPL_GOARCH=amd64 TPL_SUFFIX=darwin-amd64
+dist-macos-amd64: _build-macos-amd64
 	@$(MAKE) _bundle-app GOARCH=amd64 TYPST_BIN=$(DIST)/_bin/typst-darwin-amd64
 
-dist-macos-universal: dist-macos-arm64 dist-macos-amd64
+dist-macos-universal: _build-macos-arm64 _build-macos-amd64
 	@echo "==> Creating universal .app..."
 	@mkdir -p "$(DIST)/$(APP_NAME).app/Contents/MacOS"
 	@mkdir -p "$(DIST)/$(APP_NAME).app/Contents/Resources"
@@ -189,7 +210,7 @@ define CREATE_DMG
 	@echo "==> Creating DMG..."
 	@command -v create-dmg >/dev/null 2>&1 || \
 		{ echo "Error: create-dmg not found. Install with: brew install create-dmg"; exit 1; }
-	@rm -f "$(DIST)/$(APP_NAME)-$(VERSION)-macOS.dmg"
+	@rm -f "$(DIST)/$(APP_NAME)-$(VERSION)-macOS-$(1).dmg"
 	create-dmg \
 		--volname "$(APP_NAME)" \
 		--volicon "$(DMG_VOLICON)" \
@@ -201,19 +222,19 @@ define CREATE_DMG
 		--hide-extension "$(APP_NAME).app" \
 		--app-drop-link $(DMG_LNK_X) $(DMG_LNK_Y) \
 		--no-internet-enable \
-		"$(DIST)/$(APP_NAME)-$(VERSION)-macOS.dmg" \
+		"$(DIST)/$(APP_NAME)-$(VERSION)-macOS-$(1).dmg" \
 		"$(DIST)/$(APP_NAME).app"
-	@echo "==> $(DIST)/$(APP_NAME)-$(VERSION)-macOS.dmg"
+	@echo "==> $(DIST)/$(APP_NAME)-$(VERSION)-macOS-$(1).dmg"
 endef
 
 dist-dmg-arm64: dist-macos-arm64
-	$(call CREATE_DMG)
+	$(call CREATE_DMG,arm64)
 
 dist-dmg-amd64: dist-macos-amd64
-	$(call CREATE_DMG)
+	$(call CREATE_DMG,amd64)
 
 dist-dmg-universal: dist-macos-universal
-	$(call CREATE_DMG)
+	$(call CREATE_DMG,universal)
 
 dist-dmg: dist-dmg-arm64 dist-dmg-amd64 dist-dmg-universal
 
@@ -221,15 +242,20 @@ dist-dmg: dist-dmg-arm64 dist-dmg-amd64 dist-dmg-universal
 # Requires: brew install mingw-w64
 
 dist-windows-amd64: _frontend-embed
-	@mkdir -p $(DIST)
+	@mkdir -p $(DIST) $(DIST)/_bin
 	@command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1 || \
 		{ echo "Error: mingw-w64 not found. Install with: brew install mingw-w64"; exit 1; }
-	GOOS=windows GOARCH=amd64 CGO_ENABLED=1 \
+	@( GOOS=windows GOARCH=amd64 CGO_ENABLED=1 \
 		CC=x86_64-w64-mingw32-gcc \
 		go build -tags "$(WAILS_TAGS)" -ldflags "$(LDFLAGS) -H windowsgui" \
-		-o "$(DIST)/$(APP_NAME)-$(VERSION)-windows.exe" $(DESKTOP_SRC)/
-	@$(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_WINDOWS_AMD64) TYPST_OUT=$(DIST)/typst.exe
-	@$(MAKE) _build-templates TPL_GOOS=windows TPL_GOARCH=amd64 TPL_SUFFIX=windows-amd64
+		-o "$(DIST)/$(APP_NAME)-$(VERSION)-windows.exe" $(DESKTOP_SRC)/ ) & PID_GO=$$!; \
+	( $(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_WINDOWS_AMD64) \
+		TYPST_OUT=$(DIST)/typst.exe ) & PID_TYPST=$$!; \
+	( $(MAKE) _build-templates TPL_GOOS=windows TPL_GOARCH=amd64 \
+		TPL_SUFFIX=windows-amd64 ) & PID_TPL=$$!; \
+	wait $$PID_GO || exit 1; \
+	wait $$PID_TYPST || exit 1; \
+	wait $$PID_TPL || exit 1
 	@mkdir -p "$(DIST)/templates/gongwen" "$(DIST)/templates/jiaoan-shicao"
 	cp $(DIST)/_bin/presto-template-gongwen-windows-amd64 "$(DIST)/templates/gongwen/presto-template-gongwen.exe"
 	cp cmd/gongwen/manifest.json "$(DIST)/templates/gongwen/"
