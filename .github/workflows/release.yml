@@ -119,7 +119,7 @@ jobs:
           curl -sL "$LLVM_MINGW_URL" -o llvm-mingw.zip
           # SEC-23: Verify integrity of cross-compilation toolchain
           # Update this hash when upgrading llvm-mingw version
-          EXPECTED_HASH="e30f5761b6ea0a4b7fffc14e78ee0d7f009db16dbc7777d19e2dca77bc0e4ae4"
+          EXPECTED_HASH="9395d95c089611e6cd728c9a07219ffc5ac706e0c719833a2f7e64a706a81541"
           echo "${EXPECTED_HASH}  llvm-mingw.zip" | sha256sum -c - || {
             echo "ERROR: llvm-mingw checksum verification failed!"
             echo "If upgrading the version, update the EXPECTED_HASH in this workflow."
