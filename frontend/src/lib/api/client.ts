@@ -2,8 +2,24 @@ import type { Template, Manifest, GitHubRepo, BatchImportResult } from './types'
 
 const BASE = import.meta.env.VITE_API_URL || '';
 
+function getApiKey(): string {
+  if (typeof document === 'undefined') return '';
+  const meta = document.querySelector('meta[name="api-key"]');
+  return meta?.getAttribute('content') || '';
+}
+
+function authFetch(url: string, init?: RequestInit): Promise<Response> {
+  const key = getApiKey();
+  if (key) {
+    const headers = new Headers(init?.headers);
+    headers.set('Authorization', `Bearer ${key}`);
+    return fetch(url, { ...init, headers });
+  }
+  return fetch(url, init);
+}
+
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, init);
+  const res = await authFetch(`${BASE}${path}`, init);
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();
 }
@@ -26,7 +42,7 @@ export async function getExample(id: string): Promise<string> {
 }
 
 export async function convert(markdown: string, templateId: string): Promise<string> {
-  const res = await fetch(`${BASE}/api/convert`, {
+  const res = await authFetch(`${BASE}/api/convert`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ markdown, templateId })
@@ -45,7 +61,7 @@ export async function compile(typstSource: string, workDir?: string): Promise<Bl
   const url = workDir
     ? `${BASE}/api/compile?workDir=${encodeURIComponent(workDir)}`
     : `${BASE}/api/compile`;
-  const res = await fetch(url, {
+  const res = await authFetch(url, {
     method: 'POST',
     headers,
     body: typstSource
@@ -63,7 +79,7 @@ export async function compileSvg(typstSource: string, workDir?: string): Promise
   const url = workDir
     ? `${BASE}/api/compile-svg?workDir=${encodeURIComponent(workDir)}`
     : `${BASE}/api/compile-svg`;
-  const res = await fetch(url, {
+  const res = await authFetch(url, {
     method: 'POST',
     headers,
     body: typstSource
@@ -81,7 +97,7 @@ export async function convertAndCompile(
   templateId: string,
   workDir?: string
 ): Promise<Blob> {
-  const res = await fetch(`${BASE}/api/convert-and-compile`, {
+  const res = await authFetch(`${BASE}/api/convert-and-compile`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ markdown, templateId, workDir })
@@ -94,7 +110,7 @@ export async function convertAndCompile(
 }
 
 export async function installTemplate(owner: string, repo: string): Promise<void> {
-  const res = await fetch(
+  const res = await authFetch(
     `${BASE}/api/templates/${encodeURIComponent(owner + '/' + repo)}/install`,
     {
       method: 'POST',
@@ -106,12 +122,12 @@ export async function installTemplate(owner: string, repo: string): Promise<void
 }
 
 export async function deleteTemplate(id: string): Promise<void> {
-  const res = await fetch(`${BASE}/api/templates/${id}`, { method: 'DELETE' });
+  const res = await authFetch(`${BASE}/api/templates/${id}`, { method: 'DELETE' });
   if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
 }
 
 export async function renameTemplate(id: string, displayName: string): Promise<void> {
-  const res = await fetch(`${BASE}/api/templates/${encodeURIComponent(id)}`, {
+  const res = await authFetch(`${BASE}/api/templates/${encodeURIComponent(id)}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ displayName }),
@@ -134,7 +150,7 @@ export async function importTemplateZip(
   const formData = new FormData();
   formData.append('file', file);
   const params = onConflict ? `?onConflict=${onConflict}` : '';
-  const res = await fetch(`${BASE}/api/templates/import${params}`, {
+  const res = await authFetch(`${BASE}/api/templates/import${params}`, {
     method: 'POST',
     body: formData,
   });
@@ -154,7 +170,7 @@ export async function importTemplateZip(
 export async function importBatchZip(file: File): Promise<BatchImportResult> {
   const formData = new FormData();
   formData.append('file', file);
-  const res = await fetch(`${BASE}/api/batch/import-zip`, {
+  const res = await authFetch(`${BASE}/api/batch/import-zip`, {
     method: 'POST',
     body: formData,
   });
