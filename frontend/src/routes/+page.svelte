@@ -10,6 +10,7 @@
   import { templateStore } from '$lib/stores/templates.svelte';
   import { extractTemplateName, resolveTemplate } from '$lib/utils/frontmatter';
   import { triggerAction, shouldShowPoint } from '$lib/stores/wizard.svelte';
+  import { fileRouter } from '$lib/stores/file-router.svelte';
 
   // Wails runtime bindings (available when running as desktop app)
   declare global {
@@ -17,6 +18,7 @@
       go?: { main: { App: {
         SavePDF: (markdown: string, templateId: string, workDir: string) => Promise<void>;
         OpenFile: () => Promise<{ content: string; dir: string } | null>;
+        OpenFiles: () => Promise<{ name: string; content: string; dir: string; isZip: boolean }[] | null>;
         CompileSVG: (typstSource: string, workDir: string) => Promise<string[]>;
       } } };
       runtime?: { EventsOn: (event: string, cb: (...args: any[]) => void) => void };
@@ -26,6 +28,17 @@
   let converting = $state(false);
   let errorMsg = $state('');
   let autoDetectedOnce = $state(false);
+
+  // React to external content load (drag-drop or file-router)
+  $effect(() => {
+    if (editor.pendingExternalLoad) {
+      editor.pendingExternalLoad = false;
+      autoDetectedOnce = false;
+      tryAutoDetectTemplate(editor.markdown);
+      handleConvert(editor.markdown);
+    }
+  });
+
   let editorScrollRatio = $state(0);
   let previewScrollRatio = $state(0);
   let scrollSource: 'editor' | 'preview' | null = $state(null);
@@ -235,36 +248,36 @@
 
   async function handleOpen() {
     try {
-      if (window.go?.main?.App?.OpenFile) {
-        const result = await window.go.main.App.OpenFile();
-        if (result) {
-          editor.markdown = result.content;
-          editor.documentDir = result.dir;
-          autoDetectedOnce = false;
-          tryAutoDetectTemplate(result.content);
-          handleConvert(editor.markdown);
-        }
-        return;
+      let files: File[];
+      let documentDirs: Map<string, string> | undefined;
+
+      if (window.go?.main?.App?.OpenFiles) {
+        // Desktop: multi-file dialog (supports ZIP + markdown)
+        const results = await window.go.main.App.OpenFiles();
+        if (!results || results.length === 0) return;
+        documentDirs = new Map();
+        files = results.map((r: { name: string; content: string; dir: string; isZip: boolean }) => {
+          if (r.isZip) {
+            const bytes = Uint8Array.from(atob(r.content), c => c.charCodeAt(0));
+            return new File([bytes], r.name, { type: 'application/zip' });
+          }
+          documentDirs!.set(r.name, r.dir);
+          return new File([r.content], r.name, { type: 'text/markdown' });
+        });
+      } else {
+        // Browser: file input (multiple, supports ZIP)
+        files = await new Promise<File[]>(resolve => {
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = '.md,.markdown,.txt,.zip';
+          input.multiple = true;
+          input.onchange = () => resolve(Array.from(input.files ?? []));
+          input.click();
+        });
       }
-      // Browser fallback: use file input
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = '.md,.markdown,.txt';
-      input.onchange = () => {
-        const file = input.files?.[0];
-        if (!file) return;
-        // Browser File API doesn't expose directory path
-        editor.documentDir = '';
-        const reader = new FileReader();
-        reader.onload = () => {
-          editor.markdown = reader.result as string;
-          autoDetectedOnce = false;
-          tryAutoDetectTemplate(editor.markdown);
-          handleConvert(editor.markdown);
-        };
-        reader.readAsText(file);
-      };
-      input.click();
+
+      if (files.length === 0) return;
+      await fileRouter.processFiles(files, '/', documentDirs);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       errorMsg = msg;
