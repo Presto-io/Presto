@@ -1,34 +1,36 @@
 <script lang="ts">
 	import '../app.css';
 	import { onMount } from 'svelte';
-	import { Package } from 'lucide-svelte';
+	import { FileText } from 'lucide-svelte';
 	import WizardOverlay from '$lib/components/wizard/WizardOverlay.svelte';
-	import { importTemplateZip } from '$lib/api/client';
-	import { templateStore } from '$lib/stores/templates.svelte';
+	import { fileRouter } from '$lib/stores/file-router.svelte';
 
 	let { children } = $props();
 
-	// --- Drag-drop ZIP import ---
+	// --- Universal drag-drop ---
 	let dragOver = $state(false);
 	let dragCounter = 0;
-	let toast = $state<{ message: string; type: 'success' | 'error' } | null>(null);
-	let toastTimer: ReturnType<typeof setTimeout>;
+	let confirmDialog: HTMLDialogElement;
 
-	function showToast(message: string, type: 'success' | 'error') {
-		clearTimeout(toastTimer);
-		toast = { message, type };
-		toastTimer = setTimeout(() => { toast = null; }, 2500);
+	const markdownExts = ['.md', '.markdown', '.txt'];
+	function isAcceptedFile(name: string): boolean {
+		const lower = name.toLowerCase();
+		return lower.endsWith('.zip') || markdownExts.some(ext => lower.endsWith(ext));
 	}
 
-	function hasZipFile(e: DragEvent): boolean {
+	function hasDroppableFile(e: DragEvent): boolean {
 		if (!e.dataTransfer?.types.includes('Files')) return false;
+		// Don't intercept internal drags (file reassignment between templates)
+		if (e.dataTransfer.types.includes('application/x-presto-files')) return false;
 		const items = e.dataTransfer.items;
 		for (let i = 0; i < items.length; i++) {
 			if (items[i].kind === 'file') {
 				const entry = items[i].webkitGetAsEntry?.();
-				if (entry && entry.name.toLowerCase().endsWith('.zip')) return true;
-				// Fallback: check type
+				if (entry && isAcceptedFile(entry.name)) return true;
+				// Fallback: check MIME type for ZIP
 				if (items[i].type === 'application/zip' || items[i].type === 'application/x-zip-compressed') return true;
+				// Fallback: check MIME type for text/markdown
+				if (items[i].type === 'text/plain' || items[i].type === 'text/markdown') return true;
 			}
 		}
 		return false;
@@ -36,7 +38,7 @@
 
 	function handleDragEnter(e: DragEvent) {
 		dragCounter++;
-		if (hasZipFile(e)) {
+		if (hasDroppableFile(e)) {
 			e.preventDefault();
 			dragOver = true;
 		}
@@ -59,33 +61,22 @@
 		dragOver = false;
 		if (!e.dataTransfer?.files) return;
 
-		const file = Array.from(e.dataTransfer.files).find(f =>
-			f.name.toLowerCase().endsWith('.zip')
-		);
-		if (!file) return;
+		const files = Array.from(e.dataTransfer.files).filter(f => isAcceptedFile(f.name));
+		if (files.length === 0) return;
 		e.preventDefault();
+		e.stopPropagation();
 
-		try {
-			const tpls = await importTemplateZip(file);
-			const names = tpls.map(t => t.displayName || t.name).join('、');
-			showToast(`模板 "${names}" 导入成功`, 'success');
-			await templateStore.refresh();
-		} catch (err: any) {
-			if (err.conflicts) {
-				// Conflict: auto-rename and retry
-				try {
-					const tpls = await importTemplateZip(file, 'rename');
-					const names = tpls.map(t => t.displayName || t.name).join('、');
-					showToast(`模板 "${names}" 导入成功（已自动重命名）`, 'success');
-					await templateStore.refresh();
-				} catch (retryErr) {
-					showToast(retryErr instanceof Error ? retryErr.message : String(retryErr), 'error');
-				}
-			} else {
-				showToast(err instanceof Error ? err.message : String(err), 'error');
-			}
-		}
+		await fileRouter.processFiles(files, window.location.pathname);
 	}
+
+	// Sync confirm dialog with fileRouter state
+	$effect(() => {
+		if (fileRouter.confirmVisible) {
+			confirmDialog?.showModal();
+		} else {
+			confirmDialog?.close();
+		}
+	});
 
 	onMount(() => {
 		if (!window.runtime?.EventsOn) return;
@@ -115,18 +106,27 @@
 	{#if dragOver}
 		<div class="drop-overlay">
 			<div class="drop-content">
-				<Package size={32} />
-				<span>释放以导入模板</span>
+				<FileText size={32} />
+				<span>释放以导入文件</span>
 			</div>
 		</div>
 	{/if}
 
-	{#if toast}
-		<div class="toast" class:toast-error={toast.type === 'error'}>
-			{toast.message}
+	{#if fileRouter.toast}
+		<div class="toast" class:toast-error={fileRouter.toast.type === 'error'}>
+			{fileRouter.toast.message}
 		</div>
 	{/if}
 </div>
+
+<dialog bind:this={confirmDialog} class="confirm-dialog">
+	<h3>打开文件</h3>
+	<p>当前编辑器有未保存的内容，打开新文件将替换当前内容。</p>
+	<div class="dialog-actions">
+		<button class="dialog-btn primary" onclick={fileRouter.confirmAccept}>替换</button>
+		<button class="dialog-btn" onclick={fileRouter.confirmCancel}>取消</button>
+	</div>
+</dialog>
 
 <style>
 	.app {
@@ -185,5 +185,49 @@
 	@keyframes toast-in {
 		from { opacity: 0; transform: translateX(-50%) translateY(8px); }
 		to { opacity: 1; transform: translateX(-50%) translateY(0); }
+	}
+	.confirm-dialog {
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md, 8px);
+		background: var(--color-surface);
+		color: var(--color-text);
+		padding: 24px;
+		max-width: 400px;
+		font-family: var(--font-ui);
+	}
+	.confirm-dialog::backdrop {
+		background: rgba(0, 0, 0, 0.4);
+	}
+	.confirm-dialog h3 {
+		margin: 0 0 8px;
+		font-size: 16px;
+		font-weight: 600;
+	}
+	.confirm-dialog p {
+		margin: 0 0 20px;
+		font-size: 13px;
+		color: var(--color-muted);
+		line-height: 1.5;
+	}
+	.dialog-actions {
+		display: flex;
+		gap: 8px;
+		justify-content: flex-end;
+	}
+	.dialog-btn {
+		padding: 6px 14px;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-sm);
+		background: var(--color-surface);
+		color: var(--color-text);
+		font-size: 12px;
+		cursor: pointer;
+		transition: opacity var(--transition);
+	}
+	.dialog-btn:hover { opacity: 0.85; }
+	.dialog-btn.primary {
+		background: var(--color-accent);
+		color: var(--color-bg);
+		border-color: var(--color-accent);
 	}
 </style>
