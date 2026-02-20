@@ -14,6 +14,7 @@ LDFLAGS      := -s -w -X main.version=$(VERSION)
 DIST         := dist
 DESKTOP_SRC  := ./cmd/presto-desktop
 DESKTOP_EMBED:= cmd/presto-desktop/build
+MACOSX_DEPLOYMENT_TARGET := 11.0
 
 # Typst download URL patterns
 TYPST_BASE   := https://github.com/typst/typst/releases/download/v$(TYPST_VERSION)
@@ -32,7 +33,8 @@ server: frontend
 
 desktop: frontend
 	cp -r frontend/build/* $(DESKTOP_EMBED)/
-	CGO_LDFLAGS="-framework UniformTypeIdentifiers" \
+	MACOSX_DEPLOYMENT_TARGET=$(MACOSX_DEPLOYMENT_TARGET) \
+		CGO_LDFLAGS="-framework UniformTypeIdentifiers" \
 		go build -tags "$(WAILS_TAGS)" -ldflags "$(LDFLAGS)" -o bin/presto-desktop $(DESKTOP_SRC)/
 
 templates:
@@ -105,7 +107,8 @@ _download-typst:
 # Build binaries only (no .app bundle) — parallel execution
 _build-macos-arm64: _frontend-embed
 	@mkdir -p $(DIST)/_bin
-	@( GOOS=darwin GOARCH=arm64 CGO_ENABLED=1 \
+	@( MACOSX_DEPLOYMENT_TARGET=$(MACOSX_DEPLOYMENT_TARGET) \
+		GOOS=darwin GOARCH=arm64 CGO_ENABLED=1 \
 		CGO_LDFLAGS="-framework UniformTypeIdentifiers" \
 		go build -tags "$(WAILS_TAGS)" -ldflags "$(LDFLAGS)" \
 		-o $(DIST)/_bin/presto-darwin-arm64 $(DESKTOP_SRC)/ ) & PID_GO=$$!; \
@@ -119,7 +122,8 @@ _build-macos-arm64: _frontend-embed
 
 _build-macos-amd64: _frontend-embed
 	@mkdir -p $(DIST)/_bin
-	@( GOOS=darwin GOARCH=amd64 CGO_ENABLED=1 \
+	@( MACOSX_DEPLOYMENT_TARGET=$(MACOSX_DEPLOYMENT_TARGET) \
+		GOOS=darwin GOARCH=amd64 CGO_ENABLED=1 \
 		CGO_LDFLAGS="-framework UniformTypeIdentifiers" \
 		go build -tags "$(WAILS_TAGS)" -ldflags "$(LDFLAGS)" \
 		-o $(DIST)/_bin/presto-darwin-amd64 $(DESKTOP_SRC)/ ) & PID_GO=$$!; \

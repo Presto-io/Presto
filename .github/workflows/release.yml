@@ -72,6 +72,8 @@ jobs:
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
 
       - name: Build DMG
+        env:
+          MACOSX_DEPLOYMENT_TARGET: '11.0'
         run: make ${{ matrix.make_target }} VERSION=${{ env.VERSION }} SKIP_FRONTEND=1
 
       - uses: actions/upload-artifact@v4
