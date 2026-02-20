@@ -114,6 +114,11 @@ export function disableWizard() {
   saveState();
 }
 
+export function enableWizard() {
+  wizard.disabled = false;
+  saveState();
+}
+
 export function resetWizard() {
   wizard.points = {};
   wizard.disabled = false;

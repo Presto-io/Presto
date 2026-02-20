@@ -2,11 +2,11 @@
   import { onMount, onDestroy } from 'svelte';
   import { fly, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
-  import { ExternalLink, Shield, Info, BookOpen, ArrowLeft, RefreshCw, Search, Package, Download, Trash2, Loader, Upload, Pencil, Check, X, AlertTriangle } from 'lucide-svelte';
+  import { ExternalLink, Shield, Info, BookOpen, ArrowLeft, RefreshCw, Search, Package, Download, Trash2, Loader, Upload, Pencil, Check, X, AlertTriangle, Settings, Scale, Lightbulb } from 'lucide-svelte';
   import { goto } from '$app/navigation';
   import { listTemplates, discoverTemplates, installTemplate, deleteTemplate, importTemplateZip, renameTemplate } from '$lib/api/client';
   import type { Template, GitHubRepo } from '$lib/api/types';
-  import { triggerAction, resetWizard } from '$lib/stores/wizard.svelte';
+  import { triggerAction, resetWizard, disableWizard, enableWizard, wizard } from '$lib/stores/wizard.svelte';
 
   // --- Settings state ---
   let communityEnabled = $state(false);
@@ -54,16 +54,19 @@
     })
   );
 
-  const sections = [
-    { id: 'general', label: '通用' },
-    { id: 'template-dev', label: '模板开发' },
-    { id: 'about', label: '关于' },
-    { id: 'licenses', label: '开源协议' },
+  import type { Component } from 'svelte';
+
+  const sections: { id: string; label: string; icon: Component }[] = [
+    { id: 'general', label: '通用', icon: Settings },
+    { id: 'wizard', label: '引导', icon: Lightbulb },
+    { id: 'template-dev', label: '模板开发', icon: BookOpen },
+    { id: 'about', label: '关于', icon: Info },
+    { id: 'licenses', label: '开源协议', icon: Scale },
   ];
 
   let panelTabs = $derived(communityEnabled ? [
-    { id: 'tpl-manage' as const, label: '模板管理' },
-    { id: 'tpl-search' as const, label: '模板搜索' },
+    { id: 'tpl-manage' as const, label: '模板管理', icon: Package },
+    { id: 'tpl-search' as const, label: '模板搜索', icon: Search },
   ] : []);
 
   declare global {
@@ -71,6 +74,7 @@
       go?: { main: { App: {
         GetVersion: () => Promise<string>;
         CheckForUpdate: () => Promise<{ hasUpdate: boolean; currentVersion: string; latestVersion: string; downloadURL: string; releaseURL: string }>;
+        DeleteTemplate: (name: string) => Promise<void>;
       } } };
     }
   }
@@ -233,8 +237,17 @@
 
   async function handleDelete(name: string) {
     if (!confirm(`确定卸载模板 "${name}"？`)) return;
-    await deleteTemplate(name);
-    installed = await listTemplates();
+    try {
+      if (window.go?.main?.App?.DeleteTemplate) {
+        await window.go.main.App.DeleteTemplate(name);
+      } else {
+        await deleteTemplate(name);
+      }
+      installed = (await listTemplates()) ?? [];
+      showImportToast(`模板 "${name}" 已卸载`, 'success');
+    } catch (err) {
+      showImportToast(err instanceof Error ? err.message : String(err), 'error');
+    }
   }
 
   // --- ZIP import ---
@@ -352,23 +365,27 @@
   <div class="settings-layout">
     <nav class="settings-nav">
       {#each sections as sec (sec.id)}
+        {@const Icon = sec.icon}
         <button
           class="nav-item"
           class:active={!activePanel && activeSection === sec.id}
           onclick={() => scrollTo(sec.id)}
         >
+          <Icon size={14} />
           {sec.label}
         </button>
       {/each}
       {#if panelTabs.length > 0}
         <div class="nav-divider" transition:fade={{ duration: 200 }}></div>
         {#each panelTabs as tab (tab.id)}
+          {@const Icon = tab.icon}
           <button
             class="nav-item"
             class:active={activePanel === tab.id}
             onclick={() => togglePanel(tab.id)}
             transition:fly={{ x: -12, duration: 300, easing: cubicOut }}
           >
+            <Icon size={14} />
             {tab.label}
           </button>
         {/each}
@@ -560,7 +577,7 @@
       {:else}
         <div class="settings-content">
           <section id="section-general">
-            <h3>通用</h3>
+            <h3><Settings size={16} /> 通用</h3>
             <div class="setting-row">
               <div class="setting-info">
                 <span class="setting-label">启用社区模板</span>
@@ -576,9 +593,29 @@
                 <span class="slider" class:on={communityEnabled}></span>
               </button>
             </div>
+          </section>
+
+          <section id="section-wizard">
+            <h3><Lightbulb size={16} /> 引导</h3>
+            <p class="section-desc">操作引导会在首次使用时逐步展示各功能的提示，帮助快速上手。</p>
+            <div class="setting-row">
+              <div class="setting-info">
+                <span class="setting-label">启用引导</span>
+                <span class="setting-desc">开启后将在适当时机显示操作提示</span>
+              </div>
+              <button
+                class="toggle"
+                onclick={() => wizard.disabled ? enableWizard() : disableWizard()}
+                role="switch"
+                aria-checked={!wizard.disabled}
+                aria-label="启用引导"
+              >
+                <span class="slider" class:on={!wizard.disabled}></span>
+              </button>
+            </div>
             <div class="setting-row" style="margin-top: var(--space-sm)">
               <div class="setting-info">
-                <span class="setting-label">新手引导</span>
+                <span class="setting-label">重置引导</span>
                 <span class="setting-desc">重置所有引导提示，重新展示操作引导</span>
               </div>
               <button class="btn-reset-wizard" onclick={resetWizard}>重置引导</button>
@@ -648,7 +685,7 @@
           </section>
 
           <section id="section-licenses">
-            <h3>开源协议声明</h3>
+            <h3><Scale size={16} /> 开源协议声明</h3>
             <p class="section-desc">Presto 基于以下开源软件构建，感谢这些项目的贡献者。</p>
             <ul class="license-list">
               <li><a href="https://go.dev" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://go.dev'); }} class="lib-name">Go<ExternalLink size={10} /></a><span class="lib-license">BSD-3-Clause</span></li>
@@ -773,7 +810,7 @@
   }
 
   .settings-nav {
-    width: 120px;
+    width: 140px;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
@@ -790,6 +827,9 @@
   }
 
   .nav-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
     text-align: left;
     padding: var(--space-sm) var(--space-md);
     background: none;

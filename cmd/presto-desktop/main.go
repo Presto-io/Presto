@@ -212,6 +212,15 @@ func (a *App) ImportBatchZip(filePath string) (*api.BatchImportResult, error) {
 	return api.ProcessBatchZip(data, a.manager)
 }
 
+// DeleteTemplate uninstalls a third-party template by name.
+// Bypasses the HTTP layer where Wails WebView may not support DELETE method.
+func (a *App) DeleteTemplate(name string) error {
+	if template.IsOfficial(name) {
+		return fmt.Errorf("cannot delete built-in template")
+	}
+	return a.manager.Uninstall(name)
+}
+
 // GetVersion returns the current app version.
 func (a *App) GetVersion() string {
 	if version == "" {
