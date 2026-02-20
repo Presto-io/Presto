@@ -145,7 +145,7 @@
   }
 
   // --- File adding with auto-detect ---
-  async function addFiles(newFiles: File[]) {
+  async function addFiles(newFiles: File[], fileWorkDir?: string) {
     const additions: BatchFile[] = [];
     for (const file of newFiles) {
       // Read only the first 2KB for frontmatter detection
@@ -167,6 +167,7 @@
         file,
         templateId,
         autoDetected,
+        workDir: fileWorkDir,
       });
     }
     batchFiles = [...batchFiles, ...additions];
@@ -222,6 +223,60 @@
     if (mdFiles.length > 0) addFiles(mdFiles);
     for (const zip of zipFiles) handleZipImport(zip);
     input.value = '';
+  }
+
+  /** Desktop: use native dialog + Wails binding; Browser: click hidden file input */
+  async function handleSelectFiles() {
+    const wails = (window as any).go?.main?.App;
+    if (!wails?.OpenFiles) {
+      // Browser mode: use HTML file input
+      fileInput?.click();
+      return;
+    }
+
+    // Desktop mode: native file dialog
+    const results = await wails.OpenFiles();
+    if (!results || results.length === 0) return;
+
+    for (const r of results) {
+      if (r.isZip && r.path && wails.ImportBatchZip) {
+        // Process ZIP via Wails binding
+        zipImporting = true;
+        try {
+          const result = await wails.ImportBatchZip(r.path);
+          if (result.templates?.length > 0) await templateStore.refresh();
+          const additions: BatchFile[] = [];
+          for (const md of result.markdownFiles ?? []) {
+            const blob = new Blob([md.content], { type: 'text/markdown' });
+            const file = new File([blob], md.name, { type: 'text/markdown' });
+            let templateId = selectedTemplate;
+            let autoDetected = false;
+            if (md.detectedTemplate) {
+              const resolved = resolveTemplate(md.detectedTemplate, templateStore.templates);
+              if (resolved) {
+                templateId = resolved;
+                autoDetected = true;
+              }
+            }
+            additions.push({
+              id: crypto.randomUUID(),
+              file,
+              templateId,
+              autoDetected,
+              workDir: md.workDir || result.workDir,
+            });
+          }
+          batchFiles = [...batchFiles, ...additions];
+        } catch (err) {
+          console.error('ImportBatchZip failed:', err);
+        } finally {
+          zipImporting = false;
+        }
+      } else if (!r.isZip) {
+        const file = new File([r.content], r.name, { type: 'text/markdown' });
+        addFiles([file], r.dir);
+      }
+    }
   }
 
   function removeFile(fileId: string) {
@@ -494,7 +549,7 @@
     <div class="batch-content">
       <!-- Action bar -->
       <div class="action-bar">
-        <button class="btn-action" onclick={() => fileInput?.click()}>
+        <button class="btn-action" onclick={handleSelectFiles}>
           <Upload size={14} />
           <span>选择文件</span>
         </button>

@@ -18,8 +18,9 @@
       go?: { main: { App: {
         SavePDF: (markdown: string, templateId: string, workDir: string) => Promise<void>;
         OpenFile: () => Promise<{ content: string; dir: string } | null>;
-        OpenFiles: () => Promise<{ name: string; content: string; dir: string; isZip: boolean }[] | null>;
+        OpenFiles: () => Promise<{ name: string; content: string; dir: string; isZip: boolean; path?: string }[] | null>;
         CompileSVG: (typstSource: string, workDir: string) => Promise<string[]>;
+        ImportBatchZip: (filePath: string) => Promise<any>;
       } } };
       runtime?: { EventsOn: (event: string, cb: (...args: any[]) => void) => void };
     }
@@ -256,14 +257,28 @@
         const results = await window.go.main.App.OpenFiles();
         if (!results || results.length === 0) return;
         documentDirs = new Map();
-        files = results.map((r: { name: string; content: string; dir: string; isZip: boolean }) => {
-          if (r.isZip) {
-            const bytes = Uint8Array.from(atob(r.content), c => c.charCodeAt(0));
-            return new File([bytes], r.name, { type: 'application/zip' });
+        const zipResults: any[] = [];
+        files = [];
+        for (const r of results) {
+          if (r.isZip && r.path && window.go.main.App.ImportBatchZip) {
+            // Process ZIP via Wails binding (bypasses WebView HTTP)
+            try {
+              const result = await window.go.main.App.ImportBatchZip(r.path);
+              zipResults.push(result);
+            } catch (err) {
+              console.error('ImportBatchZip failed:', err);
+            }
+          } else if (!r.isZip) {
+            documentDirs.set(r.name, r.dir);
+            files.push(new File([r.content], r.name, { type: 'text/markdown' }));
           }
-          documentDirs!.set(r.name, r.dir);
-          return new File([r.content], r.name, { type: 'text/markdown' });
-        });
+        }
+        if (files.length === 0 && zipResults.length === 0) return;
+        await fileRouter.processFiles(
+          files, '/', documentDirs,
+          zipResults.length > 0 ? zipResults : undefined,
+        );
+        return;
       } else {
         // Browser: file input (multiple, supports ZIP)
         files = await new Promise<File[]>(resolve => {

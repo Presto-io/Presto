@@ -93,22 +93,41 @@
 			window.runtime.EventsOn('menu:selectAll', () => document.execCommand('selectAll'));
 
 			// Native file drop: Wails provides absolute paths → we get dir info for images
-			window.runtime.EventsOn('native-file-drop', (...args: any[]) => {
+			window.runtime.EventsOn('native-file-drop', async (...args: any[]) => {
 				const items: any[] = Array.isArray(args[0]) ? args[0] : args;
 				dragCounter = 0;
 				dragOver = false;
 
 				const documentDirs = new Map<string, string>();
-				const files = items.map((item: any) => {
-					if (item.isZip) {
-						const bytes = Uint8Array.from(atob(item.content), (c: string) => c.charCodeAt(0));
-						return new File([bytes], item.name, { type: 'application/zip' });
+				const files: File[] = [];
+				const zipResults: any[] = [];
+
+				for (const item of items) {
+					if (item.isZip && item.path) {
+						// Call Wails binding directly — bypasses WebView HTTP layer
+						try {
+							const result = await (window as any).go.main.App.ImportBatchZip(item.path);
+							zipResults.push(result);
+						} catch (err) {
+							console.error('ImportBatchZip failed:', err);
+							fileRouter.showToast(
+								err instanceof Error ? err.message : 'ZIP 导入失败',
+								'error',
+							);
+						}
+					} else {
+						documentDirs.set(item.name, item.dir);
+						files.push(new File([item.content], item.name, { type: 'text/markdown' }));
 					}
-					documentDirs.set(item.name, item.dir);
-					return new File([item.content], item.name, { type: 'text/markdown' });
-				});
-				if (files.length > 0) {
-					fileRouter.processFiles(files, window.location.pathname, documentDirs);
+				}
+
+				if (files.length > 0 || zipResults.length > 0) {
+					fileRouter.processFiles(
+						files,
+						window.location.pathname,
+						documentDirs.size > 0 ? documentDirs : undefined,
+						zipResults.length > 0 ? zipResults : undefined,
+					);
 				}
 			});
 		}
