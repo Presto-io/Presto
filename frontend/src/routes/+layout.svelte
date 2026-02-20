@@ -62,8 +62,8 @@
 		);
 		if (files.length === 0) return;
 
-		// Always route as Cmd+O: pass '/' regardless of current page
-		await fileRouter.processFiles(files, '/');
+		// Route based on the actual current page
+		await fileRouter.processFiles(files, window.location.pathname);
 	}
 
 	// Sync confirm dialog with fileRouter state
@@ -108,7 +108,7 @@
 					return new File([item.content], item.name, { type: 'text/markdown' });
 				});
 				if (files.length > 0) {
-					fileRouter.processFiles(files, '/', documentDirs);
+					fileRouter.processFiles(files, window.location.pathname, documentDirs);
 				}
 			});
 		}

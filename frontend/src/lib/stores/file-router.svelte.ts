@@ -97,6 +97,15 @@ export const fileRouter = {
       const allMarkdown: File[] = [...mdFiles];
       let workDir: string | undefined;
       const importedTemplates: { name: string; displayName: string; status: string }[] = [];
+      // Per-file working directories (from ZIP per-file workDir + desktop documentDirs)
+      const perFileDirs = new Map<string, string>();
+
+      // Carry over desktop documentDirs for directly dropped files
+      if (documentDirs) {
+        for (const [name, dir] of documentDirs) {
+          if (isMarkdown(name)) perFileDirs.set(name, dir);
+        }
+      }
 
       for (const zip of zipFiles) {
         try {
@@ -105,13 +114,16 @@ export const fileRouter = {
           // Collect imported templates
           importedTemplates.push(...result.templates);
 
-          // Record workDir for image resolution
+          // Record workDir for image resolution (fallback)
           if (result.workDir) workDir = result.workDir;
 
           // Create File objects from extracted markdown
           for (const md of result.markdownFiles) {
             const blob = new Blob([md.content], { type: 'text/markdown' });
             allMarkdown.push(new File([blob], md.name, { type: 'text/markdown' }));
+            // Per-file workDir (nested ZIP dirs) takes priority over top-level workDir
+            const dir = md.workDir || result.workDir;
+            if (dir) perFileDirs.set(md.name, dir);
           }
         } catch (err) {
           console.error('ZIP import failed:', err);
@@ -144,7 +156,11 @@ export const fileRouter = {
 
       if (currentPath === '/batch') {
         // On batch page: add all to batch
-        pendingDrop.set({ files: allMarkdown, workDir });
+        pendingDrop.set({
+          files: allMarkdown,
+          workDir,
+          documentDirs: perFileDirs.size > 0 ? perFileDirs : undefined,
+        });
         return;
       }
 
@@ -155,14 +171,18 @@ export const fileRouter = {
 
         const file = allMarkdown[0];
         const content = await file.text();
-        const dir = documentDirs?.get(file.name) || workDir || '';
+        const dir = perFileDirs.get(file.name) || workDir || '';
         editor.markdown = content;
         editor.documentDir = dir;
         editor.pendingExternalLoad = true;
         if (currentPath !== '/') await goto('/');
       } else {
         // Multiple files → batch
-        pendingDrop.set({ files: allMarkdown, workDir });
+        pendingDrop.set({
+          files: allMarkdown,
+          workDir,
+          documentDirs: perFileDirs.size > 0 ? perFileDirs : undefined,
+        });
         if (currentPath !== '/batch') await goto('/batch');
       }
     } finally {
