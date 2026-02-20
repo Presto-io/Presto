@@ -38,8 +38,14 @@
 
   let successCount = $derived(results.filter(r => r.blob).length);
   let errorCount = $derived(results.filter(r => r.error).length);
-  let progress = $derived(results.length);
-  let totalFiles = $derived(batchFiles.length);
+
+  // Pending = files not yet converted (no matching result)
+  let convertedFileIds = $derived(new Set(results.map(r => r.fileId)));
+  let pendingFiles = $derived(batchFiles.filter(f => !convertedFileIds.has(f.id)));
+
+  // Batch progress tracking (for current conversion run)
+  let batchSize = $state(0);
+  let batchDone = $state(0);
 
   // Group files by template
   interface TemplateGroup {
@@ -50,7 +56,7 @@
 
   let groups = $derived.by(() => {
     const map = new Map<string, BatchFile[]>();
-    for (const f of batchFiles) {
+    for (const f of pendingFiles) {
       if (!map.has(f.templateId)) map.set(f.templateId, []);
       map.get(f.templateId)!.push(f);
     }
@@ -87,7 +93,7 @@
 
   // Count files per template (for nav badge)
   function groupFileCount(templateName: string): number {
-    return batchFiles.filter(f => f.templateId === templateName).length;
+    return pendingFiles.filter(f => f.templateId === templateName).length;
   }
 
   // Wails desktop: SaveFile binding available?
@@ -319,11 +325,12 @@
 
   // --- Conversion ---
   async function convertAll() {
-    if (batchFiles.length === 0) return;
+    if (pendingFiles.length === 0) return;
     processing = true;
-    results = [];
 
-    const queue = [...batchFiles];
+    const queue = [...pendingFiles];
+    batchSize = queue.length;
+    batchDone = 0;
 
     async function worker() {
       while (queue.length > 0) {
@@ -345,11 +352,12 @@
             error: e instanceof Error ? e.message : String(e),
           }];
         }
+        batchDone++;
       }
     }
 
     await Promise.all(
-      Array.from({ length: Math.min(CONCURRENCY, batchFiles.length) }, () => worker())
+      Array.from({ length: Math.min(CONCURRENCY, queue.length) }, () => worker())
     );
     processing = false;
   }
@@ -507,13 +515,13 @@
           <button
             class="btn-convert"
             onclick={convertAll}
-            disabled={processing || batchFiles.length === 0}
+            disabled={processing || pendingFiles.length === 0}
           >
             {#if processing}
               <Loader size={14} class="spin" />
-              <span>转换中 ({progress}/{totalFiles})</span>
+              <span>转换中 ({batchDone}/{batchSize})</span>
             {:else}
-              <span>转换全部 ({totalFiles})</span>
+              <span>转换全部 ({pendingFiles.length})</span>
             {/if}
           </button>
         {/if}
@@ -523,7 +531,7 @@
       </div>
 
       <!-- Drop zone / empty state -->
-      {#if batchFiles.length === 0 && results.length === 0}
+      {#if pendingFiles.length === 0 && results.length === 0}
         <div
           class="drop-zone"
           role="region"
@@ -546,7 +554,7 @@
       {/if}
 
       <!-- File list grouped by template -->
-      {#if batchFiles.length > 0 && results.length === 0}
+      {#if pendingFiles.length > 0}
         {#each groups as group (group.templateId)}
           <div class="section">
             <div
