@@ -52,6 +52,11 @@
 		e.preventDefault();
 		e.stopPropagation();
 
+		// Desktop: Wails native handler provides paths with dir info
+		// Skip browser processing to avoid double handling
+		if (window.runtime?.EventsOn) return;
+
+		// Browser mode: no dir info available
 		const files = Array.from(e.dataTransfer!.files).filter(f =>
 			ACCEPTED_EXTS.some(ext => f.name.toLowerCase().endsWith(ext))
 		);
@@ -86,6 +91,26 @@
 			window.runtime.EventsOn('menu:copy', () => document.execCommand('copy'));
 			window.runtime.EventsOn('menu:paste', () => document.execCommand('paste'));
 			window.runtime.EventsOn('menu:selectAll', () => document.execCommand('selectAll'));
+
+			// Native file drop: Wails provides absolute paths → we get dir info for images
+			window.runtime.EventsOn('native-file-drop', (...args: any[]) => {
+				const items: any[] = Array.isArray(args[0]) ? args[0] : args;
+				dragCounter = 0;
+				dragOver = false;
+
+				const documentDirs = new Map<string, string>();
+				const files = items.map((item: any) => {
+					if (item.isZip) {
+						const bytes = Uint8Array.from(atob(item.content), (c: string) => c.charCodeAt(0));
+						return new File([bytes], item.name, { type: 'application/zip' });
+					}
+					documentDirs.set(item.name, item.dir);
+					return new File([item.content], item.name, { type: 'text/markdown' });
+				});
+				if (files.length > 0) {
+					fileRouter.processFiles(files, '/', documentDirs);
+				}
+			});
 		}
 
 		return () => {
@@ -130,6 +155,7 @@
 
 <style>
 	.app {
+		--wails-drop-target: drop;
 		display: flex;
 		flex-direction: column;
 		height: 100vh;

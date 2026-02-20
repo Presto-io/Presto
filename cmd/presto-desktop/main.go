@@ -60,6 +60,14 @@ func NewApp(manager *template.Manager, compiler *typst.Compiler) *App {
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+
+	// Native file drop: receive absolute paths and forward to frontend
+	wailsRuntime.OnFileDrop(ctx, func(x, y int, paths []string) {
+		items := a.readFilePaths(paths)
+		if len(items) > 0 {
+			wailsRuntime.EventsEmit(ctx, "native-file-drop", items)
+		}
+	})
 }
 
 // OpenFile opens a native file dialog and returns the file content and directory.
@@ -86,22 +94,9 @@ func (a *App) OpenFile() (*OpenFileResult, error) {
 	}, nil
 }
 
-// OpenFiles opens a native multi-file dialog supporting markdown and ZIP files.
-// Returns file info for each selected file. ZIP files are base64-encoded.
-func (a *App) OpenFiles() ([]OpenFilesItem, error) {
-	paths, err := wailsRuntime.OpenMultipleFilesDialog(a.ctx, wailsRuntime.OpenDialogOptions{
-		Title: "打开文件",
-		Filters: []wailsRuntime.FileFilter{
-			{DisplayName: "支持的文件", Pattern: "*.md;*.markdown;*.txt;*.zip"},
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-	if len(paths) == 0 {
-		return nil, nil
-	}
-
+// readFilePaths reads files from absolute paths and returns OpenFilesItem entries.
+// Shared by OpenFiles (dialog) and OnFileDrop (native drag-drop).
+func (a *App) readFilePaths(paths []string) []OpenFilesItem {
 	var items []OpenFilesItem
 	for _, p := range paths {
 		data, err := os.ReadFile(p)
@@ -123,7 +118,25 @@ func (a *App) OpenFiles() ([]OpenFilesItem, error) {
 		}
 		items = append(items, item)
 	}
-	return items, nil
+	return items
+}
+
+// OpenFiles opens a native multi-file dialog supporting markdown and ZIP files.
+// Returns file info for each selected file. ZIP files are base64-encoded.
+func (a *App) OpenFiles() ([]OpenFilesItem, error) {
+	paths, err := wailsRuntime.OpenMultipleFilesDialog(a.ctx, wailsRuntime.OpenDialogOptions{
+		Title: "打开文件",
+		Filters: []wailsRuntime.FileFilter{
+			{DisplayName: "支持的文件", Pattern: "*.md;*.markdown;*.txt;*.zip"},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(paths) == 0 {
+		return nil, nil
+	}
+	return a.readFilePaths(paths), nil
 }
 
 func buildMenu(app *App) *menu.Menu {
@@ -473,6 +486,9 @@ func main() {
 		AssetServer: &assetserver.Options{
 			Assets:  frontendFS,
 			Handler: apiHandler,
+		},
+		DragAndDrop: &options.DragAndDrop{
+			EnableFileDrop: true,
 		},
 		Menu:      appMenu,
 		OnStartup: app.startup,
