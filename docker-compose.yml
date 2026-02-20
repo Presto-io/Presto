@@ -4,7 +4,7 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - presto-data:/root/.presto
+      - presto-data:/home/presto/.presto
     restart: unless-stopped
 
 volumes:
