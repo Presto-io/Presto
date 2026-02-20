@@ -2,11 +2,11 @@
   import { onMount, onDestroy } from 'svelte';
   import { fly, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
-  import { ExternalLink, Shield, Info, BookOpen, ArrowLeft, RefreshCw, Search, Package, Download, Trash2, Loader, Upload, Pencil, Check, X, AlertTriangle, Settings, Scale, Lightbulb } from 'lucide-svelte';
+  import { ExternalLink, Shield, Info, BookOpen, ArrowLeft, RefreshCw, Search, Package, Download, Trash2, Loader, Upload, Pencil, Check, X, AlertTriangle, Settings, Scale, HelpCircle } from 'lucide-svelte';
   import { goto } from '$app/navigation';
   import { listTemplates, discoverTemplates, installTemplate, deleteTemplate, importTemplateZip, renameTemplate } from '$lib/api/client';
   import type { Template, GitHubRepo } from '$lib/api/types';
-  import { triggerAction, resetWizard, disableWizard, enableWizard, wizard } from '$lib/stores/wizard.svelte';
+  import { triggerAction, resetWizard } from '$lib/stores/wizard.svelte';
 
   // --- Settings state ---
   let communityEnabled = $state(false);
@@ -58,7 +58,7 @@
 
   const sections: { id: string; label: string; icon: Component }[] = [
     { id: 'general', label: '通用', icon: Settings },
-    { id: 'wizard', label: '引导', icon: Lightbulb },
+    { id: 'help', label: '帮助', icon: HelpCircle },
     { id: 'template-dev', label: '模板开发', icon: BookOpen },
     { id: 'about', label: '关于', icon: Info },
     { id: 'licenses', label: '开源协议', icon: Scale },
@@ -235,8 +235,16 @@
     }
   }
 
-  async function handleDelete(name: string) {
-    if (!confirm(`确定卸载模板 "${name}"？`)) return;
+  let deleteConfirm = $state<string | null>(null);
+
+  function handleDelete(name: string) {
+    deleteConfirm = name;
+  }
+
+  async function confirmDelete() {
+    const name = deleteConfirm;
+    if (!name) return;
+    deleteConfirm = null;
     try {
       if (window.go?.main?.App?.DeleteTemplate) {
         await window.go.main.App.DeleteTemplate(name);
@@ -595,25 +603,70 @@
             </div>
           </section>
 
-          <section id="section-wizard">
-            <h3><Lightbulb size={16} /> 引导</h3>
-            <p class="section-desc">操作引导会在首次使用时逐步展示各功能的提示，帮助快速上手。</p>
-            <div class="setting-row">
-              <div class="setting-info">
-                <span class="setting-label">启用引导</span>
-                <span class="setting-desc">开启后将在适当时机显示操作提示</span>
+          <section id="section-help">
+            <h3><HelpCircle size={16} /> 帮助</h3>
+
+            <h4 class="subsection-title">功能</h4>
+            <div class="feature-list">
+              <div class="feature-row">
+                <span class="feature-name">Markdown 编辑</span>
+                <span class="feature-desc">支持实时预览的 Markdown 编辑器</span>
               </div>
-              <button
-                class="toggle"
-                onclick={() => wizard.disabled ? enableWizard() : disableWizard()}
-                role="switch"
-                aria-checked={!wizard.disabled}
-                aria-label="启用引导"
-              >
-                <span class="slider" class:on={!wizard.disabled}></span>
-              </button>
+              <div class="feature-row">
+                <span class="feature-name">PDF 导出</span>
+                <span class="feature-desc">将 Markdown 转换为排版精美的 PDF</span>
+              </div>
+              <div class="feature-row">
+                <span class="feature-name">模板系统</span>
+                <span class="feature-desc">切换不同文档模板，支持第三方模板</span>
+              </div>
+              <div class="feature-row">
+                <span class="feature-name">批量转换</span>
+                <span class="feature-desc">一次转换多个 Markdown 文件为 PDF</span>
+              </div>
+              <div class="feature-row">
+                <span class="feature-name">拖放导入</span>
+                <span class="feature-desc">拖拽文件到窗口即可打开或批量导入</span>
+              </div>
+              <div class="feature-row">
+                <span class="feature-name">社区模板</span>
+                <span class="feature-desc">浏览和安装第三方社区模板</span>
+              </div>
             </div>
-            <div class="setting-row" style="margin-top: var(--space-sm)">
+
+            <h4 class="subsection-title">快捷键</h4>
+            <div class="shortcut-list">
+              <div class="shortcut-row">
+                <span class="shortcut-action">打开文件</span>
+                <span class="shortcut-key">⌘O</span>
+              </div>
+              <div class="shortcut-row">
+                <span class="shortcut-action">导出 PDF</span>
+                <span class="shortcut-key">⌘E</span>
+              </div>
+              <div class="shortcut-row">
+                <span class="shortcut-action">打开设置</span>
+                <span class="shortcut-key">⌘,</span>
+              </div>
+              <div class="shortcut-row">
+                <span class="shortcut-action">模板管理</span>
+                <span class="shortcut-key">⌘⇧T</span>
+              </div>
+              <div class="shortcut-row">
+                <span class="shortcut-action">搜索 / 替换</span>
+                <span class="shortcut-key">⌘F</span>
+              </div>
+              <div class="shortcut-row">
+                <span class="shortcut-action">撤销</span>
+                <span class="shortcut-key">⌘Z</span>
+              </div>
+              <div class="shortcut-row">
+                <span class="shortcut-action">重做</span>
+                <span class="shortcut-key">⌘⇧Z</span>
+              </div>
+            </div>
+
+            <div class="setting-row" style="margin-top: var(--space-lg)">
               <div class="setting-info">
                 <span class="setting-label">重置引导</span>
                 <span class="setting-desc">重置所有引导提示，重新展示操作引导</span>
@@ -754,6 +807,31 @@
         <button class="btn-secondary" onclick={() => handleConflictResolve('skip')}>跳过</button>
         <button class="btn-secondary" onclick={() => handleConflictResolve('rename')}>自动重命名</button>
         <button class="btn-danger" onclick={() => handleConflictResolve('overwrite')}>覆盖</button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+{#if deleteConfirm}
+  <div
+    class="modal-overlay"
+    onclick={() => deleteConfirm = null}
+    onkeydown={(e) => { if (e.key === 'Escape') deleteConfirm = null; }}
+    role="dialog"
+    aria-modal="true"
+    aria-label="确认卸载"
+    tabindex="-1"
+  >
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="modal" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
+      <div class="modal-icon">
+        <Trash2 size={32} />
+      </div>
+      <h3>确认卸载</h3>
+      <p>确定卸载模板 "{deleteConfirm}"？此操作不可撤销。</p>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick={() => deleteConfirm = null}>取消</button>
+        <button class="btn-danger" onclick={confirmDelete}>卸载</button>
       </div>
     </div>
   </div>
@@ -1020,6 +1098,55 @@
     font-size: 0.8125rem;
     color: var(--color-muted);
     margin: 0 0 var(--space-md);
+  }
+  .subsection-title {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-muted);
+    margin: 0 0 var(--space-sm);
+  }
+  .feature-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    margin-bottom: var(--space-lg);
+  }
+  .feature-row {
+    display: flex;
+    gap: var(--space-md);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--color-surface);
+    border-radius: var(--radius-sm);
+    font-size: 0.8125rem;
+  }
+  .feature-name {
+    font-weight: 500;
+    white-space: nowrap;
+    min-width: 80px;
+  }
+  .feature-desc {
+    color: var(--color-muted);
+  }
+  .shortcut-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+  .shortcut-row {
+    display: flex;
+    justify-content: space-between;
+    padding: var(--space-sm) var(--space-md);
+    background: var(--color-surface);
+    border-radius: var(--radius-sm);
+    font-size: 0.8125rem;
+  }
+  .shortcut-key {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--color-muted);
+  }
+  .shortcut-action {
+    color: var(--color-text);
   }
   .license-list {
     list-style: none;
