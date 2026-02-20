@@ -248,7 +248,7 @@ func uniqueNameInSet(base string, used map[string]bool) string {
 }
 
 // EnsureOfficialTemplates copies bundled official templates from bundleDir
-// to the user's templates directory if they are missing.
+// to the user's templates directory, always overwriting to keep them in sync.
 // bundleDir should contain subdirectories for each official template,
 // e.g. bundleDir/gongwen/manifest.json and bundleDir/gongwen/presto-template-gongwen.
 func (m *Manager) EnsureOfficialTemplates(bundleDir string) {
@@ -262,14 +262,8 @@ func (m *Manager) EnsureOfficialTemplates(bundleDir string) {
 			binaryName += ".exe"
 		}
 
-		// Skip if already properly installed (both manifest and binary exist)
 		manifestDst := filepath.Join(tplDir, "manifest.json")
 		binaryDst := filepath.Join(tplDir, binaryName)
-		if _, err := os.Stat(manifestDst); err == nil {
-			if _, err := os.Stat(binaryDst); err == nil {
-				continue
-			}
-		}
 
 		// Source paths in the bundle
 		manifestSrc := filepath.Join(bundleDir, name, "manifest.json")
@@ -295,7 +289,7 @@ func (m *Manager) EnsureOfficialTemplates(bundleDir string) {
 			log.Printf("[templates] failed to copy binary for %s: %v", name, err)
 			continue
 		}
-		log.Printf("[templates] installed bundled template: %s", name)
+		log.Printf("[templates] synced bundled template: %s", name)
 	}
 }
 
