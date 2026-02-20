@@ -49,9 +49,10 @@ type OpenFileResult struct {
 // OpenFilesItem represents a single file selected via the multi-file dialog.
 type OpenFilesItem struct {
 	Name    string `json:"name"`
-	Content string `json:"content"` // text for md/txt, base64 for zip
+	Content string `json:"content"` // text for md/txt; empty for zip
 	Dir     string `json:"dir"`
 	IsZip   bool   `json:"isZip"`
+	Path    string `json:"path,omitempty"` // absolute path (zip only, for Wails binding)
 }
 
 func NewApp(manager *template.Manager, compiler *typst.Compiler) *App {
@@ -96,15 +97,10 @@ func (a *App) OpenFile() (*OpenFileResult, error) {
 
 // readFilePaths reads files from absolute paths and returns OpenFilesItem entries.
 // Shared by OpenFiles (dialog) and OnFileDrop (native drag-drop).
+// ZIP files pass path only (frontend calls ImportBatchZip binding directly).
 func (a *App) readFilePaths(paths []string) []OpenFilesItem {
 	var items []OpenFilesItem
 	for _, p := range paths {
-		data, err := os.ReadFile(p)
-		if err != nil {
-			log.Printf("[desktop] failed to read %s: %v", p, err)
-			continue
-		}
-
 		isZip := strings.HasSuffix(strings.ToLower(p), ".zip")
 		item := OpenFilesItem{
 			Name:  filepath.Base(p),
@@ -112,8 +108,14 @@ func (a *App) readFilePaths(paths []string) []OpenFilesItem {
 			IsZip: isZip,
 		}
 		if isZip {
-			item.Content = base64.StdEncoding.EncodeToString(data)
+			// Pass path for Wails binding; no need to base64 encode
+			item.Path = p
 		} else {
+			data, err := os.ReadFile(p)
+			if err != nil {
+				log.Printf("[desktop] failed to read %s: %v", p, err)
+				continue
+			}
 			item.Content = string(data)
 		}
 		items = append(items, item)
@@ -197,6 +199,17 @@ func buildMenu(app *App) *menu.Menu {
 // bypassing the HTTP layer where Wails WebView strips headers/query params.
 func (a *App) CompileSVG(typstSource string, workDir string) ([]string, error) {
 	return a.compiler.CompileToSVG(typstSource, workDir)
+}
+
+// ImportBatchZip reads a ZIP file from disk and processes it: installs templates
+// and extracts markdown files. Bypasses the HTTP layer (Wails WebView strips
+// multipart Content-Type headers, breaking FormData uploads).
+func (a *App) ImportBatchZip(filePath string) (*api.BatchImportResult, error) {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("read ZIP failed: %w", err)
+	}
+	return api.ProcessBatchZip(data, a.manager)
 }
 
 // GetVersion returns the current app version.

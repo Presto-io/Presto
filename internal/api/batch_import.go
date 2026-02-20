@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -16,19 +17,23 @@ import (
 	"github.com/mrered/presto/internal/template"
 )
 
-type batchImportResult struct {
-	Templates     []templateImportStatus `json:"templates"`
-	MarkdownFiles []markdownFileEntry    `json:"markdownFiles"`
+// BatchImportResult is the result of processing a batch ZIP file.
+// Exported so the desktop Wails binding can return it directly.
+type BatchImportResult struct {
+	Templates     []TemplateImportStatus `json:"templates"`
+	MarkdownFiles []MarkdownFileEntry    `json:"markdownFiles"`
 	WorkDir       string                 `json:"workDir,omitempty"`
 }
 
-type templateImportStatus struct {
+// TemplateImportStatus describes the outcome of importing a single template.
+type TemplateImportStatus struct {
 	Name        string `json:"name"`
 	DisplayName string `json:"displayName"`
 	Status      string `json:"status"` // "installed", "overwritten", "skipped"
 }
 
-type markdownFileEntry struct {
+// MarkdownFileEntry describes a markdown file extracted from a ZIP.
+type MarkdownFileEntry struct {
 	Name             string `json:"name"`
 	Content          string `json:"content"`
 	DetectedTemplate string `json:"detectedTemplate,omitempty"`
@@ -42,48 +47,18 @@ var markdownExts = map[string]bool{
 	".txt":      true,
 }
 
-func (s *Server) handleBatchImportZip(w http.ResponseWriter, r *http.Request) {
-	// SEC-11: Limit request body
-	r.Body = http.MaxBytesReader(w, r.Body, maxZIPUploadSize)
-
-	if err := r.ParseMultipartForm(10 << 20); err != nil {
-		log.Printf("[batch] import: parse form failed: %v", err)
-		writeJSONError(w, "invalid request or file too large", http.StatusBadRequest)
-		return
-	}
-
-	file, header, err := r.FormFile("file")
+// ProcessBatchZip processes ZIP data: extracts templates and markdown files.
+// Shared by the HTTP handler and the desktop Wails binding.
+func ProcessBatchZip(zipData []byte, mgr *template.Manager) (*BatchImportResult, error) {
+	zr, err := zip.NewReader(bytes.NewReader(zipData), int64(len(zipData)))
 	if err != nil {
-		log.Printf("[batch] import: no file in request: %v", err)
-		writeJSONError(w, "no file uploaded", http.StatusBadRequest)
-		return
-	}
-	defer file.Close()
-
-	if !strings.HasSuffix(strings.ToLower(header.Filename), ".zip") {
-		writeJSONError(w, "only .zip files are accepted", http.StatusBadRequest)
-		return
-	}
-
-	data, err := io.ReadAll(file)
-	if err != nil {
-		log.Printf("[batch] import: read file failed: %v", err)
-		writeJSONError(w, "failed to read uploaded file", http.StatusBadRequest)
-		return
-	}
-
-	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
-	if err != nil {
-		log.Printf("[batch] import: invalid zip: %v", err)
-		writeJSONError(w, "invalid ZIP file", http.StatusBadRequest)
-		return
+		return nil, fmt.Errorf("invalid ZIP file: %w", err)
 	}
 
 	// SEC-30: Reject path traversal in ZIP entries
 	for _, f := range zr.File {
 		if strings.Contains(f.Name, "..") {
-			writeJSONError(w, "ZIP contains path traversal", http.StatusBadRequest)
-			return
+			return nil, fmt.Errorf("ZIP contains path traversal")
 		}
 	}
 
@@ -97,9 +72,7 @@ func (s *Server) handleBatchImportZip(w http.ResponseWriter, r *http.Request) {
 	// Create a temp directory to extract non-template files (markdown, images, etc.)
 	workDir, err := os.MkdirTemp("", "presto-batch-*")
 	if err != nil {
-		log.Printf("[batch] import: failed to create temp dir: %v", err)
-		writeJSONError(w, "failed to create working directory", http.StatusInternalServerError)
-		return
+		return nil, fmt.Errorf("failed to create working directory: %w", err)
 	}
 
 	// Extract non-template files to workDir, preserving directory structure
@@ -156,7 +129,7 @@ func (s *Server) handleBatchImportZip(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Import templates (always overwrite if same name exists)
-	var importedTemplates []templateImportStatus
+	var importedTemplates []TemplateImportStatus
 	for _, root := range templateRoots {
 		manifest, err := readManifestFromZip(zr, root)
 		if err != nil {
@@ -167,10 +140,10 @@ func (s *Server) handleBatchImportZip(w http.ResponseWriter, r *http.Request) {
 		name := manifest.Name
 		status := "installed"
 
-		if s.manager.Exists(name) {
+		if mgr.Exists(name) {
 			if template.IsOfficial(name) {
 				status = "skipped"
-				importedTemplates = append(importedTemplates, templateImportStatus{
+				importedTemplates = append(importedTemplates, TemplateImportStatus{
 					Name:        name,
 					DisplayName: manifest.DisplayName,
 					Status:      status,
@@ -178,20 +151,20 @@ func (s *Server) handleBatchImportZip(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			// Always overwrite for batch import
-			if err := s.manager.Uninstall(name); err != nil {
+			if err := mgr.Uninstall(name); err != nil {
 				log.Printf("[batch] import: failed to uninstall %q: %v", name, err)
 				continue
 			}
 			status = "overwritten"
 		}
 
-		result, err := s.importTemplateFromZipDir(zr, root, name)
+		result, err := importTemplateFromZipDir(zr, root, name, mgr)
 		if err != nil {
 			log.Printf("[batch] import: failed to import template %q: %v", name, err)
 			continue
 		}
 
-		importedTemplates = append(importedTemplates, templateImportStatus{
+		importedTemplates = append(importedTemplates, TemplateImportStatus{
 			Name:        result.Name,
 			DisplayName: result.DisplayName,
 			Status:      status,
@@ -199,7 +172,7 @@ func (s *Server) handleBatchImportZip(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Read markdown files and extract template field from frontmatter
-	var markdownEntries []markdownFileEntry
+	var markdownEntries []MarkdownFileEntry
 	for _, relPath := range mdFiles {
 		absPath := filepath.Join(workDir, filepath.FromSlash(relPath))
 		content, err := os.ReadFile(absPath)
@@ -207,7 +180,7 @@ func (s *Server) handleBatchImportZip(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		entry := markdownFileEntry{
+		entry := MarkdownFileEntry{
 			Name:    path.Base(relPath),
 			Content: string(content),
 		}
@@ -227,13 +200,13 @@ func (s *Server) handleBatchImportZip(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if importedTemplates == nil {
-		importedTemplates = []templateImportStatus{}
+		importedTemplates = []TemplateImportStatus{}
 	}
 	if markdownEntries == nil {
-		markdownEntries = []markdownFileEntry{}
+		markdownEntries = []MarkdownFileEntry{}
 	}
 
-	result := batchImportResult{
+	result := &BatchImportResult{
 		Templates:     importedTemplates,
 		MarkdownFiles: markdownEntries,
 	}
@@ -249,6 +222,46 @@ func (s *Server) handleBatchImportZip(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[batch] imported %d template(s), %d markdown file(s) from ZIP (workDir=%s)",
 		len(importedTemplates), len(markdownEntries), result.WorkDir)
+
+	return result, nil
+}
+
+func (s *Server) handleBatchImportZip(w http.ResponseWriter, r *http.Request) {
+	// SEC-11: Limit request body
+	r.Body = http.MaxBytesReader(w, r.Body, maxZIPUploadSize)
+
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		log.Printf("[batch] import: parse form failed: %v", err)
+		writeJSONError(w, "invalid request or file too large", http.StatusBadRequest)
+		return
+	}
+
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		log.Printf("[batch] import: no file in request: %v", err)
+		writeJSONError(w, "no file uploaded", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	if !strings.HasSuffix(strings.ToLower(header.Filename), ".zip") {
+		writeJSONError(w, "only .zip files are accepted", http.StatusBadRequest)
+		return
+	}
+
+	data, err := io.ReadAll(file)
+	if err != nil {
+		log.Printf("[batch] import: read file failed: %v", err)
+		writeJSONError(w, "failed to read uploaded file", http.StatusBadRequest)
+		return
+	}
+
+	result, err := ProcessBatchZip(data, s.manager)
+	if err != nil {
+		log.Printf("[batch] import: %v", err)
+		writeJSONError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(result)
