@@ -8,6 +8,12 @@ type FieldSchema struct {
 	Format  string `json:"format,omitempty"`
 }
 
+type FontRequirement struct {
+	Name        string `json:"name"`
+	DisplayName string `json:"displayName"`
+	URL         string `json:"url"`
+}
+
 type Manifest struct {
 	Name              string                 `json:"name"`
 	DisplayName       string                 `json:"displayName"`
@@ -17,6 +23,7 @@ type Manifest struct {
 	License           string                 `json:"license"`
 	MinPrestoVersion  string                 `json:"minPrestoVersion"`
 	Keywords          []string               `json:"keywords"`
+	RequiredFonts     []FontRequirement      `json:"requiredFonts"`
 	FrontmatterSchema map[string]FieldSchema `json:"frontmatterSchema"`
 }
 
