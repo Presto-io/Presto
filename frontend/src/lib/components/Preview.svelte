@@ -84,6 +84,8 @@
   }
   .svg-page {
     background: white;
+    color: black;
+    color-scheme: light;
     box-shadow: var(--shadow-md);
     border-radius: 2px;
     overflow: hidden;
