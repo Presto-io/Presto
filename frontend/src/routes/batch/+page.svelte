@@ -113,11 +113,10 @@
     if (!data) return;
     if (!templateStore.loaded) return;
 
-    const additions: BatchFile[] = [];
     for (const file of data.files) {
-      // Try auto-detect template from frontmatter (first 2KB)
-      // Since $effect can't be async, schedule processing
-      processDroppedFile(file, data.workDir);
+      // Per-file workDir: documentDirs (per-file) > workDir (shared fallback)
+      const fileWorkDir = data.documentDirs?.get(file.name) || data.workDir;
+      processDroppedFile(file, fileWorkDir);
     }
     pendingDrop.clear();
   });
@@ -204,7 +203,7 @@
           file,
           templateId,
           autoDetected,
-          workDir: result.workDir,
+          workDir: md.workDir || result.workDir,
         });
       }
       batchFiles = [...batchFiles, ...additions];
