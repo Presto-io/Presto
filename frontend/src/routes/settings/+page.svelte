@@ -6,6 +6,7 @@
   import { goto } from '$app/navigation';
   import { listTemplates, discoverTemplates, installTemplate, deleteTemplate, importTemplateZip, renameTemplate } from '$lib/api/client';
   import type { Template, GitHubRepo } from '$lib/api/types';
+  import { templateStore } from '$lib/stores/templates.svelte';
   import { triggerAction, resetWizard } from '$lib/stores/wizard.svelte';
 
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgent);
@@ -14,7 +15,7 @@
   // --- Settings state ---
   let communityEnabled = $state(false);
   let showWarning = $state(false);
-  let appVersion = $state('0.1.0');
+  let appVersion = $state('dev');
   let updateInfo = $state<{ hasUpdate: boolean; latestVersion: string; downloadURL: string; releaseURL: string } | null>(null);
   let checking = $state(false);
   let updateError = $state('');
@@ -255,6 +256,7 @@
         await deleteTemplate(name);
       }
       installed = (await listTemplates()) ?? [];
+      await templateStore.refresh();
       showImportToast(`模板 "${name}" 已卸载`, 'success');
     } catch (err) {
       showImportToast(err instanceof Error ? err.message : String(err), 'error');
