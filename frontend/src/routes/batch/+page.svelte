@@ -4,6 +4,7 @@
   import { createZip } from '$lib/utils/zip';
   import { templateStore } from '$lib/stores/templates.svelte';
   import { extractTemplateName, resolveTemplate } from '$lib/utils/frontmatter';
+  import { pendingDrop } from '$lib/stores/pending-drop.svelte';
   import type { BatchFile, BatchResult } from '$lib/api/types';
   import { ArrowLeft, Upload, FileText, Download, X, Loader, CheckCircle, AlertCircle, Search, Package, GripVertical } from 'lucide-svelte';
   import { goto } from '$app/navigation';
@@ -27,7 +28,6 @@
   let batchFiles: BatchFile[] = $state([]);
   let results: BatchResult[] = $state([]);
   let processing = $state(false);
-  let dragOver = $state(false);
   let fileInput: HTMLInputElement | undefined = $state();
 
   // Drag-and-drop between groups
@@ -101,6 +101,44 @@
     }
   });
 
+  // Watch for files routed from layout drag-drop or page navigation
+  $effect(() => {
+    const data = pendingDrop.data;
+    if (!data) return;
+    if (!templateStore.loaded) return;
+
+    const additions: BatchFile[] = [];
+    for (const file of data.files) {
+      // Try auto-detect template from frontmatter (first 2KB)
+      // Since $effect can't be async, schedule processing
+      processDroppedFile(file, data.workDir);
+    }
+    pendingDrop.clear();
+  });
+
+  async function processDroppedFile(file: File, workDir?: string) {
+    const headerText = await file.slice(0, 2048).text();
+    const field = extractTemplateName(headerText);
+    let templateId = selectedTemplate;
+    let autoDetected = false;
+
+    if (field) {
+      const resolved = resolveTemplate(field, templates);
+      if (resolved) {
+        templateId = resolved;
+        autoDetected = true;
+      }
+    }
+
+    batchFiles = [...batchFiles, {
+      id: crypto.randomUUID(),
+      file,
+      templateId,
+      autoDetected,
+      workDir,
+    }];
+  }
+
   // --- File adding with auto-detect ---
   async function addFiles(newFiles: File[]) {
     const additions: BatchFile[] = [];
@@ -127,22 +165,6 @@
       });
     }
     batchFiles = [...batchFiles, ...additions];
-  }
-
-  function handleDrop(e: DragEvent) {
-    e.preventDefault();
-    dragOver = false;
-
-    const droppedFiles = Array.from(e.dataTransfer?.files ?? []);
-
-    // Separate ZIPs from markdown files
-    const zipFiles = droppedFiles.filter(f => f.name.toLowerCase().endsWith('.zip'));
-    const mdFiles = droppedFiles.filter(f =>
-      f.name.endsWith('.md') || f.name.endsWith('.markdown') || f.name.endsWith('.txt')
-    );
-
-    if (mdFiles.length > 0) addFiles(mdFiles);
-    for (const zip of zipFiles) handleZipImport(zip);
   }
 
   async function handleZipImport(zipFile: File) {
@@ -189,7 +211,11 @@
 
   function handleFileInput(e: Event) {
     const input = e.target as HTMLInputElement;
-    addFiles(Array.from(input.files ?? []));
+    const allFiles = Array.from(input.files ?? []);
+    const zipFiles = allFiles.filter(f => f.name.toLowerCase().endsWith('.zip'));
+    const mdFiles = allFiles.filter(f => !f.name.toLowerCase().endsWith('.zip'));
+    if (mdFiles.length > 0) addFiles(mdFiles);
+    for (const zip of zipFiles) handleZipImport(zip);
     input.value = '';
   }
 
@@ -500,10 +526,6 @@
       {#if batchFiles.length === 0 && results.length === 0}
         <div
           class="drop-zone"
-          class:drag-over={dragOver}
-          ondrop={handleDrop}
-          ondragover={(e) => { e.preventDefault(); dragOver = true; }}
-          ondragleave={() => dragOver = false}
           role="region"
           aria-label="拖拽文件区域"
         >
@@ -515,10 +537,6 @@
         <!-- Compact drop target -->
         <div
           class="drop-zone compact"
-          class:drag-over={dragOver}
-          ondrop={handleDrop}
-          ondragover={(e) => { e.preventDefault(); dragOver = true; }}
-          ondragleave={() => dragOver = false}
           role="region"
           aria-label="拖拽更多文件"
         >
@@ -871,10 +889,6 @@
     gap: var(--space-sm);
     font-size: 0.75rem;
     border-radius: var(--radius-md);
-  }
-  .drop-zone.drag-over {
-    border-color: var(--color-accent);
-    background: rgba(122, 162, 247, 0.04);
   }
   .drop-title {
     margin: 0;

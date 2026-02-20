@@ -8,4 +8,5 @@ export const editor = $state({
   svgPages: [] as string[],
   selectedTemplate: '',
   documentDir: '',
+  pendingExternalLoad: false,
 });
