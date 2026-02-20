@@ -17,8 +17,9 @@ import (
 const compileTimeout = 60 * time.Second // SEC-12
 
 type Compiler struct {
-	Root    string // root directory for typst path resolution
-	BinPath string // path to typst binary (empty = use PATH)
+	Root      string   // root directory for typst path resolution
+	BinPath   string   // path to typst binary (empty = use PATH)
+	FontPaths []string // additional font directories for --font-path
 }
 
 func NewCompiler() *Compiler {
@@ -61,6 +62,9 @@ func (c *Compiler) compileWithRoot(typFile, root string) (string, error) {
 	args := []string{"compile"}
 	if root != "" {
 		args = append(args, "--root", root)
+	}
+	for _, fp := range c.FontPaths {
+		args = append(args, "--font-path", fp)
 	}
 	args = append(args, typFile, pdfFile)
 	cmd := exec.CommandContext(ctx, c.typstBin(), args...)
@@ -155,6 +159,9 @@ func (c *Compiler) CompileToSVG(typstSource, workDir string) ([]string, error) {
 	// Use the actual working directory as root so the source file
 	// is always inside the project root (typst requires this).
 	args = append(args, "--root", dir)
+	for _, fp := range c.FontPaths {
+		args = append(args, "--font-path", fp)
+	}
 	args = append(args, typFile, outPattern)
 	cmd := exec.CommandContext(ctx, c.typstBin(), args...)
 	log.Printf("[compile-svg] running: %s %s", c.typstBin(), strings.Join(args, " "))

@@ -24,7 +24,8 @@ type ServerOptions struct {
 	TemplatesDir string
 	StaticDir    string
 	TypstBin     string
-	APIKey       string // empty = desktop mode (no auth required)
+	APIKey       string   // empty = desktop mode (no auth required)
+	FontPaths    []string // additional font directories for typst
 }
 
 func NewServer(opts ServerOptions) http.Handler {
@@ -36,6 +37,7 @@ func NewServer(opts ServerOptions) http.Handler {
 	}
 	compiler := typst.NewCompilerWithRoot(compilerRoot)
 	compiler.BinPath = opts.TypstBin
+	compiler.FontPaths = opts.FontPaths
 
 	s := &Server{
 		mux:      http.NewServeMux(),
