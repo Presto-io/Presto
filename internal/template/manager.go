@@ -255,6 +255,9 @@ func (m *Manager) EnsureOfficialTemplates(bundleDir string) {
 	if bundleDir == "" {
 		return
 	}
+	if _, err := os.Stat(bundleDir); err != nil {
+		return
+	}
 	for name := range OfficialTemplates {
 		tplDir := filepath.Join(m.TemplatesDir, name)
 		binaryName := fmt.Sprintf("presto-template-%s", name)
