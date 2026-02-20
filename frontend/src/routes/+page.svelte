@@ -555,7 +555,7 @@
     font-family: var(--font-ui);
   }
   .confirm-dialog::backdrop {
-    background: rgba(0, 0, 0, 0.4);
+    background: var(--color-backdrop);
   }
   .confirm-dialog h3 {
     margin: 0 0 8px;
