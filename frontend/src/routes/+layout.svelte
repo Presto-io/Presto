@@ -7,48 +7,36 @@
 
 	let { children } = $props();
 
-	// --- Universal drag-drop ---
+	// --- Universal drag-drop (window-level capture phase) ---
 	let dragOver = $state(false);
 	let dragCounter = 0;
 	let confirmDialog: HTMLDialogElement;
 
-	const markdownExts = ['.md', '.markdown', '.txt'];
-	function isAcceptedFile(name: string): boolean {
-		const lower = name.toLowerCase();
-		return lower.endsWith('.zip') || markdownExts.some(ext => lower.endsWith(ext));
-	}
+	const ACCEPTED_EXTS = ['.md', '.markdown', '.txt', '.zip'];
 
-	function hasDroppableFile(e: DragEvent): boolean {
+	/** Check if this is an external file drag (not an internal presto drag). */
+	function isExternalFileDrag(e: DragEvent): boolean {
 		if (!e.dataTransfer?.types.includes('Files')) return false;
 		// Don't intercept internal drags (file reassignment between templates)
 		if (e.dataTransfer.types.includes('application/x-presto-files')) return false;
-		const items = e.dataTransfer.items;
-		for (let i = 0; i < items.length; i++) {
-			if (items[i].kind === 'file') {
-				const entry = items[i].webkitGetAsEntry?.();
-				if (entry && isAcceptedFile(entry.name)) return true;
-				// Fallback: check MIME type for ZIP
-				if (items[i].type === 'application/zip' || items[i].type === 'application/x-zip-compressed') return true;
-				// Fallback: check MIME type for text/markdown
-				if (items[i].type === 'text/plain' || items[i].type === 'text/markdown') return true;
-			}
-		}
-		return false;
+		return true;
 	}
 
 	function handleDragEnter(e: DragEvent) {
+		if (!isExternalFileDrag(e)) return;
 		dragCounter++;
-		if (hasDroppableFile(e)) {
-			e.preventDefault();
-			dragOver = true;
-		}
+		e.preventDefault();
+		dragOver = true;
 	}
 
 	function handleDragOver(e: DragEvent) {
-		if (dragOver) e.preventDefault();
+		if (!isExternalFileDrag(e)) return;
+		e.preventDefault();
+		e.stopPropagation();
 	}
 
-	function handleDragLeave() {
+	function handleDragLeave(e: DragEvent) {
+		if (!isExternalFileDrag(e)) return;
 		dragCounter--;
 		if (dragCounter <= 0) {
 			dragCounter = 0;
@@ -59,14 +47,18 @@
 	async function handleDrop(e: DragEvent) {
 		dragCounter = 0;
 		dragOver = false;
-		if (!e.dataTransfer?.files) return;
-
-		const files = Array.from(e.dataTransfer.files).filter(f => isAcceptedFile(f.name));
-		if (files.length === 0) return;
+		if (!isExternalFileDrag(e)) return;
+		// Prevent default BEFORE filtering — stops browser from opening the file
 		e.preventDefault();
 		e.stopPropagation();
 
-		await fileRouter.processFiles(files, window.location.pathname);
+		const files = Array.from(e.dataTransfer!.files).filter(f =>
+			ACCEPTED_EXTS.some(ext => f.name.toLowerCase().endsWith(ext))
+		);
+		if (files.length === 0) return;
+
+		// Always route as Cmd+O: pass '/' regardless of current page
+		await fileRouter.processFiles(files, '/');
 	}
 
 	// Sync confirm dialog with fileRouter state
@@ -79,25 +71,33 @@
 	});
 
 	onMount(() => {
-		if (!window.runtime?.EventsOn) return;
-		// Forward edit menu events to native document commands
-		// (Wails custom menus intercept Cmd+C/V/X/Z, so we re-dispatch via JS)
-		window.runtime.EventsOn('menu:undo', () => document.execCommand('undo'));
-		window.runtime.EventsOn('menu:redo', () => document.execCommand('redo'));
-		window.runtime.EventsOn('menu:cut', () => document.execCommand('cut'));
-		window.runtime.EventsOn('menu:copy', () => document.execCommand('copy'));
-		window.runtime.EventsOn('menu:paste', () => document.execCommand('paste'));
-		window.runtime.EventsOn('menu:selectAll', () => document.execCommand('selectAll'));
+		// Register drag handlers on window in capture phase
+		// — runs before any child component (including CodeMirror) can intercept
+		window.addEventListener('dragenter', handleDragEnter, true);
+		window.addEventListener('dragover', handleDragOver, true);
+		window.addEventListener('dragleave', handleDragLeave, true);
+		window.addEventListener('drop', handleDrop, true);
+
+		// Forward Wails edit menu events to native document commands
+		if (window.runtime?.EventsOn) {
+			window.runtime.EventsOn('menu:undo', () => document.execCommand('undo'));
+			window.runtime.EventsOn('menu:redo', () => document.execCommand('redo'));
+			window.runtime.EventsOn('menu:cut', () => document.execCommand('cut'));
+			window.runtime.EventsOn('menu:copy', () => document.execCommand('copy'));
+			window.runtime.EventsOn('menu:paste', () => document.execCommand('paste'));
+			window.runtime.EventsOn('menu:selectAll', () => document.execCommand('selectAll'));
+		}
+
+		return () => {
+			window.removeEventListener('dragenter', handleDragEnter, true);
+			window.removeEventListener('dragover', handleDragOver, true);
+			window.removeEventListener('dragleave', handleDragLeave, true);
+			window.removeEventListener('drop', handleDrop, true);
+		};
 	});
 </script>
 
-<div
-	class="app"
-	ondragenter={handleDragEnter}
-	ondragover={handleDragOver}
-	ondragleave={handleDragLeave}
-	ondrop={handleDrop}
->
+<div class="app">
 	<main id="main-content">
 		{@render children()}
 	</main>
