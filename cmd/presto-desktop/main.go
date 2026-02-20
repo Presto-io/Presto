@@ -46,6 +46,14 @@ type OpenFileResult struct {
 	Dir     string `json:"dir"`
 }
 
+// OpenFilesItem represents a single file selected via the multi-file dialog.
+type OpenFilesItem struct {
+	Name    string `json:"name"`
+	Content string `json:"content"` // text for md/txt, base64 for zip
+	Dir     string `json:"dir"`
+	IsZip   bool   `json:"isZip"`
+}
+
 func NewApp(manager *template.Manager, compiler *typst.Compiler) *App {
 	return &App{manager: manager, compiler: compiler}
 }
@@ -78,12 +86,52 @@ func (a *App) OpenFile() (*OpenFileResult, error) {
 	}, nil
 }
 
+// OpenFiles opens a native multi-file dialog supporting markdown and ZIP files.
+// Returns file info for each selected file. ZIP files are base64-encoded.
+func (a *App) OpenFiles() ([]OpenFilesItem, error) {
+	paths, err := wailsRuntime.OpenMultipleFilesDialog(a.ctx, wailsRuntime.OpenDialogOptions{
+		Title: "打开文件",
+		Filters: []wailsRuntime.FileFilter{
+			{DisplayName: "支持的文件", Pattern: "*.md;*.markdown;*.txt;*.zip"},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(paths) == 0 {
+		return nil, nil
+	}
+
+	var items []OpenFilesItem
+	for _, p := range paths {
+		data, err := os.ReadFile(p)
+		if err != nil {
+			log.Printf("[desktop] failed to read %s: %v", p, err)
+			continue
+		}
+
+		isZip := strings.HasSuffix(strings.ToLower(p), ".zip")
+		item := OpenFilesItem{
+			Name:  filepath.Base(p),
+			Dir:   filepath.Dir(p),
+			IsZip: isZip,
+		}
+		if isZip {
+			item.Content = base64.StdEncoding.EncodeToString(data)
+		} else {
+			item.Content = string(data)
+		}
+		items = append(items, item)
+	}
+	return items, nil
+}
+
 func buildMenu(app *App) *menu.Menu {
 	appMenu := menu.NewMenu()
 	appMenu.Append(menu.AppMenu())
 
 	fileMenu := appMenu.AddSubmenu("文件")
-	fileMenu.AddText("打开 Markdown…", keys.CmdOrCtrl("o"), func(_ *menu.CallbackData) {
+	fileMenu.AddText("打开文件…", keys.CmdOrCtrl("o"), func(_ *menu.CallbackData) {
 		wailsRuntime.EventsEmit(app.ctx, "menu:open")
 	})
 	fileMenu.AddSeparator()
