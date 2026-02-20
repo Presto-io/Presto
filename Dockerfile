@@ -52,13 +52,15 @@ RUN addgroup -S presto && adduser -S -G presto presto
 COPY --from=typst-downloader /usr/local/bin/typst /usr/local/bin/typst
 COPY --from=go-builder /bin/presto-server /usr/local/bin/
 
-RUN mkdir -p /home/presto/.presto/templates/gongwen /home/presto/.presto/templates/jiaoan-shicao && \
-    chown -R presto:presto /home/presto/.presto
+# Bundle templates next to server binary (server syncs them to user dir on startup)
+RUN mkdir -p /usr/local/bin/templates/gongwen /usr/local/bin/templates/jiaoan-shicao
+COPY --from=go-builder /bin/presto-template-gongwen /usr/local/bin/templates/gongwen/presto-template-gongwen
+COPY cmd/gongwen/manifest.json /usr/local/bin/templates/gongwen/
+COPY --from=go-builder /bin/presto-template-jiaoan-shicao /usr/local/bin/templates/jiaoan-shicao/presto-template-jiaoan-shicao
+COPY cmd/jiaoan-shicao/manifest.json /usr/local/bin/templates/jiaoan-shicao/
 
-COPY --chown=presto:presto --from=go-builder /bin/presto-template-gongwen /home/presto/.presto/templates/gongwen/presto-template-gongwen
-COPY --chown=presto:presto cmd/gongwen/manifest.json /home/presto/.presto/templates/gongwen/
-COPY --chown=presto:presto --from=go-builder /bin/presto-template-jiaoan-shicao /home/presto/.presto/templates/jiaoan-shicao/presto-template-jiaoan-shicao
-COPY --chown=presto:presto cmd/jiaoan-shicao/manifest.json /home/presto/.presto/templates/jiaoan-shicao/
+# Create user data dir (will be overlaid by volume mount, server populates on startup)
+RUN mkdir -p /home/presto/.presto && chown presto:presto /home/presto/.presto
 
 COPY --from=frontend-builder /app/build /srv/frontend
 
