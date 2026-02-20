@@ -167,6 +167,7 @@ dist-macos-universal: _build-macos-arm64 _build-macos-amd64
 	@if [ -f packaging/macos/icon.icns ]; then \
 		cp packaging/macos/icon.icns "$(DIST)/$(APP_NAME).app/Contents/Resources/"; \
 	fi
+	codesign --force --deep -s - "$(DIST)/$(APP_NAME).app"
 	@echo "==> $(DIST)/$(APP_NAME).app"
 
 dist-macos: dist-macos-arm64
@@ -194,6 +195,7 @@ _bundle-app:
 	@if [ -f packaging/macos/icon.icns ]; then \
 		cp packaging/macos/icon.icns "$(DIST)/$(APP_NAME).app/Contents/Resources/"; \
 	fi
+	codesign --force --deep -s - "$(DIST)/$(APP_NAME).app"
 
 # ─── DMG (per-arch + universal) ─────────────────────────
 # Requires: brew install create-dmg
