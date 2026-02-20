@@ -15,7 +15,7 @@
   // --- Settings state ---
   let communityEnabled = $state(false);
   let showWarning = $state(false);
-  let appVersion = $state('dev');
+  let appVersion = $state(__APP_VERSION__);
   let updateInfo = $state<{ hasUpdate: boolean; latestVersion: string; downloadURL: string; releaseURL: string } | null>(null);
   let checking = $state(false);
   let updateError = $state('');
