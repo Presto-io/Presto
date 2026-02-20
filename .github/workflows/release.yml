@@ -16,8 +16,33 @@ env:
   TYPST_VERSION: '0.14.2'
 
 jobs:
+  # ── Frontend: build once, share across platforms ──────────
+  build-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend
+        run: cd frontend && npm ci && npm run build
+
+      - name: Embed into desktop build dir
+        run: cp -r frontend/build/* cmd/presto-desktop/build/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: cmd/presto-desktop/build/
+          retention-days: 1
+
   # ── macOS: arm64 + amd64 ─────────────────────────────────
   build-macos:
+    needs: build-frontend
     runs-on: macos-latest
     strategy:
       fail-fast: false
@@ -33,15 +58,12 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
+          cache: true
 
-      - uses: actions/setup-node@v4
+      - uses: actions/download-artifact@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install frontend dependencies
-        run: cd frontend && npm ci
+          name: frontend-build
+          path: cmd/presto-desktop/build/
 
       - name: Install create-dmg
         run: brew install create-dmg
@@ -50,10 +72,7 @@ jobs:
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
 
       - name: Build DMG
-        run: make ${{ matrix.make_target }} VERSION=${{ env.VERSION }}
-
-      - name: Rename with arch suffix
-        run: mv "dist/Presto-${{ env.VERSION }}-macOS.dmg" "dist/Presto-${{ env.VERSION }}-macOS-${{ matrix.goarch }}.dmg"
+        run: make ${{ matrix.make_target }} VERSION=${{ env.VERSION }} SKIP_FRONTEND=1
 
       - uses: actions/upload-artifact@v4
         with:
@@ -62,6 +81,7 @@ jobs:
 
   # ── Windows: amd64 + arm64 ─────────────────────────────────
   build-windows:
+    needs: build-frontend
     runs-on: windows-latest
     defaults:
       run:
@@ -82,15 +102,12 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
+          cache: true
 
-      - uses: actions/setup-node@v4
+      - uses: actions/download-artifact@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install frontend dependencies
-        run: cd frontend && npm ci
+          name: frontend-build
+          path: cmd/presto-desktop/build/
 
       - name: Add MSYS2 MinGW to PATH
         run: echo "C:/msys64/mingw64/bin" >> "$GITHUB_PATH"
@@ -113,11 +130,6 @@ jobs:
 
       - name: Extract version
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
-
-      - name: Build frontend and embed
-        run: |
-          cd frontend && npm run build && cd ..
-          cp -r frontend/build/* cmd/presto-desktop/build/
 
       - name: Build Windows binary
         env:
@@ -150,6 +162,7 @@ jobs:
 
   # ── Linux: amd64 + arm64 ───────────────────────────────────
   build-linux:
+    needs: build-frontend
     runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
@@ -167,15 +180,12 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
+          cache: true
 
-      - uses: actions/setup-node@v4
+      - uses: actions/download-artifact@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install frontend dependencies
-        run: cd frontend && npm ci
+          name: frontend-build
+          path: cmd/presto-desktop/build/
 
       - name: Install native dependencies (amd64)
         if: matrix.goarch == 'amd64'
@@ -204,9 +214,6 @@ jobs:
 
       - name: Extract version
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
-
-      - name: Build frontend and embed
-        run: make _frontend-embed
 
       - name: Build Linux binary
         run: |
