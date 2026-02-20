@@ -4,7 +4,7 @@
   import Preview from '$lib/components/Preview.svelte';
   import TemplateSelector from '$lib/components/TemplateSelector.svelte';
   import { convert, compile, compileSvg, convertAndCompile, getExample } from '$lib/api/client';
-  import { Download, Settings, FolderOpen, Layers } from 'lucide-svelte';
+  import { Download, Settings, FolderOpen, Layers, AlertTriangle, ExternalLink } from 'lucide-svelte';
   import { goto } from '$app/navigation';
   import { editor } from '$lib/stores/editor.svelte';
   import { templateStore } from '$lib/stores/templates.svelte';
@@ -25,6 +25,13 @@
       runtime?: { EventsOn: (event: string, cb: (...args: any[]) => void) => void };
     }
   }
+
+  // Derive missing fonts for the currently selected template
+  let currentMissingFonts = $derived(
+    templateStore.templates
+      .find(t => t.name === editor.selectedTemplate)
+      ?.missingFonts ?? []
+  );
 
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgent);
   const mod = isMac ? '⌘' : 'Ctrl+';
@@ -360,6 +367,20 @@
   </div>
 </div>
 
+{#if currentMissingFonts.length > 0}
+  <div class="font-warning">
+    <AlertTriangle size={13} />
+    <span>缺少字体：</span>
+    {#each currentMissingFonts as font, i}
+      {#if i > 0}<span class="font-sep">、</span>{/if}
+      <a href={font.url} target="_blank" rel="noopener noreferrer">
+        {font.displayName}
+        <ExternalLink size={10} />
+      </a>
+    {/each}
+  </div>
+{/if}
+
 <div class="editor-layout" bind:this={layoutEl} class:dragging={isDragging}>
   <div class="pane" style="flex: {splitRatio}">
     <Editor bind:value={editor.markdown} onchange={handleConvert} scrollRatio={editorScrollRatio} onscroll={(ratio: number) => {
@@ -500,6 +521,34 @@
     transition: opacity var(--transition);
   }
   .btn-export:hover { opacity: 0.85; }
+  .font-warning {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px var(--space-lg);
+    background: rgba(224, 175, 104, 0.12);
+    border-bottom: 1px solid rgba(224, 175, 104, 0.25);
+    font-size: 12px;
+    color: var(--color-warning);
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    line-height: 1.6;
+  }
+  .font-warning a {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    color: var(--color-warning);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    white-space: nowrap;
+  }
+  .font-warning a:hover {
+    color: var(--color-text);
+  }
+  .font-sep {
+    color: var(--color-muted);
+  }
   .editor-layout {
     display: flex;
     flex: 1;

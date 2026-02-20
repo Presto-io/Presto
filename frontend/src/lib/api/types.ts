@@ -1,3 +1,9 @@
+export interface MissingFont {
+  name: string;
+  displayName: string;
+  url: string;
+}
+
 export interface Template {
   name: string;
   displayName: string;
@@ -6,6 +12,7 @@ export interface Template {
   author: string;
   builtin: boolean;
   keywords?: string[];
+  missingFonts?: MissingFont[];
 }
 
 export interface FieldSchema {

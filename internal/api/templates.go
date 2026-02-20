@@ -27,19 +27,26 @@ func (s *Server) handleListTemplates(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[templates] found %d templates", len(templates))
 
+	type missingFont struct {
+		Name        string `json:"name"`
+		DisplayName string `json:"displayName"`
+		URL         string `json:"url"`
+	}
+
 	type templateInfo struct {
-		Name        string   `json:"name"`
-		DisplayName string   `json:"displayName"`
-		Description string   `json:"description"`
-		Version     string   `json:"version"`
-		Author      string   `json:"author"`
-		Builtin     bool     `json:"builtin"`
-		Keywords    []string `json:"keywords"`
+		Name         string        `json:"name"`
+		DisplayName  string        `json:"displayName"`
+		Description  string        `json:"description"`
+		Version      string        `json:"version"`
+		Author       string        `json:"author"`
+		Builtin      bool          `json:"builtin"`
+		Keywords     []string      `json:"keywords"`
+		MissingFonts []missingFont `json:"missingFonts,omitempty"`
 	}
 
 	var result []templateInfo
 	for _, t := range templates {
-		result = append(result, templateInfo{
+		info := templateInfo{
 			Name:        t.Manifest.Name,
 			DisplayName: t.Manifest.DisplayName,
 			Description: t.Manifest.Description,
@@ -47,7 +54,17 @@ func (s *Server) handleListTemplates(w http.ResponseWriter, r *http.Request) {
 			Author:      t.Manifest.Author,
 			Builtin:     template.IsOfficial(t.Manifest.Name),
 			Keywords:    t.Manifest.Keywords,
-		})
+		}
+		for _, f := range t.Manifest.RequiredFonts {
+			if !s.availableFonts[f.Name] {
+				info.MissingFonts = append(info.MissingFonts, missingFont{
+					Name:        f.Name,
+					DisplayName: f.DisplayName,
+					URL:         f.URL,
+				})
+			}
+		}
+		result = append(result, info)
 	}
 
 	if result == nil {

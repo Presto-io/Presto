@@ -14,9 +14,10 @@ import (
 )
 
 type Server struct {
-	mux      *http.ServeMux
-	manager  *template.Manager
-	compiler *typst.Compiler
+	mux            *http.ServeMux
+	manager        *template.Manager
+	compiler       *typst.Compiler
+	availableFonts map[string]bool // cached from typst fonts at startup
 }
 
 // ServerOptions configures the API server.
@@ -40,9 +41,10 @@ func NewServer(opts ServerOptions) http.Handler {
 	compiler.FontPaths = opts.FontPaths
 
 	s := &Server{
-		mux:      http.NewServeMux(),
-		manager:  template.NewManager(opts.TemplatesDir),
-		compiler: compiler,
+		mux:            http.NewServeMux(),
+		manager:        template.NewManager(opts.TemplatesDir),
+		compiler:       compiler,
+		availableFonts: compiler.ListFonts(),
 	}
 
 	log.Printf("[presto] starting server, templates=%s static=%s typst=%s root=%s",
