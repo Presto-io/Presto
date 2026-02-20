@@ -967,7 +967,7 @@
     height: 18px;
     left: 3px;
     bottom: 3px;
-    background: white;
+    background: var(--color-toggle-knob);
     border-radius: 50%;
     transition: transform var(--transition);
   }
@@ -1362,7 +1362,7 @@
   }
   .btn-uninstall:hover {
     background: var(--color-danger);
-    color: white;
+    color: var(--color-on-danger);
   }
   .btn-install {
     background: var(--color-accent);
@@ -1376,7 +1376,7 @@
   .modal-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.6);
+    background: var(--color-backdrop);
     backdrop-filter: blur(4px);
     display: flex;
     align-items: center;
@@ -1426,7 +1426,7 @@
   .btn-secondary:hover { background: var(--color-surface-hover); }
   .btn-danger {
     background: var(--color-danger);
-    color: white;
+    color: var(--color-on-danger);
   }
   .btn-danger:hover { opacity: 0.9; }
 
@@ -1490,7 +1490,7 @@
   }
 
   /* --- Conflict modal --- */
-  .modal-icon.conflict { color: var(--color-warning, #e0af68); }
+  .modal-icon.conflict { color: var(--color-warning); }
   .conflict-actions { flex-wrap: wrap; }
 
   /* --- Import toast --- */

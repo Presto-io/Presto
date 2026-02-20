@@ -3,7 +3,7 @@
   import { EditorView, basicSetup } from 'codemirror';
   import { markdown } from '@codemirror/lang-markdown';
   import { oneDark } from '@codemirror/theme-one-dark';
-  import { EditorState } from '@codemirror/state';
+  import { EditorState, Compartment } from '@codemirror/state';
   import { search } from '@codemirror/search';
   import { placeholder } from '@codemirror/view';
 
@@ -33,14 +33,20 @@
   let internalUpdate = false;
   let ignoreScroll = false;
 
+  const themeCompartment = new Compartment();
+  let mqCleanup: (() => void) | undefined;
+
   onMount(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const isDark = mq.matches;
+
     view = new EditorView({
       state: EditorState.create({
         doc: value,
         extensions: [
           basicSetup,
           markdown(),
-          oneDark,
+          themeCompartment.of(isDark ? oneDark : []),
           EditorView.lineWrapping,
           zhPhrases,
           search({ top: true }),
@@ -51,7 +57,7 @@
             '.cm-gutters': { background: 'var(--color-bg)', borderRight: '1px solid var(--color-border)' },
             '.cm-activeLineGutter': { background: 'var(--color-surface)' },
             '.cm-placeholder': {
-              color: '#565f89',
+              color: 'var(--color-muted)',
               fontStyle: 'italic',
               whiteSpace: 'pre-wrap',
             },
@@ -78,6 +84,14 @@
       }),
       parent: container
     });
+
+    const handleThemeChange = (e: MediaQueryListEvent) => {
+      view?.dispatch({
+        effects: themeCompartment.reconfigure(e.matches ? oneDark : [])
+      });
+    };
+    mq.addEventListener('change', handleThemeChange);
+    mqCleanup = () => mq.removeEventListener('change', handleThemeChange);
   });
 
   // Sync external value changes (e.g. file upload) into CodeMirror
@@ -105,7 +119,7 @@
     }
   });
 
-  onDestroy(() => view?.destroy());
+  onDestroy(() => { mqCleanup?.(); view?.destroy(); });
 </script>
 
 <div bind:this={container} class="editor-container" role="textbox" aria-label="Markdown 编辑器"></div>
@@ -126,8 +140,8 @@
   /* ── Search Panel: VSCode-style ────────────────────────── */
 
   .editor-container :global(.cm-panels) {
-    background: #252630;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    background: var(--color-panel-bg);
+    border-bottom: 1px solid var(--color-border);
   }
   .editor-container :global(.cm-panels.cm-panels-top) {
     z-index: 10;
@@ -169,9 +183,9 @@
   /* Text inputs */
   .editor-container :global(.cm-search .cm-textfield) {
     flex: 1 1 180px;
-    background: #1a1b26;
-    color: #c0caf5;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--color-bg);
+    color: var(--color-text);
+    border: 1px solid var(--color-border-input);
     border-radius: 3px;
     padding: 3px 8px;
     font-size: 13px;
@@ -182,14 +196,14 @@
     margin: 0;
   }
   .editor-container :global(.cm-search .cm-textfield:focus) {
-    border-color: #7aa2f7;
+    border-color: var(--color-accent);
   }
 
   /* ── Icon Buttons ──────────────────────────────────────── */
 
   .editor-container :global(.cm-search .cm-button) {
     background: transparent;
-    color: #787c99;
+    color: var(--color-muted);
     border: 1px solid transparent;
     border-radius: 3px;
     padding: 0;
@@ -205,8 +219,8 @@
     transition: background 0.1s, color 0.1s;
   }
   .editor-container :global(.cm-search .cm-button:hover) {
-    background: rgba(255, 255, 255, 0.08);
-    color: #c0caf5;
+    background: var(--color-hover-overlay);
+    color: var(--color-text);
   }
 
   /* Button icons via ::after */
@@ -241,12 +255,12 @@
     border: 1px solid transparent;
     margin: 0;
     flex-shrink: 0;
-    color: #787c99;
+    color: var(--color-muted);
     transition: background 0.1s, color 0.1s, border-color 0.1s;
   }
   .editor-container :global(.cm-search label:hover) {
-    background: rgba(255, 255, 255, 0.08);
-    color: #c0caf5;
+    background: var(--color-hover-overlay);
+    color: var(--color-text);
   }
 
   /* Hide checkbox inputs */
@@ -275,9 +289,9 @@
 
   /* Active toggle state */
   .editor-container :global(.cm-search label:has(input[type=checkbox]:checked)) {
-    background: rgba(122, 162, 247, 0.15);
-    border-color: rgba(122, 162, 247, 0.4);
-    color: #7aa2f7;
+    background: var(--color-accent-bg);
+    border-color: var(--color-accent-border);
+    color: var(--color-accent);
   }
 
   /* ── Close Button ──────────────────────────────────────── */
@@ -288,7 +302,7 @@
     right: 6px;
     background: transparent;
     border: none;
-    color: #565f89;
+    color: var(--color-muted);
     font-size: 0;
     padding: 0;
     cursor: pointer;
@@ -301,8 +315,8 @@
     transition: background 0.1s, color 0.1s;
   }
   .editor-container :global(.cm-search [name=close]:hover) {
-    color: #c0caf5;
-    background: rgba(255, 255, 255, 0.08);
+    color: var(--color-text);
+    background: var(--color-hover-overlay);
   }
   .editor-container :global(.cm-search [name=close]::after) {
     content: '×';
@@ -312,12 +326,12 @@
   /* ── Search Match Highlights ───────────────────────────── */
 
   .editor-container :global(.cm-searchMatch) {
-    background-color: rgba(255, 200, 50, 0.25);
-    outline: 1px solid rgba(255, 200, 50, 0.5);
+    background-color: var(--color-search-match);
+    outline: 1px solid var(--color-search-match-border);
     border-radius: 2px;
   }
   .editor-container :global(.cm-searchMatch-selected) {
-    background-color: rgba(255, 150, 50, 0.4);
-    outline: 1px solid rgba(255, 150, 50, 0.7);
+    background-color: var(--color-search-match-active);
+    outline: 1px solid var(--color-search-match-active-border);
   }
 </style>
