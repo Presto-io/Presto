@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { fly } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
-  import { ChevronDown, Search } from 'lucide-svelte';
+  import { ChevronDown, Search, AlertTriangle } from 'lucide-svelte';
   import { templateStore } from '$lib/stores/templates.svelte';
 
   let {
@@ -37,6 +37,10 @@
     templates.find(t => t.name === selected)?.name ||
     selected ||
     '选择模板'
+  );
+
+  let selectedHasMissing = $derived(
+    (templates.find(t => t.name === selected)?.missingFonts?.length ?? 0) > 0
   );
 
   onMount(() => {
@@ -129,6 +133,9 @@
     aria-label="选择模板"
   >
     <span class="selector-label">{selectedDisplay}</span>
+    {#if selectedHasMissing}
+      <span class="selector-warn" title="缺少字体"><AlertTriangle size={11} /></span>
+    {/if}
     <ChevronDown size={12} />
   </button>
 
@@ -160,7 +167,10 @@
             onclick={() => selectTemplate(tpl.name)}
             onpointerenter={() => highlightIndex = i}
           >
-            {tpl.displayName || tpl.name}
+            <span class="option-label">{tpl.displayName || tpl.name}</span>
+            {#if (tpl.missingFonts?.length ?? 0) > 0}
+              <span class="option-warn" title="缺少字体"><AlertTriangle size={10} /></span>
+            {/if}
           </button>
         {/each}
         {#if filtered.length === 0}
@@ -251,7 +261,8 @@
     padding: var(--space-xs) 0;
   }
   .selector-option {
-    display: block;
+    display: flex;
+    align-items: center;
     width: 100%;
     text-align: left;
     padding: 6px 12px;
@@ -262,6 +273,25 @@
     font-family: var(--font-ui);
     cursor: pointer;
     transition: background var(--transition);
+  }
+  .option-label {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .option-warn {
+    color: var(--color-warning);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    margin-left: 6px;
+  }
+  .selector-warn {
+    color: var(--color-warning);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
   }
   .selector-option:hover,
   .selector-option.highlighted {

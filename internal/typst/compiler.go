@@ -41,6 +41,30 @@ func (c *Compiler) typstBin() string {
 	return "typst"
 }
 
+// ListFonts returns the set of available font family names.
+func (c *Compiler) ListFonts() map[string]bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	args := []string{"fonts"}
+	for _, fp := range c.FontPaths {
+		args = append(args, "--font-path", fp)
+	}
+	cmd := exec.CommandContext(ctx, c.typstBin(), args...)
+	output, err := cmd.Output()
+	if err != nil {
+		log.Printf("[typst] failed to list fonts: %v", err)
+		return nil
+	}
+	fonts := make(map[string]bool)
+	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
+		if name := strings.TrimSpace(line); name != "" {
+			fonts[name] = true
+		}
+	}
+	return fonts
+}
+
 // randomSuffix generates a cryptographically random hex string (SEC-25).
 func randomSuffix() string {
 	b := make([]byte, 8)
