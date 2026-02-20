@@ -32,6 +32,7 @@ type markdownFileEntry struct {
 	Name             string `json:"name"`
 	Content          string `json:"content"`
 	DetectedTemplate string `json:"detectedTemplate,omitempty"`
+	WorkDir          string `json:"workDir,omitempty"`
 }
 
 // Markdown file extensions for batch import.
@@ -209,6 +210,12 @@ func (s *Server) handleBatchImportZip(w http.ResponseWriter, r *http.Request) {
 		entry := markdownFileEntry{
 			Name:    path.Base(relPath),
 			Content: string(content),
+		}
+
+		// Per-file workDir: resolve image paths relative to the markdown file's directory
+		fileDir := path.Dir(relPath)
+		if fileDir != "." {
+			entry.WorkDir = filepath.Join(workDir, filepath.FromSlash(fileDir))
 		}
 
 		detected := extractFrontmatterTemplate(string(content))

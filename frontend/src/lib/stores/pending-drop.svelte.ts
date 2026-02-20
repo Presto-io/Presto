@@ -7,6 +7,8 @@
 export interface PendingDropData {
   files: File[];
   workDir?: string;
+  /** Per-file working directory (filename → dir). Overrides workDir. */
+  documentDirs?: Map<string, string>;
 }
 
 let _pending = $state<PendingDropData | null>(null);

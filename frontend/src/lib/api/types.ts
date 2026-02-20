@@ -46,6 +46,6 @@ export interface BatchResult {
 
 export interface BatchImportResult {
   templates: { name: string; displayName: string; status: string }[];
-  markdownFiles: { name: string; content: string; detectedTemplate?: string }[];
+  markdownFiles: { name: string; content: string; detectedTemplate?: string; workDir?: string }[];
   workDir?: string;
 }
