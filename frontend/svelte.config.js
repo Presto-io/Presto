@@ -8,7 +8,19 @@ const config = {
 			pages: 'build',
 			assets: 'build',
 			fallback: 'index.html'
-		})
+		}),
+		prerender: {
+			entries: [
+				'*',
+				'/showcase/editor-gongwen',
+				'/showcase/editor-jiaoan',
+				'/showcase/batch',
+				'/showcase/templates',
+				'/showcase/drop',
+				'/showcase/hero',
+				'/showcase/editor'
+			]
+		}
 	},
 	preprocess: vitePreprocess()
 };
