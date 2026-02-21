@@ -314,6 +314,14 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Notify Homepage
+        env:
+          GH_TOKEN: ${{ secrets.HOMEPAGE_DISPATCH_TOKEN }}
+        run: |
+          gh api repos/Presto-io/Presto-Homepage/dispatches \
+            -f event_type=release-published \
+            -f 'client_payload[tag]=${{ github.ref_name }}'
+
   # ── Homebrew Cask: 推送到 brewforge/chinese ────────────────
   update-homebrew:
     needs: release
