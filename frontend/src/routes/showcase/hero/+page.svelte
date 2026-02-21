@@ -2,7 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import Editor from '$lib/components/Editor.svelte';
   import DOMPurify from 'dompurify';
-  import { heroTypingContent } from '$lib/showcase/presets';
+  import { gongwenExample } from '$lib/showcase/presets';
   import { Download } from 'lucide-svelte';
 
   import heroFrame0 from '$lib/showcase/hero-frames/hero-frame-0.svg?raw';
@@ -13,12 +13,12 @@
   const frames = [heroFrame0, heroFrame1, heroFrame2, heroFrame3];
 
   // Sections: each section appears as a whole block, then triggers a frame switch
-  // Order: empty → frontmatter → frame-0 → title → frame-1 → paragraph → frame-2 → rest → frame-3
+  // Boundaries match SVG generation: head -7, head -11, head -22, full
   const SECTIONS = [
-    { end: 114, frame: 0, delay: 800 },   // frontmatter → frame-0
-    { end: 124, frame: 1, delay: 600 },   // 各部门、各单位： → frame-1
-    { end: 206, frame: 2, delay: 600 },   // 第一段正文 → frame-2
-    { end: heroTypingContent.length, frame: 3, delay: 0 },  // 剩余全部 → frame-3
+    { end: 114, frame: 0, delay: 800 },   // lines 1-7: frontmatter → frame-0
+    { end: 207, frame: 1, delay: 600 },   // lines 8-11: 各部门、各单位 + 正文第一段 → frame-1
+    { end: 312, frame: 2, delay: 600 },   // lines 12-22: 工作目标 + 检查范围 → frame-2
+    { end: gongwenExample.length, frame: 3, delay: 0 },  // 剩余全部 → frame-3
   ];
 
   let typedText = $state('');
@@ -47,7 +47,7 @@
     }
 
     const section = SECTIONS[sectionIndex];
-    typedText = heroTypingContent.slice(0, section.end);
+    typedText = gongwenExample.slice(0, section.end);
     currentFrame = section.frame;
     sectionIndex++;
 
