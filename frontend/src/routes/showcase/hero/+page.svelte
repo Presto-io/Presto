@@ -12,22 +12,19 @@
 
   const frames = [heroFrame0, heroFrame1, heroFrame2, heroFrame3];
 
-  // Frame thresholds: content-driven milestones
-  // -1 = no frame (initial empty state)
-  //  0 = frontmatter done (after closing ---)
-  //  1 = title/address done (after 各部门、各单位：)
-  //  2 = first paragraph done (after 现将有关事项通知如下。)
-  //  3 = all done
-  const FRAME_MILESTONES = [
-    { charIndex: 114, frame: 0 },  // frontmatter end
-    { charIndex: 124, frame: 1 },  // opening address end
-    { charIndex: 206, frame: 2 },  // first paragraph end
+  // Sections: each section appears as a whole block, then triggers a frame switch
+  // Order: empty → frontmatter → frame-0 → title → frame-1 → paragraph → frame-2 → rest → frame-3
+  const SECTIONS = [
+    { end: 114, frame: 0, delay: 800 },   // frontmatter → frame-0
+    { end: 124, frame: 1, delay: 600 },   // 各部门、各单位： → frame-1
+    { end: 206, frame: 2, delay: 600 },   // 第一段正文 → frame-2
+    { end: heroTypingContent.length, frame: 3, delay: 0 },  // 剩余全部 → frame-3
   ];
 
   let typedText = $state('');
   let currentFrame = $state(-1);  // -1 = no SVG shown
-  let typingTimer: ReturnType<typeof setTimeout>;
-  let charIndex = $state(0);
+  let animTimer: ReturnType<typeof setTimeout>;
+  let sectionIndex = 0;
 
   function sanitizeSvg(svg: string): string {
     return DOMPurify.sanitize(svg, {
@@ -37,48 +34,32 @@
     });
   }
 
-  function getTypingDelay(char: string): number {
-    if (/[。，、；：！？]/.test(char)) return 80 + Math.random() * 80;
-    if (char === '\n') return 100 + Math.random() * 80;
-    return 30 + Math.random() * 20;
-  }
-
-  function typeNextChar() {
-    if (charIndex >= heroTypingContent.length) {
-      // All typed → show frame-3 (full render)
-      currentFrame = 3;
-      // Wait then restart
-      typingTimer = setTimeout(() => {
-        charIndex = 0;
+  function showNextSection() {
+    if (sectionIndex >= SECTIONS.length) {
+      // All done, wait then restart
+      animTimer = setTimeout(() => {
+        sectionIndex = 0;
         typedText = '';
         currentFrame = -1;
-        typeNextChar();
+        animTimer = setTimeout(showNextSection, 500);
       }, 8000);
       return;
     }
 
-    const char = heroTypingContent[charIndex];
-    charIndex++;
-    typedText = heroTypingContent.slice(0, charIndex);
+    const section = SECTIONS[sectionIndex];
+    typedText = heroTypingContent.slice(0, section.end);
+    currentFrame = section.frame;
+    sectionIndex++;
 
-    // Update preview frame at milestones
-    for (let i = FRAME_MILESTONES.length - 1; i >= 0; i--) {
-      if (charIndex >= FRAME_MILESTONES[i].charIndex) {
-        currentFrame = FRAME_MILESTONES[i].frame;
-        break;
-      }
-    }
-
-    const delay = getTypingDelay(char);
-    typingTimer = setTimeout(typeNextChar, delay);
+    animTimer = setTimeout(showNextSection, section.delay);
   }
 
   onMount(() => {
-    typingTimer = setTimeout(typeNextChar, 500);
+    animTimer = setTimeout(showNextSection, 500);
   });
 
   onDestroy(() => {
-    clearTimeout(typingTimer);
+    clearTimeout(animTimer);
   });
 </script>
 
