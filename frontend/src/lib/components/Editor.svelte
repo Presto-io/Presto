@@ -21,11 +21,12 @@
     "replaced $ matches": "已替换 $ 个匹配",
   });
 
-  let { value = $bindable(''), onchange, onscroll, scrollRatio = 0 }: {
+  let { value = $bindable(''), onchange, onscroll, scrollRatio = 0, readOnly = false }: {
     value?: string;
     onchange?: (val: string) => void;
     onscroll?: (ratio: number) => void;
     scrollRatio?: number;
+    readOnly?: boolean;
   } = $props();
 
   let container: HTMLDivElement;
@@ -51,8 +52,9 @@
           themeCompartment.of(isDark ? oneDark : []),
           EditorView.lineWrapping,
           zhPhrases,
-          search({ top: true }),
-          placeholder(`在此输入 Markdown 内容，或按 ${mod}O 打开文件\n\n图片语法：![描述](路径)\n  打开文件后，图片路径相对于文件所在目录\n  直接编辑时，使用绝对路径\n\n快捷键：${mod}O 打开 · ${mod}E 导出 · ${mod}F 搜索 · ${mod}, 设置`),
+          ...(readOnly ? [EditorState.readOnly.of(true)] : []),
+          ...(readOnly ? [] : [search({ top: true })]),
+          ...(readOnly ? [] : [placeholder(`在此输入 Markdown 内容，或按 ${mod}O 打开文件\n\n图片语法：![描述](路径)\n  打开文件后，图片路径相对于文件所在目录\n  直接编辑时，使用绝对路径\n\n快捷键：${mod}O 打开 · ${mod}E 导出 · ${mod}F 搜索 · ${mod}, 设置`)]),
           EditorView.theme({
             '&': { height: '100%', fontSize: '13px' },
             '.cm-scroller': { fontFamily: 'var(--font-mono)', lineHeight: '1.6' },
