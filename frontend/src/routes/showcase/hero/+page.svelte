@@ -205,8 +205,7 @@
   }
   .preview-container {
     height: 100%;
-    overflow-y: auto;
-    overflow-x: hidden;
+    overflow: hidden;
     background: var(--color-preview-bg);
     border-left: 1px solid var(--color-border);
   }
@@ -262,5 +261,9 @@
     margin: 0;
     text-align: center;
     line-height: 1.6;
+  }
+  /* Disable all scrolling in hero — purely visual, no interaction */
+  .pane :global(.cm-scroller) {
+    overflow: hidden !important;
   }
 </style>
