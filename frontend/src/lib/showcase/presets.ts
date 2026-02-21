@@ -132,20 +132,3 @@ PLC 的外部接线：输入端子接线、输出端子接线、电源接线。
 
 任务驱动、小组讨论
 `;
-
-// Hero typing animation content (first 15 lines of gongwen example for typing effect)
-export const heroTypingContent = `---
-title: "关于开展2025年度安全生产专项检查工作的通知"
-author: "安全生产管理处"
-date: "2025-03-15"
-signature: true
-template: "gongwen"
----
-
-各部门、各单位：
-
-为进一步加强安全生产管理，落实安全生产责任制，根据《安全生产法》和上级主管部门要求，决定在全公司范围内开展2025年度安全生产专项检查工作。现将有关事项通知如下。
-
-## 工作目标
-
-全面排查安全生产隐患，建立健全安全管理制度，提高全员安全意识，确保全年安全生产事故"零发生"。`;
