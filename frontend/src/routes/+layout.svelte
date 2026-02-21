@@ -4,8 +4,11 @@
 	import { FileText } from 'lucide-svelte';
 	import WizardOverlay from '$lib/components/wizard/WizardOverlay.svelte';
 	import { fileRouter } from '$lib/stores/file-router.svelte';
+	import { page } from '$app/stores';
 
 	let { children } = $props();
+
+	let isShowcase = $derived($page.url.pathname.startsWith('/showcase'));
 
 	// --- Universal drag-drop (window-level capture phase) ---
 	let dragOver = $state(false);
@@ -76,6 +79,9 @@
 	});
 
 	onMount(() => {
+		// Skip all event registration in showcase mode
+		if (isShowcase) return;
+
 		// Register drag handlers on window in capture phase
 		// — runs before any child component (including CodeMirror) can intercept
 		window.addEventListener('dragenter', handleDragEnter, true);
@@ -145,6 +151,7 @@
 	<main id="main-content">
 		{@render children()}
 	</main>
+	{#if !isShowcase}
 	<WizardOverlay />
 
 	{#if dragOver}
@@ -161,8 +168,10 @@
 			{fileRouter.toast.message}
 		</div>
 	{/if}
+	{/if}
 </div>
 
+{#if !isShowcase}
 <dialog bind:this={confirmDialog} class="confirm-dialog">
 	<h3>打开文件</h3>
 	<p>当前编辑器有未保存的内容，打开新文件将替换当前内容。</p>
@@ -171,6 +180,7 @@
 		<button class="dialog-btn" onclick={fileRouter.confirmCancel}>取消</button>
 	</div>
 </dialog>
+{/if}
 
 <style>
 	.app {
