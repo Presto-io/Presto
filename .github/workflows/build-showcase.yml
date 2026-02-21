@@ -1,0 +1,50 @@
+name: Build Showcase
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/src/routes/showcase/**'
+      - 'frontend/src/lib/showcase/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build static showcase
+        working-directory: frontend
+        run: npm run build
+
+      - name: Extract showcase files
+        run: |
+          mkdir -p showcase-output
+          # 保持 _app/ 与 showcase/ 同级，匹配 SvelteKit 相对路径引用
+          cp -r frontend/build/showcase showcase-output/showcase
+          cp -r frontend/build/_app showcase-output/_app
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: showcase-static
+          path: showcase-output
+          retention-days: 30
+
+      - name: Trigger Homepage sync
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.HOMEPAGE_DISPATCH_TOKEN }}
+          repository: Presto-io/Presto-Homepage
+          event-type: showcase-updated
