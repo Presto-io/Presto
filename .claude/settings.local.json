@@ -22,7 +22,6 @@
       "Bash(uniq:*)",
       "Bash(grep:*)",
       "Bash(xargs:*)",
-
       "Bash(go build:*)",
       "Bash(go test:*)",
       "Bash(go run:*)",
@@ -32,10 +31,10 @@
       "Bash(go fmt:*)",
       "Bash(go generate:*)",
       "Bash(go env:*)",
+      "Bash(go doc:*)",
       "Bash(CGO_ENABLED=*)",
       "Bash(CGO_LDFLAGS=*)",
       "Bash(GOOS=*)",
-
       "Bash(npm install:*)",
       "Bash(npm install)",
       "Bash(npm ci:*)",
@@ -43,10 +42,8 @@
       "Bash(npm run:*)",
       "Bash(npx:*)",
       "Bash(node:*)",
-
       "Bash(make:*)",
       "Bash(make)",
-
       "Bash(git status:*)",
       "Bash(git status)",
       "Bash(git log:*)",
@@ -58,24 +55,19 @@
       "Bash(git rev-parse:*)",
       "Bash(git remote:*)",
       "Bash(git -C:*)",
-
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git stash:*)",
-
       "Bash(typst:*)",
       "Bash(/opt/homebrew/bin/typst:*)",
-
       "Bash(gh repo view:*)",
       "Bash(gh api:*)",
       "Bash(gh pr:*)",
       "Bash(gh issue:*)",
       "Bash(gh run:*)",
       "Bash(gh release:*)",
-
       "Bash(curl:*)",
       "Bash(python3:*)",
-
       "WebSearch",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
@@ -89,7 +81,10 @@
       "WebFetch(domain:enter-tainer.github.io)",
       "WebFetch(domain:pkg.go.dev)",
       "WebFetch(domain:developer.mozilla.org)",
-      "WebFetch(domain:stackoverflow.com)"
+      "WebFetch(domain:stackoverflow.com)",
+      "Bash(git fetch:*)",
+      "Bash(# Hero frame 2: frontmatter + ~15 content lines \\(through first major section\\) cd /tmp && head -22 /Users/mrered/Developer/Code/Gopst/cmd/gongwen/example.md && cat hero-partial-2.md)",
+      "Bash(/tmp/presto-template-gongwen)"
     ]
   }
 }
