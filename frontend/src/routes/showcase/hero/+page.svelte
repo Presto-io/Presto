@@ -12,11 +12,20 @@
 
   const frames = [heroFrame0, heroFrame1, heroFrame2, heroFrame3];
 
-  // Frame thresholds (char index where we switch to next frame)
-  const FRAME_THRESHOLDS = [0, 120, 280, 450];
+  // Frame thresholds: content-driven milestones
+  // -1 = no frame (initial empty state)
+  //  0 = frontmatter done (after closing ---)
+  //  1 = title/address done (after 各部门、各单位：)
+  //  2 = first paragraph done (after 现将有关事项通知如下。)
+  //  3 = all done
+  const FRAME_MILESTONES = [
+    { charIndex: 114, frame: 0 },  // frontmatter end
+    { charIndex: 124, frame: 1 },  // opening address end
+    { charIndex: 206, frame: 2 },  // first paragraph end
+  ];
 
   let typedText = $state('');
-  let currentFrame = $state(0);
+  let currentFrame = $state(-1);  // -1 = no SVG shown
   let typingTimer: ReturnType<typeof setTimeout>;
   let charIndex = $state(0);
 
@@ -29,20 +38,20 @@
   }
 
   function getTypingDelay(char: string): number {
-    // Punctuation pauses
-    if (/[。，、；：！？]/.test(char)) return 200 + Math.random() * 200;
-    if (char === '\n') return 300 + Math.random() * 200;
-    // Normal typing speed
-    return 50 + Math.random() * 30;
+    if (/[。，、；：！？]/.test(char)) return 80 + Math.random() * 80;
+    if (char === '\n') return 100 + Math.random() * 80;
+    return 30 + Math.random() * 20;
   }
 
   function typeNextChar() {
     if (charIndex >= heroTypingContent.length) {
-      // Done typing, wait then restart
+      // All typed → show frame-3 (full render)
+      currentFrame = 3;
+      // Wait then restart
       typingTimer = setTimeout(() => {
         charIndex = 0;
         typedText = '';
-        currentFrame = 0;
+        currentFrame = -1;
         typeNextChar();
       }, 8000);
       return;
@@ -52,10 +61,10 @@
     charIndex++;
     typedText = heroTypingContent.slice(0, charIndex);
 
-    // Update preview frame based on character progress
-    for (let i = FRAME_THRESHOLDS.length - 1; i >= 0; i--) {
-      if (charIndex >= FRAME_THRESHOLDS[i]) {
-        currentFrame = i;
+    // Update preview frame at milestones
+    for (let i = FRAME_MILESTONES.length - 1; i >= 0; i--) {
+      if (charIndex >= FRAME_MILESTONES[i].charIndex) {
+        currentFrame = FRAME_MILESTONES[i].frame;
         break;
       }
     }
@@ -65,7 +74,6 @@
   }
 
   onMount(() => {
-    // Start typing after brief delay
     typingTimer = setTimeout(typeNextChar, 500);
   });
 
@@ -98,18 +106,25 @@
   </div>
   <div class="pane preview-pane">
     <div class="preview-container">
-      <div class="svg-pages">
-        {#each frames as frame, i}
-          <div
-            class="frame-layer"
-            class:active={i === currentFrame}
-          >
-            <div class="svg-page">
-              {@html sanitizeSvg(frame)}
+      {#if currentFrame >= 0}
+        <div class="svg-pages">
+          {#each frames as frame, i}
+            <div
+              class="frame-layer"
+              class:active={i === currentFrame}
+            >
+              <div class="svg-page">
+                {@html sanitizeSvg(frame)}
+              </div>
             </div>
-          </div>
-        {/each}
-      </div>
+          {/each}
+        </div>
+      {:else}
+        <div class="preview-empty">
+          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <p>在左侧编辑 Markdown，选择模板后预览将在此显示</p>
+        </div>
+      {/if}
     </div>
   </div>
 </div>
@@ -250,5 +265,21 @@
     display: block;
     width: 100%;
     height: auto;
+  }
+  .preview-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--color-muted);
+    gap: var(--space-md);
+    padding: var(--space-xl);
+  }
+  .preview-empty p {
+    font-size: 12px;
+    margin: 0;
+    text-align: center;
+    line-height: 1.6;
   }
 </style>
