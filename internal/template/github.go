@@ -189,29 +189,6 @@ func (m *Manager) Install(owner, repo string) error {
 		}
 	}
 
-	// SEC-06: Derive and validate template name
-	name := repo
-	if strings.HasPrefix(name, "presto-template-") {
-		name = name[len("presto-template-"):]
-	}
-	name = filepath.Base(name)
-	if err := validateName(name); err != nil {
-		return fmt.Errorf("invalid template name: %w", err)
-	}
-
-	// SEC-06: Verify resolved path is within TemplatesDir
-	tplDir := filepath.Join(m.TemplatesDir, name)
-	absTemplatesDir, _ := filepath.Abs(m.TemplatesDir)
-	absTplDir, _ := filepath.Abs(tplDir)
-	if !strings.HasPrefix(absTplDir, absTemplatesDir+string(filepath.Separator)) {
-		return fmt.Errorf("template directory escapes base: %s", absTplDir)
-	}
-
-	// SEC-28: Use restrictive permissions
-	if err := os.MkdirAll(tplDir, 0700); err != nil {
-		return fmt.Errorf("create template dir: %w", err)
-	}
-
 	// Download binary (SEC-18, SEC-20)
 	binResp, err := httpClient.Get(downloadURL)
 	if err != nil {
@@ -238,10 +215,69 @@ func (m *Manager) Install(owner, repo string) error {
 		}
 	}
 
-	// SEC-28: Use restrictive permissions for binary
-	binPath := filepath.Join(tplDir, repo)
+	// Write binary to temp file, then run --manifest to extract metadata
+	tmpFile, err := os.CreateTemp("", "presto-template-*")
+	if err != nil {
+		return fmt.Errorf("create temp file: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+	defer os.Remove(tmpPath)
+
+	if _, err := tmpFile.Write(data); err != nil {
+		tmpFile.Close()
+		return fmt.Errorf("write temp binary: %w", err)
+	}
+	tmpFile.Close()
+
+	// SEC-28: Set executable permission
+	if err := os.Chmod(tmpPath, 0700); err != nil {
+		return fmt.Errorf("chmod temp binary: %w", err)
+	}
+
+	// Run --manifest to extract template metadata
+	executor := NewExecutor(tmpPath)
+	manifestBytes, err := executor.GetManifest()
+	if err != nil {
+		return fmt.Errorf("get manifest from binary: %w", err)
+	}
+	manifest, err := ParseManifest(manifestBytes)
+	if err != nil {
+		return fmt.Errorf("parse manifest: %w", err)
+	}
+
+	// SEC-06: Validate manifest name
+	if err := validateName(manifest.Name); err != nil {
+		return fmt.Errorf("invalid template name from manifest: %w", err)
+	}
+
+	// SEC-06: Verify resolved path is within TemplatesDir
+	tplDir := filepath.Join(m.TemplatesDir, manifest.Name)
+	absTemplatesDir, _ := filepath.Abs(m.TemplatesDir)
+	absTplDir, _ := filepath.Abs(tplDir)
+	if !strings.HasPrefix(absTplDir, absTemplatesDir+string(filepath.Separator)) {
+		return fmt.Errorf("template directory escapes base: %s", absTplDir)
+	}
+
+	// SEC-28: Use restrictive permissions
+	if err := os.MkdirAll(tplDir, 0700); err != nil {
+		return fmt.Errorf("create template dir: %w", err)
+	}
+
+	// Name binary per convention: presto-template-{name}
+	binaryName := fmt.Sprintf("presto-template-%s", manifest.Name)
+	if runtime.GOOS == "windows" {
+		binaryName += ".exe"
+	}
+
+	// Write binary to final location
+	binPath := filepath.Join(tplDir, binaryName)
 	if err := os.WriteFile(binPath, data, 0700); err != nil {
 		return fmt.Errorf("write binary: %w", err)
+	}
+
+	// Write manifest.json
+	if err := os.WriteFile(filepath.Join(tplDir, "manifest.json"), manifestBytes, 0644); err != nil {
+		return fmt.Errorf("write manifest: %w", err)
 	}
 
 	return nil
