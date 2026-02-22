@@ -41,6 +41,44 @@ type App struct {
 	compiler *typst.Compiler
 }
 
+// spaFallbackHandler wraps the API handler to support prerendered SvelteKit routes.
+// When Wails can't find a static asset, it calls this handler. We try:
+// 1. path + ".html" (prerendered routes like /showcase/editor → showcase/editor.html)
+// 2. Forward /api/* and /mock/* to the API handler
+// 3. Serve index.html as SPA fallback
+type spaFallbackHandler struct {
+	api    http.Handler
+	assets fs.FS
+}
+
+func (h *spaFallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// API and mock routes → forward directly
+	if strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/mock/") {
+		h.api.ServeHTTP(w, r)
+		return
+	}
+
+	// Try .html suffix for prerendered routes
+	cleanPath := strings.TrimPrefix(r.URL.Path, "/")
+	if cleanPath != "" {
+		htmlPath := cleanPath + ".html"
+		if data, err := fs.ReadFile(h.assets, htmlPath); err == nil {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.Write(data)
+			return
+		}
+	}
+
+	// SPA fallback → index.html
+	if data, err := fs.ReadFile(h.assets, "index.html"); err == nil {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write(data)
+		return
+	}
+
+	http.NotFound(w, r)
+}
+
 type OpenFileResult struct {
 	Content string `json:"content"`
 	Dir     string `json:"dir"`
@@ -496,6 +534,12 @@ func main() {
 	// Strip "build" prefix from embedded FS so files are at root
 	frontendFS, _ := fs.Sub(assets, "build")
 
+	// Wrap API handler with SPA fallback for prerendered routes
+	// Wails calls Handler when the asset is not found in the embedded FS.
+	// For prerendered SvelteKit routes like /showcase/editor, the actual
+	// file is showcase/editor.html — try .html suffix before API fallback.
+	handler := &spaFallbackHandler{api: apiHandler, assets: frontendFS}
+
 	app := NewApp(manager, compiler)
 	appMenu := buildMenu(app)
 
@@ -507,7 +551,7 @@ func main() {
 		MinHeight: 600,
 		AssetServer: &assetserver.Options{
 			Assets:  frontendFS,
-			Handler: apiHandler,
+			Handler: handler,
 		},
 		DragAndDrop: &options.DragAndDrop{
 			EnableFileDrop: true,
