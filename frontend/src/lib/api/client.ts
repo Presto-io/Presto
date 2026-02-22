@@ -1,4 +1,4 @@
-import type { Template, Manifest, GitHubRepo, BatchImportResult } from './types';
+import type { Template, Manifest, GitHubRepo, BatchImportResult, RegistryTemplate } from './types';
 
 const BASE = import.meta.env.VITE_API_URL || '';
 
@@ -28,6 +28,7 @@ export async function listTemplates(): Promise<Template[]> {
   return api('/api/templates');
 }
 
+/** @deprecated 前端已改用 registryStore，不再调用此函数 */
 export async function discoverTemplates(): Promise<GitHubRepo[]> {
   return api('/api/templates/discover');
 }
@@ -119,6 +120,14 @@ export async function installTemplate(owner: string, repo: string): Promise<void
     }
   );
   if (!res.ok) throw new Error(`Install failed: ${res.status}`);
+}
+
+export function installFromRegistry(template: RegistryTemplate): Promise<void> {
+  const url = new URL(template.repository);
+  const parts = url.pathname.slice(1).split('/');
+  const owner = parts[0];
+  const repo = parts[1];
+  return installTemplate(owner, repo);
 }
 
 export async function deleteTemplate(id: string): Promise<void> {

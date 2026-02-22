@@ -4,7 +4,7 @@
   import { goto } from '$app/navigation';
   import { registryStore } from '$lib/stores/registry.svelte';
   import { templateStore } from '$lib/stores/templates.svelte';
-  import { installTemplate } from '$lib/api/client';
+  import { installFromRegistry } from '$lib/api/client';
   import type { RegistryTemplate } from '$lib/api/types';
 
   let searchQuery = $state('');
@@ -56,11 +56,7 @@
     if (installing || isInstalled(tpl.name)) return;
     installing = tpl.name;
     try {
-      const url = new URL(tpl.repository);
-      const parts = url.pathname.slice(1).split('/');
-      const owner = parts[0];
-      const repo = parts[1];
-      await installTemplate(owner, repo);
+      await installFromRegistry(tpl);
       await templateStore.refresh();
     } catch (e) {
       console.error('Install failed:', e);
