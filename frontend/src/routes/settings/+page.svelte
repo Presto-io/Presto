@@ -88,7 +88,7 @@
         const info = await window.go.main.App.CheckForUpdate();
         updateInfo = info;
       } else {
-        const resp = await fetch('https://api.github.com/repos/Presto-io/Presto/releases/latest');
+        const resp = await fetch('https://api.github.com/repos/Presto-io/Presto-Homepage/releases/latest');
         if (!resp.ok) throw new Error(`GitHub API error: ${resp.status}`);
         const release = await resp.json();
         const latest = (release.tag_name as string).replace(/^v/, '');

@@ -243,7 +243,7 @@ func (a *App) CheckForUpdate() (*UpdateInfo, error) {
 	current := a.GetVersion()
 	info := &UpdateInfo{CurrentVersion: current}
 
-	resp, err := http.Get("https://api.github.com/repos/Presto-io/Presto/releases/latest")
+	resp, err := http.Get("https://api.github.com/repos/Presto-io/Presto-Homepage/releases/latest")
 	if err != nil {
 		return nil, fmt.Errorf("failed to check update: %w", err)
 	}
