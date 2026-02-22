@@ -89,6 +89,10 @@
   }
 
   function selectTemplate(id: string) {
+    if (selectedId === id) {
+      selectedId = null;
+      return;
+    }
     selectedId = id;
     loadReadme(id);
   }
@@ -180,6 +184,9 @@
         <div class="store-detail" class:desktop={isDesktop}>
           <!-- Header -->
           <div class="detail-header">
+            <button class="btn-back-grid" onclick={() => selectedId = null} aria-label="返回列表">
+              <ArrowLeft size={14} />
+            </button>
             <h3>{selectedTemplate.displayName}</h3>
             {#if selectedBadge}
               {@const BadgeIcon = selectedBadge.icon}
@@ -564,6 +571,21 @@
     gap: var(--space-md);
     margin-bottom: var(--space-md);
   }
+  .btn-back-grid {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    background: none;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    color: var(--color-muted);
+    cursor: pointer;
+    transition: all var(--transition);
+    flex-shrink: 0;
+  }
+  .btn-back-grid:hover { color: var(--color-accent); border-color: var(--color-accent); }
   .detail-header h3 {
     margin: 0;
     font-size: 1.125rem;
