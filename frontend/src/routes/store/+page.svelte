@@ -42,6 +42,10 @@
     registry?.templates.find(t => t.name === selectedId) ?? null
   );
 
+  let selectedBadge = $derived(
+    selectedTemplate ? trustBadge[selectedTemplate.trust] : null
+  );
+
   let installedNames = $derived(
     new Set(templateStore.templates.map(t => t.name))
   );
@@ -173,12 +177,13 @@
           <!-- Header -->
           <div class="detail-header">
             <h3>{selectedTemplate.displayName}</h3>
-            {@const badge = trustBadge[selectedTemplate.trust]}
-            {@const BadgeIcon = badge.icon}
-            <span class="trust-badge {badge.cls}" style={badge.color ? `color:${badge.color}` : ''}>
-              <BadgeIcon size={14} />
-              {badge.label}
-            </span>
+            {#if selectedBadge}
+              {@const BadgeIcon = selectedBadge.icon}
+              <span class="trust-badge {selectedBadge.cls}" style={selectedBadge.color ? `color:${selectedBadge.color}` : ''}>
+                <BadgeIcon size={14} />
+                {selectedBadge.label}
+              </span>
+            {/if}
           </div>
 
           <!-- Description -->
