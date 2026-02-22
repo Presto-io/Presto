@@ -53,7 +53,13 @@ build: server templates
 dev:
 	go run ./cmd/presto-server/
 
-run-desktop: desktop install-templates
+run-desktop: install-templates
+	cd frontend && VITE_MOCK=1 npm run build
+	cp -r frontend/build/* $(DESKTOP_EMBED)/
+	cp -r frontend/mock $(DESKTOP_EMBED)/mock
+	MACOSX_DEPLOYMENT_TARGET=$(MACOSX_DEPLOYMENT_TARGET) \
+		CGO_LDFLAGS="-framework UniformTypeIdentifiers" \
+		go build -tags "$(WAILS_TAGS)" -ldflags "$(LDFLAGS)" -o bin/presto-desktop $(DESKTOP_SRC)/
 	./bin/presto-desktop
 
 # ─── Shared ──────────────────────────────────────────────

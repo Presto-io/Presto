@@ -73,7 +73,11 @@
     readmeLoading = true;
     readmeContent = '';
     try {
-      const res = await fetch(`https://registry.presto.app/templates/${name}/README.md`);
+      const useMock = import.meta.env.DEV || import.meta.env.VITE_MOCK === '1';
+      const readmeUrl = useMock
+        ? '/mock/README.md'
+        : `https://registry.presto.app/templates/${name}/README.md`;
+      const res = await fetch(readmeUrl);
       if (res.ok) {
         readmeContent = await res.text();
       }

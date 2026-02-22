@@ -1,6 +1,9 @@
 import { sveltekit } from '@sveltejs/kit/vite';
 import { execSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { defineConfig } from 'vite';
+import type { Plugin } from 'vite';
 
 function getGitVersion(): string {
 	try {
@@ -13,8 +16,32 @@ function getGitVersion(): string {
 	}
 }
 
+function mockServer(): Plugin {
+	return {
+		name: 'mock-server',
+		configureServer(server) {
+			server.middlewares.use('/mock', (req, res, next) => {
+				const filePath = join(process.cwd(), 'mock', req.url || '');
+				try {
+					const content = readFileSync(filePath);
+					const ext = filePath.split('.').pop();
+					const types: Record<string, string> = {
+						json: 'application/json',
+						md: 'text/markdown',
+						svg: 'image/svg+xml',
+					};
+					res.setHeader('Content-Type', types[ext || ''] || 'application/octet-stream');
+					res.end(content);
+				} catch {
+					next();
+				}
+			});
+		},
+	};
+}
+
 export default defineConfig({
-	plugins: [sveltekit()],
+	plugins: [sveltekit(), mockServer()],
 	define: {
 		__APP_VERSION__: JSON.stringify(process.env.VERSION || getGitVersion())
 	},
