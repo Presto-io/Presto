@@ -13,6 +13,7 @@
   let installing = $state('');
   let readmeContent = $state('');
   let readmeLoading = $state(false);
+  let previewWidth = $state(0);
 
   let registry = $derived(registryStore.registry);
   let loading = $derived(registryStore.loading);
@@ -218,12 +219,17 @@
           </div>
 
           <!-- Preview iframe -->
-          <div class="detail-preview">
+          <div
+            class="detail-preview"
+            bind:clientWidth={previewWidth}
+            style="height:{previewWidth * 800 / 1200}px"
+          >
             <iframe
               src="/showcase/editor?registry={selectedTemplate.name}"
               sandbox="allow-scripts allow-same-origin"
               loading="lazy"
               title="模板预览"
+              style="transform:scale({previewWidth / 1200})"
             ></iframe>
           </div>
 
@@ -635,8 +641,6 @@
 
   /* Preview iframe */
   .detail-preview {
-    aspect-ratio: 16 / 10;
-    min-height: 400px;
     border-radius: var(--radius-md);
     overflow: hidden;
     border: 1px solid var(--color-border);
@@ -644,8 +648,9 @@
     background: var(--color-surface);
   }
   .detail-preview iframe {
-    width: 100%;
-    height: 100%;
+    width: 1200px;
+    height: 800px;
+    transform-origin: 0 0;
     border: none;
   }
 
