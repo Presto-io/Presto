@@ -56,3 +56,29 @@ export interface BatchImportResult {
   markdownFiles: { name: string; content: string; detectedTemplate?: string; workDir?: string }[];
   workDir?: string;
 }
+
+export interface RegistryCategory {
+  id: string;
+  label: { zh: string; en: string };
+}
+
+export interface RegistryTemplate {
+  name: string;
+  displayName: string;
+  description: string;
+  version: string;
+  author: string;
+  category: string;
+  keywords: string[];
+  license: string;
+  trust: 'official' | 'verified' | 'community';
+  publishedAt: string;
+  repository: string;
+}
+
+export interface Registry {
+  version: number;
+  updatedAt: string;
+  categories: RegistryCategory[];
+  templates: RegistryTemplate[];
+}
