@@ -2,10 +2,10 @@
   import { onMount, onDestroy } from 'svelte';
   import { fly, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
-  import { ExternalLink, Shield, Info, BookOpen, ArrowLeft, RefreshCw, Search, Package, Download, Trash2, Loader, Upload, Pencil, Check, X, AlertTriangle, Settings, Scale, HelpCircle } from 'lucide-svelte';
+  import { ExternalLink, Shield, Info, BookOpen, ArrowLeft, RefreshCw, Search, Package, ShoppingBag, Trash2, Loader, Upload, Pencil, Check, X, AlertTriangle, Settings, Scale, HelpCircle } from 'lucide-svelte';
   import { goto } from '$app/navigation';
-  import { listTemplates, discoverTemplates, installTemplate, deleteTemplate, importTemplateZip, renameTemplate } from '$lib/api/client';
-  import type { Template, GitHubRepo } from '$lib/api/types';
+  import { listTemplates, deleteTemplate, importTemplateZip, renameTemplate } from '$lib/api/client';
+  import type { Template } from '$lib/api/types';
   import { templateStore } from '$lib/stores/templates.svelte';
   import { triggerAction, resetWizard } from '$lib/stores/wizard.svelte';
 
@@ -20,15 +20,12 @@
   let checking = $state(false);
   let updateError = $state('');
   let activeSection = $state('general');
-  let activePanel = $state<'tpl-manage' | 'tpl-search' | null>(null);
+  let activePanel = $state<'tpl-manage' | null>(null);
 
   // --- Template state (migrated from /templates) ---
   let installed: Template[] = $state([]);
-  let available: GitHubRepo[] = $state([]);
   let tplLoading = $state(false);
-  let installing = $state('');
   let tplSearch = $state('');
-  let browseLoaded = $state(false);
   let installedLoaded = $state(false);
   let selectedKeywords: string[] = $state([]);
 
@@ -49,15 +46,6 @@
     })
   );
 
-  let filteredAvailable = $derived(
-    available.filter(repo => {
-      const q = tplSearch.toLowerCase();
-      return !q ||
-        repo.name.toLowerCase().includes(q) ||
-        (repo.description || '').toLowerCase().includes(q);
-    })
-  );
-
   import type { Component } from 'svelte';
 
   const sections: { id: string; label: string; icon: Component }[] = [
@@ -70,7 +58,7 @@
 
   let panelTabs = $derived(communityEnabled ? [
     { id: 'tpl-manage' as const, label: '模板管理', icon: Package },
-    { id: 'tpl-search' as const, label: '模板搜索', icon: Search },
+    { id: 'tpl-store' as const, label: '模板商店', icon: ShoppingBag },
   ] : []);
 
   declare global {
@@ -162,7 +150,11 @@
     }
   }
 
-  function togglePanel(id: 'tpl-manage' | 'tpl-search') {
+  function togglePanel(id: 'tpl-manage' | 'tpl-store') {
+    if (id === 'tpl-store') {
+      goto('/store');
+      return;
+    }
     if (activePanel === id) {
       activePanel = null;
       tplSearch = '';
@@ -173,7 +165,6 @@
       tplSearch = '';
       selectedKeywords = [];
       if (id === 'tpl-manage' && !installedLoaded) loadInstalled();
-      if (id === 'tpl-search' && !browseLoaded) loadBrowse();
     }
   }
 
@@ -217,26 +208,6 @@
       installedLoaded = true;
     } catch {}
     finally { tplLoading = false; }
-  }
-
-  async function loadBrowse() {
-    tplLoading = true;
-    try {
-      available = (await discoverTemplates()) ?? [];
-      browseLoaded = true;
-    } catch {}
-    finally { tplLoading = false; }
-  }
-
-  async function handleInstall(repo: GitHubRepo) {
-    installing = repo.full_name;
-    try {
-      await installTemplate(repo.owner.login, repo.name);
-      installed = await listTemplates();
-      installedLoaded = true;
-    } finally {
-      installing = '';
-    }
   }
 
   let deleteConfirm = $state<string | null>(null);
@@ -439,15 +410,6 @@
                 hidden
               />
             </div>
-          {:else}
-            <div class="panel-search">
-              <Search size={14} />
-              <input
-                type="text"
-                placeholder="搜索社区模板…"
-                bind:value={tplSearch}
-              />
-            </div>
           {/if}
 
           {#if activePanel === 'tpl-manage'}
@@ -532,55 +494,6 @@
                         </button>
                       </div>
                     {/if}
-                  </div>
-                {/each}
-              </div>
-            {/if}
-
-          {:else if activePanel === 'tpl-search'}
-            {#if tplLoading && !browseLoaded}
-              <div class="panel-empty">
-                <Loader size={24} class="spin" />
-                <p>加载中...</p>
-              </div>
-            {:else if filteredAvailable.length === 0}
-              <div class="panel-empty">
-                <Package size={32} />
-                <p>{tplSearch ? '没有匹配的模板' : '暂无可用模板'}</p>
-              </div>
-            {:else}
-              <div class="tpl-list">
-                {#each filteredAvailable as repo (repo.full_name)}
-                  <div class="tpl-row">
-                    <div class="tpl-info">
-                      <div class="tpl-name-row">
-                        <span class="tpl-name">{repo.name}</span>
-                        <a
-                          href={repo.html_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          class="repo-link"
-                          aria-label="在 GitHub 上查看"
-                        >
-                          <ExternalLink size={12} />
-                        </a>
-                      </div>
-                      <p class="tpl-desc">{repo.description}</p>
-                      <span class="tpl-author">{repo.owner.login}</span>
-                    </div>
-                    <button
-                      class="btn-install"
-                      onclick={() => handleInstall(repo)}
-                      disabled={installing === repo.full_name}
-                    >
-                      {#if installing === repo.full_name}
-                        <Loader size={14} class="spin" />
-                        <span>安装中...</span>
-                      {:else}
-                        <Download size={14} />
-                        <span>安装</span>
-                      {/if}
-                    </button>
                   </div>
                 {/each}
               </div>
@@ -1358,13 +1271,7 @@
     color: var(--color-muted);
     font-size: 0.625rem;
   }
-  .repo-link {
-    color: var(--color-muted);
-    text-decoration: none;
-    transition: color var(--transition);
-  }
-  .repo-link:hover { color: var(--color-accent); }
-  .btn-uninstall, .btn-install {
+  .btn-uninstall {
     display: inline-flex;
     align-items: center;
     gap: var(--space-xs);
@@ -1376,8 +1283,6 @@
     transition: all var(--transition);
     white-space: nowrap;
     flex-shrink: 0;
-  }
-  .btn-uninstall {
     background: transparent;
     color: var(--color-danger);
     border: 1px solid var(--color-danger);
@@ -1386,13 +1291,6 @@
     background: var(--color-danger);
     color: var(--color-on-danger);
   }
-  .btn-install {
-    background: var(--color-accent);
-    color: var(--color-bg);
-    border: none;
-  }
-  .btn-install:hover:not(:disabled) { opacity: 0.9; }
-  .btn-install:disabled { opacity: 0.5; cursor: not-allowed; }
 
   /* --- Modal --- */
   .modal-overlay {
