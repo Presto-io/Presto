@@ -50,8 +50,6 @@
     new Set(templateStore.templates.map(t => t.name))
   );
 
-  const isDesktop = typeof window !== 'undefined' && !!(window as any).go;
-
   function isInstalled(name: string): boolean {
     return installedNames.has(name);
   }
@@ -112,6 +110,7 @@
 </script>
 
 <div class="page">
+  <div class="drag-region" style="--wails-draggable:drag"></div>
   <div class="page-header">
     <button class="btn-back" onclick={() => goto('/settings')} aria-label="返回设置">
       <ArrowLeft size={16} />
@@ -181,7 +180,7 @@
           {/each}
         </nav>
 
-        <div class="store-detail" class:desktop={isDesktop}>
+        <div class="store-detail">
           <!-- Header -->
           <div class="detail-header">
             <button class="btn-back-grid" onclick={() => selectedId = null} aria-label="返回列表">
@@ -313,6 +312,15 @@
     height: 100%;
     display: flex;
     flex-direction: column;
+    position: relative;
+  }
+  .drag-region {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 48px;
+    z-index: 1;
   }
   h2 {
     margin: 0;
@@ -562,9 +570,6 @@
     overflow-y: auto;
     padding-right: var(--space-md);
   }
-  .store-detail.desktop {
-    max-width: 600px;
-  }
   .detail-header {
     display: flex;
     align-items: center;
@@ -630,7 +635,8 @@
 
   /* Preview iframe */
   .detail-preview {
-    aspect-ratio: 3 / 2;
+    aspect-ratio: 16 / 10;
+    min-height: 400px;
     border-radius: var(--radius-md);
     overflow: hidden;
     border: 1px solid var(--color-border);

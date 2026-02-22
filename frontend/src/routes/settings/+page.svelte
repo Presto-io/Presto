@@ -339,6 +339,7 @@
 </script>
 
 <div class="page">
+  <div class="drag-region" style="--wails-draggable:drag"></div>
   <div class="page-header">
     <button class="btn-back" onclick={() => goto('/')} aria-label="返回编辑器">
       <ArrowLeft size={16} />
@@ -768,6 +769,15 @@
     height: 100%;
     display: flex;
     flex-direction: column;
+    position: relative;
+  }
+  .drag-region {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 48px;
+    z-index: 1;
   }
   h2 {
     margin: 0;
