@@ -1,6 +1,10 @@
 import type { Registry } from '$lib/api/types';
 
-const REGISTRY_URL = 'https://registry.presto.app/templates/registry.json';
+const useMock = import.meta.env.DEV || import.meta.env.VITE_MOCK === '1';
+
+const REGISTRY_URL = useMock
+  ? '/mock/registry.json'
+  : 'https://registry.presto.app/templates/registry.json';
 
 let _registry = $state<Registry | null>(null);
 let _loading = $state(false);
