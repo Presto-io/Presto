@@ -893,7 +893,7 @@
   }
 
   .settings-nav {
-    width: 140px;
+    width: 180px;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
