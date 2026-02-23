@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -114,7 +115,19 @@ func DiscoverTemplates() ([]GitHubRepo, error) {
 	return result.Items, nil
 }
 
-func (m *Manager) Install(owner, repo string) error {
+// InstallOpts provides optional registry-sourced download info.
+// SEC-01: When provided, SHA256 comes from registry (separate trusted source)
+// instead of from the same GitHub release (untrusted same-source).
+type InstallOpts struct {
+	// DownloadURL is the direct binary download URL from registry.
+	// If set, skips GitHub release API lookup.
+	DownloadURL string
+	// ExpectedSHA256 is the hex-encoded SHA256 hash from registry.
+	// If set, verification is mandatory.
+	ExpectedSHA256 string
+}
+
+func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
 	// SEC-06/SEC-17: Validate owner and repo names
 	if err := validateName(owner); err != nil {
 		return fmt.Errorf("invalid owner: %w", err)
@@ -123,36 +136,80 @@ func (m *Manager) Install(owner, repo string) error {
 		return fmt.Errorf("invalid repo: %w", err)
 	}
 
-	// Fetch latest release metadata (SEC-18, SEC-20)
-	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", owner, repo)
-	resp, err := httpClient.Get(apiURL)
-	if err != nil {
-		return fmt.Errorf("fetch release: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if err := checkHTTPStatus(resp, "fetch release"); err != nil {
-		return err
-	}
-
-	var release GitHubRelease
-	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
-		return fmt.Errorf("decode release: %w", err)
-	}
-
-	// Find platform-specific binary asset
-	pattern := fmt.Sprintf("%s_%s", runtime.GOOS, runtime.GOARCH)
 	var downloadURL string
-	var assetName string
-	for _, asset := range release.Assets {
-		if strings.Contains(asset.Name, pattern) {
-			downloadURL = asset.BrowserDownloadURL
-			assetName = asset.Name
-			break
+	var expectedHash string
+
+	if opts != nil && opts.DownloadURL != "" {
+		// SEC-01: Registry-based install — URL and SHA256 from trusted registry
+		downloadURL = opts.DownloadURL
+		expectedHash = strings.ToLower(opts.ExpectedSHA256)
+		log.Printf("[templates] registry install: %s/%s (SHA256 from registry)", owner, repo)
+	} else {
+		// Fallback: fetch from GitHub release (for unrecorded/manual installs)
+		log.Printf("[templates] discovery install: %s/%s (fetching from release)", owner, repo)
+
+		// Fetch latest release metadata (SEC-18, SEC-20)
+		apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", owner, repo)
+		resp, err := httpClient.Get(apiURL)
+		if err != nil {
+			return fmt.Errorf("fetch release: %w", err)
 		}
-	}
-	if downloadURL == "" {
-		return fmt.Errorf("no binary found for %s/%s", runtime.GOOS, runtime.GOARCH)
+		defer resp.Body.Close()
+
+		if err := checkHTTPStatus(resp, "fetch release"); err != nil {
+			return err
+		}
+
+		var release GitHubRelease
+		if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+			return fmt.Errorf("decode release: %w", err)
+		}
+
+		// Find platform-specific binary asset (try both dash and underscore separators)
+		var assetName string
+		patterns := []string{
+			fmt.Sprintf("%s-%s", runtime.GOOS, runtime.GOARCH),
+			fmt.Sprintf("%s_%s", runtime.GOOS, runtime.GOARCH),
+		}
+		for _, pattern := range patterns {
+			for _, asset := range release.Assets {
+				if strings.Contains(asset.Name, pattern) {
+					downloadURL = asset.BrowserDownloadURL
+					assetName = asset.Name
+					break
+				}
+			}
+			if downloadURL != "" {
+				break
+			}
+		}
+		if downloadURL == "" {
+			return fmt.Errorf("no binary found for %s/%s", runtime.GOOS, runtime.GOARCH)
+		}
+
+		// SEC-01: Try to fetch checksums from release assets (same-source, weaker)
+		for _, asset := range release.Assets {
+			if asset.Name == "checksums.txt" || asset.Name == "SHA256SUMS" {
+				checksumResp, cerr := httpClient.Get(asset.BrowserDownloadURL)
+				if cerr == nil {
+					defer checksumResp.Body.Close()
+					if checksumResp.StatusCode >= 200 && checksumResp.StatusCode < 300 {
+						body, _ := io.ReadAll(io.LimitReader(checksumResp.Body, 1<<20))
+						for _, line := range strings.Split(string(body), "\n") {
+							fields := strings.Fields(line)
+							if len(fields) >= 2 {
+								fname := strings.TrimPrefix(fields[1], "*")
+								if fname == assetName {
+									expectedHash = strings.ToLower(fields[0])
+									break
+								}
+							}
+						}
+					}
+				}
+				break
+			}
+		}
 	}
 
 	// SEC-07: Validate download URL domain
@@ -162,31 +219,6 @@ func (m *Manager) Install(owner, repo string) error {
 	}
 	if !isAllowedDownloadHost(parsedURL.Host) {
 		return fmt.Errorf("download URL host not allowed: %s", parsedURL.Host)
-	}
-
-	// SEC-01: Try to fetch checksums from release assets
-	var expectedHash string
-	for _, asset := range release.Assets {
-		if asset.Name == "checksums.txt" || asset.Name == "SHA256SUMS" {
-			checksumResp, cerr := httpClient.Get(asset.BrowserDownloadURL)
-			if cerr == nil {
-				defer checksumResp.Body.Close()
-				if checksumResp.StatusCode >= 200 && checksumResp.StatusCode < 300 {
-					body, _ := io.ReadAll(io.LimitReader(checksumResp.Body, 1<<20))
-					for _, line := range strings.Split(string(body), "\n") {
-						fields := strings.Fields(line)
-						if len(fields) >= 2 {
-							fname := strings.TrimPrefix(fields[1], "*")
-							if fname == assetName {
-								expectedHash = strings.ToLower(fields[0])
-								break
-							}
-						}
-					}
-				}
-			}
-			break
-		}
 	}
 
 	// Download binary (SEC-18, SEC-20)
