@@ -1,3 +1,71 @@
+# 提示词：初始化 presto-official-templates 仓库
+
+## 背景
+
+仓库已创建：https://github.com/Presto-io/presto-official-templates
+
+这是 Presto（Markdown → Typst → PDF 桌面排版工具）的官方免费模板仓库。模板是独立的 Go 二进制程序，遵循 stdin/stdout 协议：
+- `./binary --manifest` → 输出 manifest.json
+- `./binary --example` → 输出示例 markdown
+- `./binary --version` → 输出版本号（从 manifest.json 读取）
+- `cat input.md | ./binary` → stdin 读 markdown，stdout 写 typst 源码
+
+## 任务
+
+初始化这个仓库，包含两个已有模板（gongwen、jiaoan-shicao）的完整源码。
+
+## 仓库结构
+
+```
+presto-official-templates/
+├── .github/
+│   └── workflows/
+│       └── release.yml              # 统一 CI（见下方详细说明）
+├── gongwen/                         # 类公文模板
+│   ├── main.go
+│   ├── template_head.typ
+│   ├── example.md
+│   └── manifest.json
+├── jiaoan-shicao/                   # 实操教案模板
+│   ├── main.go
+│   ├── example.md
+│   └── manifest.json
+├── go.mod                           # 共享 module
+├── go.sum
+├── Makefile
+├── CLAUDE.md
+├── CONVENTIONS.md                   # 开发者学习参考（从 starter 搬来，需更新）
+├── LICENSE                          # MIT
+└── README.md
+```
+
+## 源码文件
+
+### go.mod
+
+```
+module github.com/Presto-io/presto-official-templates
+
+go 1.23
+
+require (
+    github.com/yuin/goldmark v1.7.8
+    gopkg.in/yaml.v3 v3.0.1
+)
+```
+
+注意：两个模板的 `main.go` 中 import 路径不需要变，因为它们没有跨 package 引用，只用标准库 + goldmark + yaml.v3。
+
+### gongwen/main.go
+
+**完整复制以下代码**（这是从主仓库 cmd/gongwen/main.go 搬来的，需要做以下修改）：
+
+1. 添加 `--version` flag 支持（见下方协议变更）
+2. 其他逻辑完全不变
+
+原始 main.go 如下，请在此基础上添加 --version：
+
+```go
 package main
 
 import (
@@ -289,8 +357,6 @@ func (c *converter) renderInline(n ast.Node) string {
 		return result
 
 	case ast.KindString:
-		// Unescape HTML entities (e.g. &ldquo; → ") that may be injected by
-		// goldmark extensions like Typographer, since we output Typst, not HTML.
 		raw := html.UnescapeString(string(n.(*ast.String).Value))
 		return convertPunctuation(raw)
 
@@ -322,14 +388,12 @@ func (c *converter) renderInline(n ast.Node) string {
 		return fmt.Sprintf(`#link("%s")`, url)
 
 	case ast.KindImage:
-		// Images are handled at block level in renderParagraph
 		return ""
 
 	case ast.KindRawHTML:
 		return ""
 
 	default:
-		// For unknown inline nodes, try to render children
 		return c.renderInlines(n)
 	}
 }
@@ -392,7 +456,6 @@ func (c *converter) renderMultiImage(images []*ast.Image) string {
 	var infos []imgInfo
 	isSubfigure := false
 
-	// Check if any image has alt text → subfigure mode
 	for _, img := range images {
 		alt := c.plainText(img)
 		if alt != "" {
@@ -418,7 +481,6 @@ func (c *converter) renderMultiImage(images []*ast.Image) string {
 		infos = append(infos, imgInfo{path, caption, alt, figNum})
 	}
 
-	// Build paths, captions, alts strings
 	var pathsStr, captionsStr, altsStr []string
 	mainCaption := ""
 	for _, info := range infos {
@@ -432,21 +494,17 @@ func (c *converter) renderMultiImage(images []*ast.Image) string {
 
 	return fmt.Sprintf(`
 #context {
-  // 图片路径列表
   let paths = (%s)
-  // 图片标题列表（对应 paths）
   let captions = (%s)
-  // Alt Text 列表
   let alts = (%s)
 
   let is_subfigure = %s
   let main_caption = "%s"
 
-  let gap = 0.3cm  // 图片间隙
+  let gap = 0.3cm
   let max-width = 13.4cm
   let min-height = 6cm
 
-  // 测量所有图片的原始尺寸
   let sizes = paths.zip(captions).zip(alts).map(item => {
     let p = item.at(0).at(0)
     let c = item.at(0).at(1)
@@ -456,29 +514,22 @@ func (c *converter) renderMultiImage(images []*ast.Image) string {
     (width: s.width, height: s.height, path: p, caption: c, alt: alt, ratio: s.width / s.height)
   })
 
-  // 函数：计算一组图片等高排列时的高度
   let calc-row-height(imgs, total-width) = {
-    // 计算所有图片宽高比之和
     let ratio-sum = imgs.map(i => i.ratio).sum()
-    // 等高时的高度 = 总宽度 / 宽高比之和
     total-width / ratio-sum
   }
 
-  // 分行算法
   let rows = ()
 
   if is_subfigure {
-    // 方案一（子图模式）：强制所有图片在同一行
     rows.push(sizes)
   } else {
-    // 方案二（独立模式）：自动换行逻辑
     let remaining = sizes
 
     while remaining.len() > 0 {
       let row = ()
       let found = false
 
-      // 尝试放入尽可能多的图片
       for n in range(1, remaining.len() + 1) {
         let candidate = remaining.slice(0, n)
         let gaps = (n - 1) * gap
@@ -486,7 +537,6 @@ func (c *converter) renderMultiImage(images []*ast.Image) string {
         let row-h = calc-row-height(candidate, available-width)
 
         if row-h < min-height and n > 1 {
-          // 高度不够，使用前一个数量
           row = remaining.slice(0, n - 1)
           remaining = remaining.slice(n - 1)
           found = true
@@ -495,7 +545,6 @@ func (c *converter) renderMultiImage(images []*ast.Image) string {
       }
 
       if not found {
-        // 所有图片都能放，或者只有一张图片
         row = remaining
         remaining = ()
       }
@@ -504,7 +553,6 @@ func (c *converter) renderMultiImage(images []*ast.Image) string {
     }
   }
 
-  // 渲染函数
   let render-rows(rows) = {
     for row in rows {
       let n = row.len()
@@ -512,7 +560,6 @@ func (c *converter) renderMultiImage(images []*ast.Image) string {
       let available-width = max-width - gaps
       let row-height = calc-row-height(row, available-width)
 
-      // 限制最大高度
       if row-height > max-width {
         row-height = max-width
       }
@@ -523,23 +570,18 @@ func (c *converter) renderMultiImage(images []*ast.Image) string {
         ..row.enumerate().map(item => {
           let i = item.at(0)
           let img-data = item.at(1)
-          // 使用比例计算宽度：w = row-height * ratio
           let w = row-height * img-data.ratio
 
           if is_subfigure {
-             // 子图模式：上面是图，下面是 (a) 文件名
-             // 使用文件名(img-data.caption)作为子图注，忽略其他 Alt
              let sub-label = numbering("a", i + 1)
              let sub-text = [ (#sub-label) #img-data.caption ]
 
              v(0.5em)
              align(center, block({
                image(img-data.path, width: w, height: row-height)
-               // 子图注样式：与大图注一致 (FONT_FS, zh(3))
                align(center, text(font: FONT_FS, size: zh(3))[#sub-text])
              }))
           } else {
-             // 独立模式：完整的 figure
              figure(
                image(img-data.path, width: w, height: row-height),
                caption: [ #img-data.caption ]
@@ -551,7 +593,6 @@ func (c *converter) renderMultiImage(images []*ast.Image) string {
     }
   }
 
-  // 根据模式输出
   if is_subfigure {
     figure(
       context { render-rows(rows) },
@@ -593,7 +634,6 @@ func processMarker(text string) (string, bool) {
 }
 
 // stripTrailingMarker checks for {.noindent} or {indent} at end of inline text.
-// Returns: cleaned text, "noindent"/"indent"/"" marker type.
 func stripTrailingMarker(text string) (string, string) {
 	text = strings.TrimRight(text, " ")
 	if strings.HasSuffix(text, "{.noindent}") {
@@ -607,7 +647,6 @@ func stripTrailingMarker(text string) (string, string) {
 
 // renderParagraph renders a paragraph node to Typst.
 func (c *converter) renderParagraph(para *ast.Paragraph) string {
-	// Check for images
 	images := c.collectImages(para)
 	if len(images) == 1 {
 		return c.renderSingleImage(images[0])
@@ -616,22 +655,17 @@ func (c *converter) renderParagraph(para *ast.Paragraph) string {
 		return c.renderMultiImage(images)
 	}
 
-	// Get plain text for marker detection
 	plain := c.plainText(para)
 	trimmed := strings.TrimSpace(plain)
 
-	// Check standalone markers
 	if result, ok := processMarker(trimmed); ok {
 		return result
 	}
 
-	// Render inline content
 	content := c.renderInlines(para)
 
-	// Check trailing markers
 	_, marker := stripTrailingMarker(trimmed)
 	if marker == "noindent" {
-		// Strip the marker from rendered content too
 		content = strings.TrimRight(content, " \n")
 		content = strings.TrimSuffix(content, "{.noindent}")
 		content = strings.TrimRight(content, " ")
@@ -644,7 +678,6 @@ func (c *converter) renderParagraph(para *ast.Paragraph) string {
 		return content + "\n\n"
 	}
 
-	// Greeting detection: before any header, paragraph ending with : or ：
 	if !c.hasSeenHeader {
 		t := strings.TrimSpace(content)
 		if strings.HasSuffix(t, "：") || strings.HasSuffix(t, ":") {
@@ -659,14 +692,12 @@ func (c *converter) renderParagraph(para *ast.Paragraph) string {
 func (c *converter) renderHeading(h *ast.Heading) string {
 	c.hasSeenHeader = true
 
-	// Level 1: skip (title from metadata)
 	if h.Level == 1 {
 		return ""
 	}
 
 	content := c.renderInlines(h)
 
-	// Check for trailing {.noindent} marker
 	_, marker := stripTrailingMarker(strings.TrimSpace(c.plainText(h)))
 	if marker == "noindent" {
 		content = strings.TrimRight(content, " \n")
@@ -710,10 +741,8 @@ func (c *converter) renderListItem(item ast.Node) string {
 		case ast.KindList:
 			parts = append(parts, c.renderList(child.(*ast.List)))
 		default:
-			// For tight lists, goldmark may use TextBlock or other node types
 			content := c.renderInlines(child)
 			if content == "" {
-				// Try rendering as block children
 				for gc := child.FirstChild(); gc != nil; gc = gc.NextSibling() {
 					content += c.renderInline(gc)
 				}
@@ -761,7 +790,6 @@ func (c *converter) renderDocument(doc ast.Node) string {
 
 	for child != nil {
 		if isNoindentStart(child, c.source) {
-			// Collect children until noindent-end
 			child = child.NextSibling()
 			var innerBuf strings.Builder
 			for child != nil && !isNoindentEnd(child, c.source) {
@@ -769,7 +797,7 @@ func (c *converter) renderDocument(doc ast.Node) string {
 				child = child.NextSibling()
 			}
 			if child != nil {
-				child = child.NextSibling() // skip noindent-end
+				child = child.NextSibling()
 			}
 			inner := innerBuf.String()
 			buf.WriteString("#block[#set par(first-line-indent: 0pt)\n#block[\n")
@@ -804,10 +832,8 @@ func (c *converter) renderBlock(n ast.Node, inNoindent bool) string {
 	case ast.KindBlockquote:
 		return c.renderBlockquote(n)
 	case ast.KindHTMLBlock:
-		// Skip HTML blocks that aren't our markers
 		return ""
 	default:
-		// Try to render children for unknown block types
 		var buf strings.Builder
 		for child := n.FirstChild(); child != nil; child = child.NextSibling() {
 			buf.WriteString(c.renderBlock(child, inNoindent))
@@ -845,7 +871,6 @@ func (c *converter) renderBlockquote(n ast.Node) string {
 	var buf strings.Builder
 	for child := n.FirstChild(); child != nil; child = child.NextSibling() {
 		content := c.renderBlock(child, false)
-		// Prefix each line with >
 		for _, line := range strings.Split(strings.TrimRight(content, "\n"), "\n") {
 			buf.WriteString("#quote[" + line + "]\n")
 		}
@@ -870,16 +895,11 @@ func convertBody(body string) string {
 	return conv.renderDocument(doc)
 }
 
-// ---------- Convert ----------
-
 // convert takes parsed front-matter and markdown body, returns full .typ output.
 func convert(fm frontMatter, body string) string {
 	var out strings.Builder
 
-	// 1. Template head
 	out.WriteString(templateHead)
-
-	// 2. Variable section
 	out.WriteString(fmt.Sprintf("#let autoTitle = \"%s\"\n", fm.Title))
 	out.WriteString("\n")
 	out.WriteString(fmt.Sprintf("#let autoAuthor = \"%s\"\n", fm.Author))
@@ -887,7 +907,6 @@ func convert(fm frontMatter, body string) string {
 	out.WriteString(fmt.Sprintf("#let autoDate = %s\n", formatDate(fm.Date)))
 	out.WriteString("\n")
 
-	// Document metadata
 	out.WriteString("#set document(\n")
 	out.WriteString("  title: autoTitle.replace(\"|\", \" \"),\n")
 	out.WriteString("  author: autoAuthor,\n")
@@ -896,20 +915,16 @@ func convert(fm frontMatter, body string) string {
 	out.WriteString(")\n")
 	out.WriteString("\n")
 
-	// Title heading
 	out.WriteString("= #autoTitle.split(\"|\").map(s => s.trim()).join(linebreak())\n")
 	out.WriteString("\n")
 
-	// Author name (only if NOT signature mode)
 	if !fm.Signature {
 		out.WriteString("#name(autoAuthor)\n")
 	}
 	out.WriteString("\n")
 
-	// Body: convert markdown to Typst
 	out.WriteString(convertBody(body))
 
-	// Signature block at end
 	if fm.Signature {
 		out.WriteString("\n#v(18pt)\n")
 		out.WriteString("#align(right, block[\n")
@@ -967,3 +982,534 @@ func main() {
 		fmt.Print(result)
 	}
 }
+```
+
+### --version flag 添加方法
+
+在所有模板的 main() 函数中，在 `flag.Parse()` 之后、`manifestFlag` 检查之前，添加：
+
+```go
+versionFlag := flag.Bool("version", false, "output version")
+// ... flag.Parse() ...
+
+if *versionFlag {
+    // 从 manifestJSON 解析 version 字段
+    var m map[string]interface{}
+    if err := json.Unmarshal([]byte(manifestJSON), &m); err == nil {
+        if v, ok := m["version"]; ok {
+            fmt.Println(v)
+        }
+    }
+    return
+}
+```
+
+需要 import `encoding/json`。
+
+### gongwen/template_head.typ
+
+完整复制：
+
+```typst
+// 中文字号转换函数
+#import "@preview/pointless-size:0.1.2": zh
+
+// 定义常用字体名称
+#let FONT_XBS = "FZXiaoBiaoSong-B05" // 方正小标宋
+#let FONT_HEI = "STHeiti" // 黑体
+#let FONT_FS = "STFangsong" // 仿宋
+#let FONT_KAI = "STKaiti" // 楷体
+#let FONT_SONG = "STSong" // 宋体
+
+// 设置页面、页边距、页脚
+#set page(
+  paper: "a4",
+  margin: (
+    inside: 28mm,
+    outside: 26mm,
+    top: 37mm,
+    bottom: 35mm,
+  ),
+
+  // 将页脚基线放到"版心下边缘之下 7mm"
+  footer-descent: 7mm,
+
+  // 使用更稳定的奇偶页判断和页码格式
+  footer: context {
+    let page-num = here().page()
+    let is-even = calc.even(page-num)
+    let num = str(page-num)
+    let pm = text(font: FONT_SONG, size: zh(4))[— #num —] // 4 号宋体
+
+    if is-even {
+      align(left, [#h(1em) #pm]) // 偶数页：居左
+    } else {
+      align(right, [#pm #h(1em)]) // 奇数页：居右
+    }
+  },
+)
+
+// 设置文档默认语言和正文字体
+#set text(
+  lang: "zh",
+  font: FONT_FS,
+  size: zh(3),
+  hyphenate: false,
+  cjk-latin-spacing: auto,
+)
+
+// 设置段落样式，以满足"每行28字符，每页22行"的网格标准，首行缩进2字符
+#set par(
+  first-line-indent: (amount: 2em, all: true),
+  justify: true,
+  leading: 15.6pt, // 行间距
+  spacing: 15.6pt, // 段间距
+)
+
+// 计数器设置
+#let h2-counter = counter("h2")
+#let h3-counter = counter("h3")
+#let h4-counter = counter("h4")
+#let h5-counter = counter("h5")
+
+// 图片样式设置
+#show figure: it => {
+  // 居中对齐，无首行缩进
+  set par(first-line-indent: 0pt)
+  align(center, block({
+    // 图片尺寸由 Lua filter 控制
+    it.body
+
+    // 图注样式：3号仿宋，格式为"图1 标题"
+    text(
+      font: FONT_FS,
+      size: zh(3),
+      it.caption,
+    )
+  }))
+}
+
+// 自定义标题函数
+#let custom-heading(level, body, numbering: auto) = {
+  if level == 1 {
+    v(0pt)
+    align(center)[
+      #text(
+        font: FONT_XBS,
+        size: zh(2),
+        weight: "bold",
+      )[
+        #set par(leading: 35pt - zh(2))
+        #body
+      ]
+    ]
+    v(28.7pt)
+  } else if level == 2 {
+    h2-counter.step()
+    h3-counter.update(0)
+    h4-counter.update(1)
+    h5-counter.update(1)
+    text(
+      font: FONT_HEI,
+      size: zh(3),
+    )[#context h2-counter.display("一、")#body]
+  } else if level == 3 {
+    h3-counter.step()
+    h4-counter.update(1)
+    h5-counter.update(1)
+
+    let number = h3-counter.get().first()
+    text(
+      font: FONT_KAI,
+      size: zh(3),
+    )[#context h3-counter.display("（一）")#body]
+  } else if level == 4 {
+    h4-counter.step()
+    h5-counter.update(1)
+
+    let number = h4-counter.get().first()
+    text(
+      size: zh(3),
+    )[#number. #body]
+  } else if level == 5 {
+    h5-counter.step()
+
+    let number = h5-counter.get().first()
+    text(
+      size: zh(3),
+    )[（#number）#body]
+  }
+}
+
+#show heading: it => {
+  if it.level == 1 {
+    custom-heading(it.level, it.body, numbering: it.numbering)
+  } else {
+    let spacing = 13.9pt
+    let threshold = 3em
+
+    block(
+      sticky: true,
+      above: spacing,
+      below: spacing,
+      {
+        block(
+          custom-heading(it.level, it.body, numbering: it.numbering) + v(threshold),
+          breakable: false,
+        )
+        v(-threshold)
+      },
+    )
+  }
+}
+
+#h2-counter.update(0)
+#h3-counter.update(0)
+#h4-counter.update(0)
+#h5-counter.update(0)
+
+#let list-depth = state("list-depth", 0)
+
+#let flush-left-list(it) = {
+  list-depth.update(d => d + 1)
+
+  let is-enum = (it.func() == enum)
+  let children = it.children
+
+  context {
+    let depth = list-depth.get()
+    let block-indent = if depth > 1 { 2em } else { 0pt }
+
+    pad(left: block-indent, block({
+      for (count, item) in children.enumerate(start: 1) {
+        if item.func() == list.item or item.func() == enum.item {
+          let marker = if is-enum {
+            let pattern = if it.has("numbering") and it.numbering != auto { it.numbering } else { "1." }
+            numbering(pattern, count)
+          } else {
+            if it.has("marker") and it.marker.len() > 0 { it.marker.at(0) } else { [•] }
+          }
+
+          par(
+            first-line-indent: par.first-line-indent,
+            hanging-indent: 0pt,
+          )[#marker#h(0.25em)#item.body]
+        } else {
+          item
+        }
+      }
+    }))
+
+    list-depth.update(d => d - 1)
+  }
+}
+
+#show list: flush-left-list
+#show enum: flush-left-list
+
+#let name(name) = align(center, pad(bottom: 0.8em)[
+  #text(font: FONT_KAI, size: zh(3))[#name]
+])
+
+```
+
+### gongwen/manifest.json
+
+```json
+{
+  "name": "gongwen",
+  "displayName": "类公文模板",
+  "description": "符合 GB/T 9704-2012 标准的类公文排版，支持标题、作者、日期、签名等元素",
+  "version": "1.0.0",
+  "author": "Presto-io",
+  "license": "MIT",
+  "category": "公文",
+  "keywords": ["公文", "通知", "报告", "政府", "GB/T 9704"],
+  "minPrestoVersion": "0.1.0",
+  "requiredFonts": [
+    { "name": "FZXiaoBiaoSong-B05", "displayName": "方正小标宋", "url": "https://www.foundertype.com/index.php/FontInfo/index/id/164" },
+    { "name": "STHeiti", "displayName": "华文黑体", "url": "https://www.foundertype.com/index.php/FontInfo/index/id/131" },
+    { "name": "STFangsong", "displayName": "华文仿宋", "url": "https://www.foundertype.com/index.php/FontInfo/index/id/128" },
+    { "name": "STKaiti", "displayName": "华文楷体", "url": "https://www.foundertype.com/index.php/FontInfo/index/id/130" },
+    { "name": "STSong", "displayName": "华文宋体", "url": "https://www.foundertype.com/index.php/FontInfo/index/id/135" }
+  ],
+  "frontmatterSchema": {
+    "title": { "type": "string", "default": "请输入文字" },
+    "author": { "type": "string", "default": "请输入文字" },
+    "date": { "type": "string", "format": "YYYY-MM-DD" },
+    "signature": { "type": "boolean", "default": false }
+  }
+}
+```
+
+### gongwen/example.md
+
+```markdown
+---
+title: "关于开展2025年度安全生产专项检查工作的通知"
+author: "安全生产管理处"
+date: "2025-03-15"
+signature: true
+template: "gongwen"
+---
+
+各部门、各单位：
+
+为进一步加强安全生产管理，落实安全生产责任制，根据《安全生产法》和上级主管部门要求，决定在全公司范围内开展2025年度安全生产专项检查工作。现将有关事项通知如下。
+
+## 工作目标
+
+全面排查安全生产隐患，建立健全安全管理制度，提高全员安全意识，确保全年安全生产事故"零发生"。
+
+## 检查范围与内容
+
+### 检查范围
+
+本次专项检查覆盖公司所有生产经营场所，包括：
+
+1. 各生产车间及仓储区域
+2. 办公场所及公共区域
+3. 在建工程项目现场
+
+### 重点检查内容
+
+- 安全生产责任制落实情况
+- 消防设施设备完好情况
+- 特种设备检验及操作人员持证上岗情况
+- 危险化学品储存、使用管理情况
+- **应急预案**的制定及演练情况
+
+## 工作安排
+
+### 自查自纠阶段
+
+各部门、各单位对照检查标准，全面开展自查自纠，建立问题清单，制定整改措施。
+
+### 集中检查阶段
+
+由安全生产管理处牵头，组织相关部门成立联合检查组，对各单位进行全面检查。
+
+### 整改落实阶段
+
+针对检查中发现的问题，责任单位须在规定期限内完成整改，并将整改报告报送安全生产管理处。
+
+## 工作要求
+
+各部门、各单位要高度重视此次专项检查工作，主要负责人要亲自部署、亲自督办。对检查中发现的重大隐患，要立即整改；对不能立即整改的，要制定切实可行的整改方案，明确整改期限和责任人。
+
+特此通知。
+```
+
+### jiaoan-shicao/ 目录
+
+jiaoan-shicao 的 main.go 也是从主仓库 cmd/jiaoan-shicao/main.go 完整搬过来，同样需要添加 --version flag。代码太长不在此重复，请从本地文件复制。jiaoan-shicao 不依赖 goldmark，只用标准库 + embed。
+
+jiaoan-shicao/manifest.json 更新 category：
+
+```json
+{
+  "name": "jiaoan-shicao",
+  "displayName": "实操教案模板",
+  "description": "将 Markdown 格式的实操教案转换为标准表格排版",
+  "version": "1.0.0",
+  "author": "Presto-io",
+  "license": "MIT",
+  "category": "教育",
+  "keywords": ["教案", "实操", "教学", "表格", "教育"],
+  "minPrestoVersion": "0.1.0",
+  "requiredFonts": [
+    { "name": "FZXiaoBiaoSong-B05", "displayName": "方正小标宋", "url": "https://www.foundertype.com/index.php/FontInfo/index/id/164" },
+    { "name": "STHeiti", "displayName": "华文黑体", "url": "https://www.foundertype.com/index.php/FontInfo/index/id/131" },
+    { "name": "STFangsong", "displayName": "华文仿宋", "url": "https://www.foundertype.com/index.php/FontInfo/index/id/128" },
+    { "name": "STKaiti", "displayName": "华文楷体", "url": "https://www.foundertype.com/index.php/FontInfo/index/id/130" },
+    { "name": "STSong", "displayName": "华文宋体", "url": "https://www.foundertype.com/index.php/FontInfo/index/id/135" }
+  ]
+}
+```
+
+### CI: .github/workflows/release.yml
+
+基于 starter-go 的 release.yml 改造，增加模板名矩阵：
+
+```yaml
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os == 'windows' && 'windows-latest' || matrix.os == 'linux' && 'ubuntu-latest' || 'macos-latest' }}
+    strategy:
+      matrix:
+        template: [gongwen, jiaoan-shicao]
+        os: [darwin, linux, windows]
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+        run: |
+          cd ${{ matrix.template }}
+          EXT=""
+          if [ "${{ matrix.os }}" = "windows" ]; then EXT=".exe"; fi
+          go build -trimpath -ldflags="-s -w" -o "../presto-template-${{ matrix.template }}-${{ matrix.os }}-${{ matrix.arch }}${EXT}" .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: presto-template-${{ matrix.template }}-${{ matrix.os }}-${{ matrix.arch }}
+          path: presto-template-*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: sha256sum presto-template-* > SHA256SUMS
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            presto-template-*
+            SHA256SUMS
+          generate_release_notes: true
+```
+
+### Makefile
+
+```makefile
+.PHONY: build build-all test clean preview
+
+TEMPLATES := gongwen jiaoan-shicao
+
+build:
+ifndef NAME
+	$(error Usage: make build NAME=gongwen)
+endif
+	cd $(NAME) && go build -trimpath -ldflags="-s -w" -o ../presto-template-$(NAME) .
+
+build-all:
+	@for t in $(TEMPLATES); do \
+		echo "Building $$t..."; \
+		cd $$t && go build -trimpath -ldflags="-s -w" -o ../presto-template-$$t . && cd ..; \
+	done
+
+test:
+ifndef NAME
+	@for t in $(TEMPLATES); do \
+		echo "Testing $$t..."; \
+		./presto-template-$$t --manifest | python3 -m json.tool > /dev/null && \
+		./presto-template-$$t --example | ./presto-template-$$t > /dev/null && \
+		./presto-template-$$t --version > /dev/null && \
+		echo "  $$t: OK"; \
+	done
+else
+	./presto-template-$(NAME) --manifest | python3 -m json.tool > /dev/null
+	./presto-template-$(NAME) --example | ./presto-template-$(NAME) > /dev/null
+	./presto-template-$(NAME) --version > /dev/null
+endif
+
+preview:
+ifndef NAME
+	$(error Usage: make preview NAME=gongwen)
+endif
+	@mkdir -p ~/.presto/templates/$(NAME)
+	cp presto-template-$(NAME) ~/.presto/templates/$(NAME)/
+	./presto-template-$(NAME) --manifest > ~/.presto/templates/$(NAME)/manifest.json
+	@echo "Installed $(NAME) to ~/.presto/templates/$(NAME)/"
+
+clean:
+	rm -f presto-template-*
+```
+
+### CLAUDE.md
+
+```markdown
+# Presto Official Templates
+
+请阅读并遵循 CONVENTIONS.md。
+
+## 关键约束
+
+- 不要修改模板二进制协议（stdin/stdout 接口）
+- 不要引入新的第三方 Go 依赖（只用 goldmark + yaml.v3 + 标准库）
+- Commit 消息用中文，格式 `<type>: <描述>`
+- 每个模板是独立的 main package，在自己的子目录下
+```
+
+### README.md
+
+```markdown
+# Presto Official Templates
+
+Presto 官方免费模板集合。每个模板是一个独立的 Go 程序，遵循 Presto 模板协议（stdin Markdown → stdout Typst）。
+
+## 包含模板
+
+| 模板 | 说明 |
+|------|------|
+| `gongwen` | 符合 GB/T 9704-2012 标准的类公文排版 |
+| `jiaoan-shicao` | 实操教案 Markdown → 标准表格排版 |
+
+## 快速开始
+
+### 构建
+
+```bash
+# 构建所有模板
+make build-all
+
+# 构建单个模板
+make build NAME=gongwen
+```
+
+### 测试
+
+```bash
+make test
+```
+
+### 安装到 Presto
+
+```bash
+make preview NAME=gongwen
+```
+
+## 开发者
+
+如果你想开发自己的模板，请参考：
+- [CONVENTIONS.md](CONVENTIONS.md) — 模板开发规范
+- [presto-template-starter-go](https://github.com/Presto-io/presto-template-starter-go) — Go 脚手架
+- [presto-template-starter-rust](https://github.com/Presto-io/presto-template-starter-rust) — Rust 脚手架
+- [presto-template-starter-typescript](https://github.com/Presto-io/presto-template-starter-typescript) — TypeScript 脚手架
+
+## 协议
+
+MIT
+```
+
+### LICENSE
+
+MIT License, Copyright 2026 Presto
+
+## 注意事项
+
+1. `go.mod` 放在仓库根目录，但每个模板是独立的 `main` package。构建时需要 `cd` 进子目录或使用 `-C` flag。
+2. jiaoan-shicao 的 main.go 不依赖 goldmark，但共享 go.mod 没有问题（多余依赖不会被编译进去）。
+3. CONVENTIONS.md 暂时从 starter-go 复制一份过来，后续会迁移到 Presto-Homepage。
+4. 两个模板都需要添加 `--version` flag，这是协议变更（见下方脚手架提示词）。
+5. 构建完成后运行 `make test` 验证所有模板。

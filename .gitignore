@@ -5,8 +5,7 @@
 *.dll
 *.so
 *.dylib
-/gongwen
-/jiaoan-shicao
+presto-template-*
 
 # Go
 /vendor/
