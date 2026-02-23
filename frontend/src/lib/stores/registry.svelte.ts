@@ -4,7 +4,7 @@ const useMock = import.meta.env.DEV || import.meta.env.VITE_MOCK === '1';
 
 const REGISTRY_URL = useMock
   ? '/mock/registry.json'
-  : 'https://registry.presto.app/templates/registry.json';
+  : 'https://presto.c-1o.top/templates/registry.json';
 
 let _registry = $state<Registry | null>(null);
 let _loading = $state(false);
