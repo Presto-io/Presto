@@ -76,7 +76,7 @@ export interface RegistryTemplate {
   category: string;
   keywords: string[];
   license: string;
-  trust: 'official' | 'verified' | 'community';
+  trust: 'official' | 'verified' | 'community' | 'unverified';
   publishedAt?: string;
   repository?: string;                           // v1: full URL
   repo?: string;                                 // v2: "owner/repo"

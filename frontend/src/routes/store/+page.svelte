@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { ArrowLeft, Search, Loader, ExternalLink, Download, Check, RefreshCw, ShieldCheck, Shield, Users } from 'lucide-svelte';
+  import { ArrowLeft, Search, X, Loader, ExternalLink, Download, Check, RefreshCw, ShieldCheck, Shield, Users, ShieldOff } from 'lucide-svelte';
   import { goto } from '$app/navigation';
   import { registryStore } from '$lib/stores/registry.svelte';
   import { templateStore } from '$lib/stores/templates.svelte';
@@ -36,6 +36,7 @@
     official: { label: '官方', cls: 'trust-official', color: '#3b82f6', icon: ShieldCheck },
     verified: { label: '已验证', cls: 'trust-verified', color: '#22c55e', icon: Shield },
     community: { label: '社区', cls: 'trust-community', color: '', icon: Users },
+    unverified: { label: '未验证', cls: 'trust-unverified', color: '#e0af68', icon: ShieldOff },
   } as const;
 
   let filteredTemplates = $derived.by(() => {
@@ -167,43 +168,49 @@
       <button class="btn-retry" onclick={() => registryStore.refresh()}>重试</button>
     </div>
   {:else if registry}
-    <!-- Search + Category Chips -->
-    <div class="store-toolbar">
-      <div class="store-search">
-        <Search size={14} />
+    <!-- Filter Toolbar -->
+    <div class="filter-toolbar">
+      <!-- Row 1: Search -->
+      <div class="search-box">
+        <span class="search-icon"><Search size={14} /></span>
         <input
           type="text"
-          placeholder="搜索模板…"
+          class="search-input"
+          placeholder="搜索模板名称、描述或标签…"
           bind:value={searchQuery}
         />
-      </div>
-      <div class="category-chips">
-        <button
-          class="chip"
-          class:active={!activeCategory}
-          onclick={() => activeCategory = null}
-        >全部</button>
-        {#each categories as cat (cat.id)}
-          <button
-            class="chip"
-            class:active={activeCategory === cat.id}
-            onclick={() => activeCategory = activeCategory === cat.id ? null : cat.id}
-          >{cat.label.zh}</button>
-        {/each}
-      </div>
-      <div class="trust-chips">
-        {#each Object.entries(trustBadge) as [key, badge] (key)}
-          {@const BadgeIcon = badge.icon}
-          <button
-            class="chip trust-chip"
-            class:active={activeTrust === key}
-            onclick={() => activeTrust = activeTrust === key ? null : key}
-            style={activeTrust === key && badge.color ? `border-color:${badge.color};color:${badge.color}` : ''}
-          >
-            <BadgeIcon size={11} />
-            {badge.label}
+        {#if searchQuery}
+          <button class="search-clear" onclick={() => searchQuery = ''}>
+            <X size={12} />
           </button>
-        {/each}
+        {/if}
+      </div>
+      <!-- Row 2: Segmented Control + Trust Toggles -->
+      <div class="controls-row">
+        <div class="segmented-control" style="--segment-index:{activeCategory === null ? 0 : categories.findIndex(c => c.id === activeCategory) + 1};--segment-count:{categories.length + 1}">
+          <div class="segment-track"></div>
+          <button class="segment" class:active={!activeCategory} onclick={() => activeCategory = null}>全部</button>
+          {#each categories as cat (cat.id)}
+            <button class="segment" class:active={activeCategory === cat.id} onclick={() => activeCategory = activeCategory === cat.id ? null : cat.id}>{cat.label.zh}</button>
+          {/each}
+        </div>
+        <div class="controls-sep"></div>
+        <div class="trust-toggles">
+          {#each Object.entries(trustBadge) as [key, badge] (key)}
+            {@const BadgeIcon = badge.icon}
+            <button
+              class="trust-toggle"
+              class:active={activeTrust === key}
+              style="--toggle-color:{badge.color || 'var(--color-muted)'}"
+              onclick={() => activeTrust = activeTrust === key ? null : key}
+              title={badge.label}
+            >
+              <span class="trust-dot"></span>
+              <BadgeIcon size={13} />
+              <span class="trust-label">{badge.label}</span>
+            </button>
+          {/each}
+        </div>
       </div>
     </div>
 
@@ -417,70 +424,176 @@
   .btn-refresh:hover { color: var(--color-accent); border-color: var(--color-accent); }
   .btn-refresh:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  /* Toolbar */
-  .store-toolbar {
+  /* Filter Toolbar */
+  .filter-toolbar {
     display: flex;
     flex-direction: column;
-    gap: var(--space-md);
+    gap: var(--space-sm);
     margin-bottom: var(--space-xl);
     flex-shrink: 0;
   }
-  .store-search {
+  .search-box {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: var(--space-sm);
-    padding: var(--space-sm) var(--space-md);
     background: var(--color-surface);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
-    color: var(--color-muted);
+    transition: border-color 250ms ease, box-shadow 250ms ease;
   }
-  .store-search input {
+  .search-box:focus-within {
+    border-color: var(--color-accent-border);
+    box-shadow: 0 0 0 3px rgba(122, 162, 247, 0.08);
+  }
+  .search-icon {
+    display: flex;
+    align-items: center;
+    padding-left: var(--space-md);
+    color: var(--color-muted);
+    transition: color 200ms ease;
+    flex-shrink: 0;
+  }
+  .search-box:focus-within .search-icon { color: var(--color-accent); }
+  .search-input {
     flex: 1;
     background: none;
     border: none;
-    color: var(--color-text);
-    font-size: 0.8125rem;
-    font-family: var(--font-ui);
     outline: none;
+    color: var(--color-text-bright);
+    font-family: var(--font-ui);
+    font-size: 13px;
+    padding: 9px var(--space-md) 9px var(--space-sm);
+    line-height: 1;
   }
-  .store-search input::placeholder { color: var(--color-muted); }
-  .category-chips {
+  .search-input::placeholder { color: var(--color-muted); }
+  .search-clear {
     display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-xs);
-  }
-  .trust-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-xs);
-  }
-  .trust-chip {
-    display: inline-flex;
     align-items: center;
-    gap: 3px;
-  }
-  .chip {
-    padding: 2px 10px;
-    border-radius: 10px;
-    border: 1px solid var(--color-border);
-    background: var(--color-surface);
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    margin-right: var(--space-sm);
+    border-radius: 50%;
+    border: none;
+    background: var(--color-surface-hover);
     color: var(--color-muted);
-    font-size: 0.75rem;
     cursor: pointer;
-    transition: all var(--transition);
+    transition: background 150ms ease, color 150ms ease, transform 120ms ease;
+    flex-shrink: 0;
   }
-  .chip:hover {
-    border-color: var(--color-accent);
-    color: var(--color-text);
+  .search-clear:hover { background: rgba(255, 255, 255, 0.1); color: var(--color-text); transform: scale(1.1); }
+  .search-clear:active { transform: scale(0.9); }
+
+  /* Controls Row */
+  .controls-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
   }
-  .chip.active {
-    background: var(--color-accent);
-    color: var(--color-bg);
-    border-color: var(--color-accent);
+
+  /* Segmented Control */
+  .segmented-control {
+    position: relative;
+    display: flex;
+    align-items: center;
+    background: var(--color-surface);
+    border-radius: var(--radius-md);
+    padding: 3px;
+    border: 1px solid var(--color-border);
+    flex-shrink: 0;
   }
-  .trust-chip.active {
-    background: transparent;
+  .segment-track {
+    position: absolute;
+    top: 3px;
+    bottom: 3px;
+    left: 3px;
+    width: calc((100% - 6px) / var(--segment-count));
+    border-radius: calc(var(--radius-md) - 2px);
+    background: var(--color-accent-bg);
+    border: 1px solid var(--color-accent-border);
+    transform: translateX(calc(var(--segment-index) * 100%));
+    transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .segment {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    padding: 5px var(--space-md);
+    border: none;
+    background: none;
+    color: var(--color-muted);
+    font-family: var(--font-ui);
+    font-size: 12.5px;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: calc(var(--radius-md) - 2px);
+    white-space: nowrap;
+    transition: color 200ms ease;
+    line-height: 1;
+    user-select: none;
+  }
+  .segment:hover:not(.active) { color: var(--color-text); }
+  .segment.active { color: var(--color-accent); }
+  .segment:active { transform: scale(0.97); }
+
+  /* Separator */
+  .controls-sep {
+    width: 1px;
+    height: 20px;
+    background: var(--color-border);
+    flex-shrink: 0;
+  }
+
+  /* Trust Toggles */
+  .trust-toggles {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+  .trust-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: 5px var(--space-sm);
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--color-muted);
+    font-family: var(--font-ui);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    line-height: 1;
+    transition: color 200ms ease, background 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
+    user-select: none;
+  }
+  .trust-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--toggle-color);
+    opacity: 0.35;
+    flex-shrink: 0;
+    transition: opacity 250ms ease, transform 250ms ease, box-shadow 250ms ease;
+  }
+  .trust-toggle:hover { color: var(--color-text); background: var(--color-surface); }
+  .trust-toggle:hover .trust-dot { opacity: 0.7; transform: scale(1.2); }
+  .trust-toggle:active { transform: scale(0.97); }
+  .trust-toggle.active {
+    color: var(--color-text-bright);
+    background: color-mix(in srgb, var(--toggle-color) 10%, transparent);
+    border-color: color-mix(in srgb, var(--toggle-color) 25%, transparent);
+  }
+  .trust-toggle.active .trust-dot {
+    opacity: 1;
+    transform: scale(1.3);
+    box-shadow: 0 0 4px color-mix(in srgb, var(--toggle-color) 50%, transparent);
+  }
+  .trust-label {
+    transition: opacity 150ms ease;
   }
 
   /* Empty / Loading */
