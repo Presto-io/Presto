@@ -6,6 +6,7 @@
   import { templateStore } from '$lib/stores/templates.svelte';
   import { installFromRegistry } from '$lib/api/client';
   import type { RegistryTemplate } from '$lib/api/types';
+  import { marked } from 'marked';
 
   let searchQuery = $state('');
   let activeCategory = $state<string | null>(null);
@@ -121,6 +122,15 @@
     if (tpl.repository) return tpl.repository;
     if (tpl.repo) return `https://github.com/${tpl.repo}`;
     return '';
+  }
+
+  const renderer = new marked.Renderer();
+  renderer.link = ({ text }) => text;
+  renderer.image = ({ text }) => text ? `[${text}]` : '';
+  marked.setOptions({ gfm: true, breaks: true, renderer });
+
+  function renderMarkdown(src: string): string {
+    return marked.parse(src, { async: false }) as string;
   }
 
   onMount(() => {
@@ -275,7 +285,7 @@
           {:else if readmeContent}
             <div class="detail-readme">
               <h4>README</h4>
-              <pre class="readme-text">{readmeContent}</pre>
+              <div class="readme-body">{@html renderMarkdown(readmeContent)}</div>
             </div>
           {/if}
 
@@ -720,7 +730,7 @@
     font-size: 0.875rem;
     color: var(--color-text);
   }
-  .readme-text {
+  .readme-body {
     margin: 0;
     padding: var(--space-md);
     background: var(--color-surface);
@@ -728,11 +738,88 @@
     border: 1px solid var(--color-border);
     font-size: 0.8125rem;
     color: var(--color-muted);
-    line-height: 1.6;
-    white-space: pre-wrap;
+    line-height: 1.7;
     word-break: break-word;
     overflow-y: auto;
     max-height: 400px;
+  }
+  .readme-body :global(h3),
+  .readme-body :global(h4),
+  .readme-body :global(h5),
+  .readme-body :global(h6) {
+    color: var(--color-text-bright);
+    margin: 1em 0 0.5em;
+    line-height: 1.3;
+  }
+  .readme-body :global(h3) { font-size: 1.1em; }
+  .readme-body :global(h4) { font-size: 1em; }
+  .readme-body :global(h5) { font-size: 0.95em; }
+  .readme-body :global(h6) { font-size: 0.9em; }
+  .readme-body :global(p) {
+    margin: 0.5em 0;
+  }
+  .readme-body :global(strong) { color: var(--color-text); }
+  .readme-body :global(code) {
+    padding: 0.15em 0.4em;
+    background: var(--color-surface-hover);
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+  }
+  .readme-body :global(pre) {
+    padding: var(--space-sm);
+    background: var(--color-surface-hover);
+    border-radius: var(--radius-sm);
+    overflow-x: auto;
+    margin: 0.75em 0;
+  }
+  .readme-body :global(pre code) {
+    padding: 0;
+    background: none;
+  }
+  .readme-body :global(ul) {
+    padding-left: 1.5em;
+    margin: 0.5em 0;
+  }
+  .readme-body :global(li) {
+    margin: 0.25em 0;
+  }
+  .readme-body :global(hr) {
+    border: none;
+    border-top: 1px solid var(--color-border);
+    margin: 1em 0;
+  }
+  .readme-body :global(table) {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0.75em 0;
+    font-size: 0.8125rem;
+  }
+  .readme-body :global(th),
+  .readme-body :global(td) {
+    padding: 0.4em 0.75em;
+    border: 1px solid var(--color-border);
+    text-align: left;
+  }
+  .readme-body :global(th) {
+    background: var(--color-surface-hover);
+    color: var(--color-text);
+    font-weight: 600;
+  }
+  .readme-body :global(tr:nth-child(even)) {
+    background: var(--color-surface-hover);
+  }
+  .readme-body :global(blockquote) {
+    margin: 0.75em 0;
+    padding: 0.5em 1em;
+    border-left: 3px solid var(--color-border);
+    color: var(--color-muted);
+    background: var(--color-surface-hover);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  }
+  .readme-body :global(ol) {
+    padding-left: 1.5em;
+    margin: 0.5em 0;
   }
 
   /* Repo link */

@@ -28,6 +28,7 @@
 		"@codemirror/view": "^6.39.14",
 		"codemirror": "^6.0.2",
 		"dompurify": "^3.2.4",
-		"lucide-svelte": "^0.564.0"
+		"lucide-svelte": "^0.564.0",
+		"marked": "^17.0.3"
 	}
 }
