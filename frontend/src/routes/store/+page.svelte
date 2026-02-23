@@ -501,7 +501,7 @@
   /* Card Grid */
   .card-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(200px, 240px));
     gap: var(--space-md);
     overflow-y: auto;
     flex: 1;
