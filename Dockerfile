@@ -1,4 +1,4 @@
-# Stage 1: Build Go binaries (runs on build host, cross-compiles via GOARCH)
+# Stage 1: Build Go server binary (runs on build host, cross-compiles via GOARCH)
 FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS go-builder
 ARG TARGETARCH
 WORKDIR /app
@@ -7,8 +7,6 @@ RUN go mod download
 COPY cmd/ cmd/
 COPY internal/ internal/
 RUN CGO_ENABLED=0 GOARCH=$TARGETARCH go build -ldflags="-s -w" -o /bin/presto-server ./cmd/presto-server/
-RUN CGO_ENABLED=0 GOARCH=$TARGETARCH go build -ldflags="-s -w" -o /bin/presto-template-gongwen ./cmd/gongwen/
-RUN CGO_ENABLED=0 GOARCH=$TARGETARCH go build -ldflags="-s -w" -o /bin/presto-template-jiaoan-shicao ./cmd/jiaoan-shicao/
 
 # Stage 2: Build frontend (platform-independent, runs on build host)
 FROM --platform=$BUILDPLATFORM node:22-alpine AS frontend-builder
@@ -43,6 +41,22 @@ RUN apk add --no-cache curl && \
     tar -xJ --strip-components=1 -C /usr/local/bin/ < /tmp/typst.tar.xz && \
     rm /tmp/typst.tar.xz
 
+# Stage 3b: Download official template binaries for target arch
+FROM --platform=$BUILDPLATFORM alpine:3.21 AS template-downloader
+ARG TARGETARCH
+ARG TPL_VERSION=v1.0.0
+RUN apk add --no-cache curl jq && \
+    TEMPLATES="gongwen jiaoan-shicao" && \
+    SUFFIX="linux-${TARGETARCH}" && \
+    for tpl in $TEMPLATES; do \
+      mkdir -p "/templates/$tpl" && \
+      echo "Downloading presto-template-${tpl}-${SUFFIX}..." && \
+      curl -sSL -o "/templates/$tpl/presto-template-$tpl" \
+        "https://github.com/Presto-io/presto-official-templates/releases/download/${TPL_VERSION}/presto-template-${tpl}-${SUFFIX}" && \
+      chmod +x "/templates/$tpl/presto-template-$tpl" && \
+      "/templates/$tpl/presto-template-$tpl" --manifest > "/templates/$tpl/manifest.json"; \
+    done
+
 # Stage 4: Final image (target platform)
 FROM alpine:3.21
 
@@ -53,11 +67,7 @@ COPY --from=typst-downloader /usr/local/bin/typst /usr/local/bin/typst
 COPY --from=go-builder /bin/presto-server /usr/local/bin/
 
 # Bundle templates next to server binary (server syncs them to user dir on startup)
-RUN mkdir -p /usr/local/bin/templates/gongwen /usr/local/bin/templates/jiaoan-shicao
-COPY --from=go-builder /bin/presto-template-gongwen /usr/local/bin/templates/gongwen/presto-template-gongwen
-COPY cmd/gongwen/manifest.json /usr/local/bin/templates/gongwen/
-COPY --from=go-builder /bin/presto-template-jiaoan-shicao /usr/local/bin/templates/jiaoan-shicao/presto-template-jiaoan-shicao
-COPY cmd/jiaoan-shicao/manifest.json /usr/local/bin/templates/jiaoan-shicao/
+COPY --from=template-downloader /templates/ /usr/local/bin/templates/
 
 # Create user data dir (will be overlaid by volume mount, server populates on startup)
 RUN mkdir -p /home/presto/.presto/fonts && chown -R presto:presto /home/presto/.presto
