@@ -19,6 +19,17 @@
   let loading = $derived(registryStore.loading);
   let error = $derived(registryStore.error);
 
+  // v2: derive categories from templates' category field when registry.categories is absent
+  let categories = $derived.by(() => {
+    if (!registry) return [];
+    if (registry.categories?.length) return registry.categories;
+    const seen = new Set<string>();
+    return registry.templates
+      .map(t => t.category)
+      .filter((c): c is string => !!c && !seen.has(c) && (seen.add(c), true))
+      .map(c => ({ id: c, label: { zh: c, en: c } }));
+  });
+
   const trustBadge = {
     official: { label: '官方', cls: 'trust-official', color: '#3b82f6', icon: ShieldCheck },
     verified: { label: '已验证', cls: 'trust-verified', color: '#22c55e', icon: Shield },
@@ -104,6 +115,12 @@
     }
   }
 
+  function getRepoUrl(tpl: RegistryTemplate): string {
+    if (tpl.repository) return tpl.repository;
+    if (tpl.repo) return `https://github.com/${tpl.repo}`;
+    return '';
+  }
+
   onMount(() => {
     registryStore.load();
     templateStore.load();
@@ -154,7 +171,7 @@
           class:active={!activeCategory}
           onclick={() => activeCategory = null}
         >全部</button>
-        {#each registry.categories as cat (cat.id)}
+        {#each categories as cat (cat.id)}
           <button
             class="chip"
             class:active={activeCategory === cat.id}
@@ -248,14 +265,16 @@
 
           <!-- Repository -->
           <div class="detail-repo">
+            {#if getRepoUrl(selectedTemplate)}
             <a
-              href={selectedTemplate.repository}
-              onclick={(e) => { e.preventDefault(); openExternal(selectedTemplate!.repository); }}
+              href={getRepoUrl(selectedTemplate)}
+              onclick={(e) => { e.preventDefault(); openExternal(getRepoUrl(selectedTemplate!)); }}
               class="repo-link"
             >
               查看源码
               <ExternalLink size={12} />
             </a>
+            {/if}
           </div>
 
           <!-- Install button -->

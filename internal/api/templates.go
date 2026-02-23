@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"runtime"
 	"strings"
 
 	"github.com/mrered/presto/internal/template"
@@ -92,8 +93,12 @@ func (s *Server) handleInstallTemplate(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
 	var req struct {
-		Owner string `json:"owner"`
-		Repo  string `json:"repo"`
+		Owner     string `json:"owner"`
+		Repo      string `json:"repo"`
+		Platforms map[string]struct {
+			URL    string `json:"url"`
+			SHA256 string `json:"sha256"`
+		} `json:"platforms"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Owner == "" {
 		parts := strings.SplitN(id, "/", 2)
@@ -112,7 +117,19 @@ func (s *Server) handleInstallTemplate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.manager.Install(req.Owner, req.Repo); err != nil {
+	// SEC-01: Extract platform-specific download info from registry data
+	var opts *template.InstallOpts
+	if req.Platforms != nil {
+		platform := runtime.GOOS + "-" + runtime.GOARCH
+		if info, ok := req.Platforms[platform]; ok && info.URL != "" {
+			opts = &template.InstallOpts{
+				DownloadURL:    info.URL,
+				ExpectedSHA256: info.SHA256,
+			}
+		}
+	}
+
+	if err := s.manager.Install(req.Owner, req.Repo, opts); err != nil {
 		log.Printf("[templates] install %s/%s failed: %v", req.Owner, req.Repo, err)
 		writeJSONError(w, "install failed", http.StatusInternalServerError)
 		return

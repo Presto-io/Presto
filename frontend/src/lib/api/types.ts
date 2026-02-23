@@ -62,6 +62,11 @@ export interface RegistryCategory {
   label: { zh: string; en: string };
 }
 
+export interface PlatformInfo {
+  url: string;
+  sha256: string;
+}
+
 export interface RegistryTemplate {
   name: string;
   displayName: string;
@@ -72,13 +77,17 @@ export interface RegistryTemplate {
   keywords: string[];
   license: string;
   trust: 'official' | 'verified' | 'community';
-  publishedAt: string;
-  repository: string;
+  publishedAt?: string;
+  repository?: string;                           // v1: full URL
+  repo?: string;                                 // v2: "owner/repo"
+  platforms?: Record<string, PlatformInfo>;       // v2: per-platform URL + SHA256
+  minPrestoVersion?: string;
+  previewImage?: string;
 }
 
 export interface Registry {
   version: number;
   updatedAt: string;
-  categories: RegistryCategory[];
+  categories?: RegistryCategory[];               // v1 only; v2 derives from template.category
   templates: RegistryTemplate[];
 }
