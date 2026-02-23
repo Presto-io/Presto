@@ -9,6 +9,7 @@
 
   let searchQuery = $state('');
   let activeCategory = $state<string | null>(null);
+  let activeTrust = $state<string | null>(null);
   let selectedId = $state<string | null>(null);
   let installing = $state('');
   let readmeContent = $state('');
@@ -46,7 +47,8 @@
         tpl.description.toLowerCase().includes(q) ||
         tpl.keywords.some(k => k.toLowerCase().includes(q));
       const matchesCategory = !activeCategory || tpl.category === activeCategory;
-      return matchesSearch && matchesCategory;
+      const matchesTrust = !activeTrust || tpl.trust === activeTrust;
+      return matchesSearch && matchesCategory && matchesTrust;
     });
   });
 
@@ -177,6 +179,20 @@
             class:active={activeCategory === cat.id}
             onclick={() => activeCategory = activeCategory === cat.id ? null : cat.id}
           >{cat.label.zh}</button>
+        {/each}
+      </div>
+      <div class="trust-chips">
+        {#each Object.entries(trustBadge) as [key, badge] (key)}
+          {@const BadgeIcon = badge.icon}
+          <button
+            class="chip trust-chip"
+            class:active={activeTrust === key}
+            onclick={() => activeTrust = activeTrust === key ? null : key}
+            style={activeTrust === key && badge.color ? `border-color:${badge.color};color:${badge.color}` : ''}
+          >
+            <BadgeIcon size={11} />
+            {badge.label}
+          </button>
         {/each}
       </div>
     </div>
@@ -424,6 +440,16 @@
     flex-wrap: wrap;
     gap: var(--space-xs);
   }
+  .trust-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+  }
+  .trust-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+  }
   .chip {
     padding: 2px 10px;
     border-radius: 10px;
@@ -442,6 +468,9 @@
     background: var(--color-accent);
     color: var(--color-bg);
     border-color: var(--color-accent);
+  }
+  .trust-chip.active {
+    background: transparent;
   }
 
   /* Empty / Loading */
