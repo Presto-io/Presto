@@ -502,6 +502,7 @@
   .card-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 240px));
+    align-content: start;
     gap: var(--space-md);
     overflow-y: auto;
     flex: 1;
