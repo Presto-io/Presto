@@ -1,4 +1,4 @@
-import type { Template, Manifest, GitHubRepo, BatchImportResult, RegistryTemplate } from './types';
+import type { Template, Manifest, GitHubRepo, BatchImportResult, RegistryTemplate, PlatformInfo } from './types';
 
 const BASE = import.meta.env.VITE_API_URL || '';
 
@@ -110,24 +110,42 @@ export async function convertAndCompile(
   return res.blob();
 }
 
-export async function installTemplate(owner: string, repo: string): Promise<void> {
+export async function installTemplate(
+  owner: string,
+  repo: string,
+  platforms?: Record<string, PlatformInfo>
+): Promise<void> {
   const res = await authFetch(
     `${BASE}/api/templates/${encodeURIComponent(owner + '/' + repo)}/install`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ owner, repo })
+      body: JSON.stringify({ owner, repo, platforms })
     }
   );
   if (!res.ok) throw new Error(`Install failed: ${res.status}`);
 }
 
 export function installFromRegistry(template: RegistryTemplate): Promise<void> {
-  const url = new URL(template.repository);
-  const parts = url.pathname.slice(1).split('/');
-  const owner = parts[0];
-  const repo = parts[1];
-  return installTemplate(owner, repo);
+  let owner: string;
+  let repo: string;
+
+  if (template.repo) {
+    // v2 format: "owner/repo"
+    const parts = template.repo.split('/');
+    owner = parts[0];
+    repo = parts[1];
+  } else if (template.repository) {
+    // v1 format: full URL
+    const url = new URL(template.repository);
+    const parts = url.pathname.slice(1).split('/');
+    owner = parts[0];
+    repo = parts[1];
+  } else {
+    return Promise.reject(new Error('No repository info'));
+  }
+
+  return installTemplate(owner, repo, template.platforms);
 }
 
 export async function deleteTemplate(id: string): Promise<void> {
