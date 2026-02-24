@@ -53,10 +53,12 @@
     const gap = parseFloat(style.gap) || 12;
     const colWidth = 200 + gap;
     const cols = Math.max(1, Math.floor((cardGridEl.clientWidth + gap) / colWidth));
-    const rowHeight = 140 + gap;
+    const firstCard = cardGridEl.querySelector('.tpl-card') as HTMLElement | null;
+    const cardH = firstCard ? firstCard.offsetHeight : 120;
+    const rowHeight = cardH + gap;
     const rows = Math.max(1, Math.floor((cardGridEl.clientHeight + gap) / rowHeight));
     const auto = cols * rows;
-    pageSize = auto > 0 ? auto : 24;
+    if (auto > 0 && auto !== pageSize) pageSize = auto;
   }
 
   $effect(() => {
@@ -65,6 +67,13 @@
     const ro = new ResizeObserver(computePageSize);
     ro.observe(cardGridEl);
     return () => ro.disconnect();
+  });
+
+  // Re-compute after data loads and cards render
+  $effect(() => {
+    if (registry && cardGridEl) {
+      requestAnimationFrame(() => computePageSize());
+    }
   });
 
   let registry = $derived(registryStore.registry);
