@@ -3,6 +3,8 @@ package api
 import (
 	"archive/zip"
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -29,6 +31,7 @@ type importResult struct {
 	Author      string   `json:"author"`
 	Builtin     bool     `json:"builtin"`
 	Keywords    []string `json:"keywords"`
+	Verified    string   `json:"verified"` // "verified" | "not_in_registry" | "pending" | "mismatch"
 }
 
 func (s *Server) handleImportTemplate(w http.ResponseWriter, r *http.Request) {
@@ -100,7 +103,7 @@ func (s *Server) handleImportTemplate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		entries = append(entries, templateEntry{root: root, manifest: manifest})
-		if s.manager.Exists(manifest.Name) && !template.IsOfficial(manifest.Name) {
+		if s.manager.Exists(manifest.Name) {
 			conflicts = append(conflicts, manifest.Name)
 		}
 	}
@@ -123,10 +126,6 @@ func (s *Server) handleImportTemplate(w http.ResponseWriter, r *http.Request) {
 		if s.manager.Exists(name) {
 			switch onConflict {
 			case "overwrite":
-				if template.IsOfficial(name) {
-					writeJSONError(w, "cannot overwrite built-in template", http.StatusBadRequest)
-					return
-				}
 				if err := s.manager.Uninstall(name); err != nil {
 					log.Printf("[templates] import: uninstall %q for overwrite failed: %v", name, err)
 					writeJSONError(w, fmt.Sprintf("failed to remove existing template %q", name), http.StatusInternalServerError)
@@ -144,7 +143,7 @@ func (s *Server) handleImportTemplate(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		result, err := importTemplateFromZipDir(zr, entry.root, name, s.manager)
+		result, err := importTemplateFromZipDir(zr, entry.root, name, s.manager, s.registry)
 		if err != nil {
 			log.Printf("[templates] import: failed for root %q: %v", entry.root, err)
 			writeJSONError(w, err.Error(), http.StatusBadRequest)
@@ -242,7 +241,8 @@ func filesInPrefix(zr *zip.Reader, prefix string) []*zip.File {
 
 // importTemplateFromZipDir installs a single template from a ZIP directory.
 // installName allows overriding the name from manifest (for rename-on-conflict).
-func importTemplateFromZipDir(zr *zip.Reader, prefix string, installName string, mgr *template.Manager) (*importResult, error) {
+// If registry is non-nil, the binary's SHA256 is verified against the registry.
+func importTemplateFromZipDir(zr *zip.Reader, prefix string, installName string, mgr *template.Manager, registry *template.RegistryCache) (*importResult, error) {
 	files := filesInPrefix(zr, prefix)
 
 	var manifestData []byte
@@ -286,10 +286,6 @@ func importTemplateFromZipDir(zr *zip.Reader, prefix string, installName string,
 		return nil, fmt.Errorf("invalid template name in manifest")
 	}
 
-	if template.IsOfficial(name) {
-		return nil, fmt.Errorf("cannot overwrite built-in template")
-	}
-
 	// SEC-06: Verify resolved path is within TemplatesDir
 	tplDir := filepath.Join(mgr.TemplatesDir, name)
 	absTemplatesDir, _ := filepath.Abs(mgr.TemplatesDir)
@@ -330,6 +326,19 @@ func importTemplateFromZipDir(zr *zip.Reader, prefix string, installName string,
 		return nil, fmt.Errorf("failed to read binary")
 	}
 
+	// SEC-01: Verify binary SHA256 against registry
+	hash := sha256.Sum256(binData)
+	actualSHA256 := hex.EncodeToString(hash[:])
+	verified := template.VerifyNotInRegistry
+	if registry != nil {
+		verified = registry.VerifySHA256(manifest.Name, actualSHA256)
+	}
+	if verified == template.VerifyMismatch {
+		// Clean up the directory we already created
+		os.RemoveAll(tplDir)
+		return nil, fmt.Errorf("SHA256 mismatch for template %q: binary may have been tampered with", manifest.Name)
+	}
+
 	binaryPath := filepath.Join(tplDir, binaryName)
 	if err := os.WriteFile(binaryPath, binData, 0755); err != nil {
 		return nil, fmt.Errorf("failed to write binary")
@@ -345,5 +354,6 @@ func importTemplateFromZipDir(zr *zip.Reader, prefix string, installName string,
 		Author:      manifest.Author,
 		Builtin:     false,
 		Keywords:    manifest.Keywords,
+		Verified:    string(verified),
 	}, nil
 }

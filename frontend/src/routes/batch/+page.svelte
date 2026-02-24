@@ -533,9 +533,6 @@
               ondrop={(e) => handleTemplateDrop(e, tpl.name)}
             >
               <span class="nav-item-name">{tpl.displayName || tpl.name}</span>
-              {#if tpl.builtin}
-                <span class="badge-builtin">内置</span>
-              {/if}
               {#if groupFileCount(tpl.name) > 0}
                 <span class="nav-item-count">{groupFileCount(tpl.name)}</span>
               {/if}

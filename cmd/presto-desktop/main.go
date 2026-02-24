@@ -39,6 +39,7 @@ type App struct {
 	ctx      context.Context
 	manager  *template.Manager
 	compiler *typst.Compiler
+	registry *template.RegistryCache
 }
 
 // spaFallbackHandler wraps the API handler to support prerendered SvelteKit routes.
@@ -93,8 +94,8 @@ type OpenFilesItem struct {
 	Path    string `json:"path,omitempty"` // absolute path (zip only, for Wails binding)
 }
 
-func NewApp(manager *template.Manager, compiler *typst.Compiler) *App {
-	return &App{manager: manager, compiler: compiler}
+func NewApp(manager *template.Manager, compiler *typst.Compiler, registry *template.RegistryCache) *App {
+	return &App{manager: manager, compiler: compiler, registry: registry}
 }
 
 func (a *App) startup(ctx context.Context) {
@@ -247,15 +248,12 @@ func (a *App) ImportBatchZip(filePath string) (*api.BatchImportResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read ZIP failed: %w", err)
 	}
-	return api.ProcessBatchZip(data, a.manager)
+	return api.ProcessBatchZip(data, a.manager, a.registry)
 }
 
-// DeleteTemplate uninstalls a third-party template by name.
+// DeleteTemplate uninstalls a template by name.
 // Bypasses the HTTP layer where Wails WebView may not support DELETE method.
 func (a *App) DeleteTemplate(name string) error {
-	if template.IsOfficial(name) {
-		return fmt.Errorf("cannot delete built-in template")
-	}
 	return a.manager.Uninstall(name)
 }
 
@@ -482,31 +480,6 @@ func findTypstBinary() string {
 	return "typst" // will fail at runtime with a clear error
 }
 
-// findBundledTemplatesDir locates the bundled templates directory.
-// Search order: .app/Contents/Resources/templates → next to executable/templates.
-func findBundledTemplatesDir() string {
-	exe, err := os.Executable()
-	if err != nil {
-		return ""
-	}
-	exe, _ = filepath.EvalSymlinks(exe)
-	exeDir := filepath.Dir(exe)
-
-	// macOS .app: Contents/MacOS/Presto → Contents/Resources/templates
-	resources := filepath.Join(exeDir, "..", "Resources", "templates")
-	if info, err := os.Stat(resources); err == nil && info.IsDir() {
-		return resources
-	}
-
-	// Same directory as executable
-	beside := filepath.Join(exeDir, "templates")
-	if info, err := os.Stat(beside); err == nil && info.IsDir() {
-		return beside
-	}
-
-	return ""
-}
-
 func main() {
 	home, _ := os.UserHomeDir()
 	templatesDir := filepath.Join(home, ".presto", "templates")
@@ -516,10 +489,10 @@ func main() {
 	typstBin := findTypstBinary()
 	log.Printf("[presto] using typst: %s", typstBin)
 
-	// Auto-install bundled official templates if missing
-	bundleDir := findBundledTemplatesDir()
-	log.Printf("[presto] bundled templates dir: %s", bundleDir)
-	manager.EnsureOfficialTemplates(bundleDir)
+	// Registry cache for SHA256 verification of imported templates
+	prestoDir := filepath.Join(home, ".presto")
+	registry := template.NewRegistryCache(prestoDir)
+	registry.RefreshAsync()
 
 	// SEC-02: Use $HOME instead of "/" to restrict file access to user's home
 	compiler := typst.NewCompilerWithRoot(home)
@@ -529,6 +502,7 @@ func main() {
 	apiHandler := api.NewServer(api.ServerOptions{
 		TemplatesDir: templatesDir,
 		TypstBin:     typstBin,
+		Registry:     registry,
 	})
 
 	// Strip "build" prefix from embedded FS so files are at root
@@ -540,7 +514,7 @@ func main() {
 	// file is showcase/editor.html — try .html suffix before API fallback.
 	handler := &spaFallbackHandler{api: apiHandler, assets: frontendFS}
 
-	app := NewApp(manager, compiler)
+	app := NewApp(manager, compiler, registry)
 	appMenu := buildMenu(app)
 
 	err := wails.Run(&options.App{
