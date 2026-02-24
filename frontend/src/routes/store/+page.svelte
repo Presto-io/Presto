@@ -19,7 +19,53 @@
   let previewWidth = $state(0);
   let currentPage = $state(1);
   let pageSize = $state(24);
-  const pageSizeOptions = [12, 24, 48, 96];
+
+  // Category scroll state
+  let categoryScrollEl = $state<HTMLElement | null>(null);
+  let canScrollLeft = $state(false);
+  let canScrollRight = $state(false);
+
+  function updateScrollState() {
+    if (!categoryScrollEl) return;
+    canScrollLeft = categoryScrollEl.scrollLeft > 4;
+    canScrollRight = categoryScrollEl.scrollLeft < categoryScrollEl.scrollWidth - categoryScrollEl.clientWidth - 4;
+  }
+
+  function scrollCategories(dir: 'left' | 'right') {
+    categoryScrollEl?.scrollBy({ left: dir === 'left' ? -200 : 200, behavior: 'smooth' });
+  }
+
+  $effect(() => {
+    if (!categoryScrollEl) return;
+    updateScrollState();
+    categoryScrollEl.addEventListener('scroll', updateScrollState, { passive: true });
+    const ro = new ResizeObserver(updateScrollState);
+    ro.observe(categoryScrollEl);
+    return () => { categoryScrollEl?.removeEventListener('scroll', updateScrollState); ro.disconnect(); };
+  });
+
+  // Card grid auto page size
+  let cardGridEl = $state<HTMLElement | null>(null);
+
+  function computePageSize() {
+    if (!cardGridEl) return;
+    const style = getComputedStyle(cardGridEl);
+    const gap = parseFloat(style.gap) || 12;
+    const colWidth = 200 + gap;
+    const cols = Math.max(1, Math.floor((cardGridEl.clientWidth + gap) / colWidth));
+    const rowHeight = 140 + gap;
+    const rows = Math.max(1, Math.floor((cardGridEl.clientHeight + gap) / rowHeight));
+    const auto = cols * rows;
+    pageSize = auto > 0 ? auto : 24;
+  }
+
+  $effect(() => {
+    if (!cardGridEl) return;
+    computePageSize();
+    const ro = new ResizeObserver(computePageSize);
+    ro.observe(cardGridEl);
+    return () => ro.disconnect();
+  });
 
   let registry = $derived(registryStore.registry);
   let loading = $derived(registryStore.loading);
@@ -69,9 +115,9 @@
     });
   });
 
-  // Reset page when filters change
+  // Reset page when filters or page size change
   $effect(() => {
-    searchQuery; activeCategory; activeTrust;
+    searchQuery; activeCategory; activeTrust; pageSize;
     currentPage = 1;
   });
 
@@ -234,14 +280,19 @@
           {/each}
         </div>
         <div class="controls-sep"></div>
-        <div class="category-scroll">
-          <div class="segmented-control" style="--segment-index:{activeCategory === null ? 0 : categories.findIndex(c => c.id === activeCategory) + 1};--segment-count:{categories.length + 1}">
-            <div class="segment-track"></div>
-            <button class="segment" class:active={!activeCategory} onclick={() => activeCategory = null}>全部</button>
+        <div class="category-bar">
+          {#if canScrollLeft}
+            <button class="scroll-arrow scroll-arrow-left" onclick={() => scrollCategories('left')} aria-label="向左滚动">‹</button>
+          {/if}
+          <div class="category-scroll" bind:this={categoryScrollEl}>
+            <button class="cat-chip" class:active={!activeCategory} onclick={() => activeCategory = null}>全部</button>
             {#each categories as cat (cat.id)}
-              <button class="segment" class:active={activeCategory === cat.id} onclick={() => activeCategory = activeCategory === cat.id ? null : cat.id}>{cat.label.zh}</button>
+              <button class="cat-chip" class:active={activeCategory === cat.id} onclick={() => activeCategory = activeCategory === cat.id ? null : cat.id}>{cat.label.zh}</button>
             {/each}
           </div>
+          {#if canScrollRight}
+            <button class="scroll-arrow scroll-arrow-right" onclick={() => scrollCategories('right')} aria-label="向右滚动">›</button>
+          {/if}
         </div>
       </div>
     </div>
@@ -370,7 +421,7 @@
           <p>{searchQuery ? '没有匹配的模板' : '暂无可用模板'}</p>
         </div>
       {:else}
-        <div class="card-grid">
+        <div class="card-grid" bind:this={cardGridEl}>
           {#each pagedTemplates as tpl (tpl.name)}
             {@const badge = trustBadge[tpl.trust]}
             {@const BadgeIcon = badge.icon}
@@ -392,21 +443,14 @@
         </div>
         <!-- Pagination -->
         <div class="pagination">
-          <div class="page-info">
-            <span>{filteredTemplates.length} 个模板</span>
-            <select class="page-size-select" bind:value={pageSize} onchange={() => currentPage = 1}>
-              {#each pageSizeOptions as size}
-                <option value={size}>{size} / 页</option>
-              {/each}
-            </select>
-          </div>
+          <span class="page-info">{filteredTemplates.length} 个模板，第 {currentPage}/{totalPages} 页</span>
           {#if totalPages > 1}
             <div class="page-controls">
               <button class="page-btn" disabled={currentPage <= 1} onclick={() => currentPage--}>&lsaquo;</button>
               {#each Array.from({length: totalPages}, (_, i) => i + 1) as p}
-                {#if p === 1 || p === totalPages || (p >= currentPage - 1 && p <= currentPage + 1)}
+                {#if p === 1 || p === totalPages || (p >= currentPage - 3 && p <= currentPage + 3)}
                   <button class="page-btn" class:active={currentPage === p} onclick={() => currentPage = p}>{p}</button>
-                {:else if p === currentPage - 2 || p === currentPage + 2}
+                {:else if p === currentPage - 4 || p === currentPage + 4}
                   <span class="page-ellipsis">…</span>
                 {/if}
               {/each}
@@ -547,63 +591,77 @@
     gap: var(--space-md);
   }
 
-  /* Segmented Control */
-  .category-scroll {
+  /* Category Bar */
+  .category-bar {
+    position: relative;
     flex: 1;
     min-width: 0;
+    isolation: isolate;
+  }
+  .category-scroll {
+    display: flex;
+    gap: var(--space-sm);
     overflow-x: auto;
+    scroll-behavior: smooth;
+    padding: 2px var(--space-sm);
     scrollbar-width: none;
     -ms-overflow-style: none;
-    position: relative;
-    mask-image: linear-gradient(to right, black calc(100% - 32px), transparent 100%);
-    -webkit-mask-image: linear-gradient(to right, black calc(100% - 32px), transparent 100%);
-    padding-right: 8px;
   }
   .category-scroll::-webkit-scrollbar { display: none; }
-  .segmented-control {
-    position: relative;
+  .cat-chip {
+    flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
-    background: var(--color-surface);
-    border-radius: var(--radius-md);
-    padding: 3px;
+    height: 30px;
+    padding: 0 var(--space-md);
     border: 1px solid var(--color-border);
-  }
-  .segment-track {
-    position: absolute;
-    top: 3px;
-    bottom: 3px;
-    left: 3px;
-    width: calc((100% - 6px) / var(--segment-count));
-    border-radius: calc(var(--radius-md) - 2px);
-    background: var(--color-accent-bg);
-    border: 1px solid var(--color-accent-border);
-    transform: translateX(calc(var(--segment-index) * 100%));
-    transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
-    pointer-events: none;
-    z-index: 0;
-  }
-  .segment {
-    position: relative;
-    z-index: 1;
-    flex: 1;
-    padding: 5px var(--space-md);
-    border: none;
-    background: none;
+    border-radius: 999px;
+    background: transparent;
     color: var(--color-muted);
     font-family: var(--font-ui);
     font-size: 12.5px;
     font-weight: 500;
-    cursor: pointer;
-    border-radius: calc(var(--radius-md) - 2px);
     white-space: nowrap;
-    transition: color 200ms ease;
-    line-height: 1;
+    cursor: pointer;
+    transition: color var(--transition), background var(--transition), border-color var(--transition);
     user-select: none;
   }
-  .segment:hover:not(.active) { color: var(--color-text); }
-  .segment.active { color: var(--color-accent); }
-  .segment:active { transform: scale(0.97); }
+  .cat-chip:hover { color: var(--color-text); background: var(--color-surface-hover); border-color: rgba(255,255,255,0.1); }
+  .cat-chip.active { color: var(--color-accent); background: var(--color-accent-bg); border-color: var(--color-accent-border); }
+  .scroll-arrow {
+    position: absolute;
+    top: 50%;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border: 1px solid var(--color-border);
+    border-radius: 50%;
+    background: var(--color-surface);
+    color: var(--color-muted);
+    font-size: 14px;
+    font-family: var(--font-ui);
+    cursor: pointer;
+    transform: translateY(-50%);
+    transition: background var(--transition), color var(--transition), border-color var(--transition);
+  }
+  .scroll-arrow:hover { background: var(--color-accent-bg); color: var(--color-accent); border-color: var(--color-accent-border); }
+  .scroll-arrow-left { left: 0; }
+  .scroll-arrow-right { right: 0; }
+  .scroll-arrow::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    width: 48px;
+    height: calc(100% + 16px);
+    transform: translateY(-50%);
+    pointer-events: none;
+    z-index: -1;
+    border-radius: var(--radius-md);
+  }
+  .scroll-arrow-left::before { left: -4px; background: linear-gradient(to right, var(--color-bg) 40%, transparent 100%); }
+  .scroll-arrow-right::before { right: -4px; background: linear-gradient(to left, var(--color-bg) 40%, transparent 100%); }
 
   /* Separator */
   .controls-sep {
@@ -707,24 +765,9 @@
     flex-shrink: 0;
   }
   .page-info {
-    display: flex;
-    align-items: center;
-    gap: var(--space-sm);
     font-size: 0.75rem;
     color: var(--color-muted);
   }
-  .page-size-select {
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    color: var(--color-text);
-    font-size: 0.75rem;
-    font-family: var(--font-ui);
-    padding: 2px 6px;
-    cursor: pointer;
-    outline: none;
-  }
-  .page-size-select:focus { border-color: var(--color-accent-border); }
   .page-controls {
     display: flex;
     align-items: center;
