@@ -7,6 +7,7 @@
   import { installFromRegistry } from '$lib/api/client';
   import type { RegistryTemplate } from '$lib/api/types';
   import { marked } from 'marked';
+  import Fuse from 'fuse.js';
 
   let searchQuery = $state('');
   let activeCategory = $state<string | null>(null);
@@ -39,18 +40,29 @@
     unverified: { label: '未验证', cls: 'trust-unverified', color: '#e0af68', icon: ShieldOff },
   } as const;
 
+  let fuse = $derived(registry ? new Fuse(registry.templates, {
+    keys: [
+      { name: 'displayName', weight: 2 },
+      { name: 'name', weight: 1.5 },
+      { name: 'description', weight: 1 },
+      { name: 'author', weight: 1 },
+      { name: 'category', weight: 0.8 },
+      { name: 'keywords', weight: 1.2 },
+    ],
+    threshold: 0.4,
+    ignoreLocation: true,
+  }) : null);
+
   let filteredTemplates = $derived.by(() => {
     if (!registry) return [];
-    return registry.templates.filter(tpl => {
-      const q = searchQuery.toLowerCase();
-      const matchesSearch = !q ||
-        tpl.displayName.toLowerCase().includes(q) ||
-        tpl.name.toLowerCase().includes(q) ||
-        tpl.description.toLowerCase().includes(q) ||
-        tpl.keywords.some(k => k.toLowerCase().includes(q));
+    const q = searchQuery.trim();
+    let results = q && fuse
+      ? fuse.search(q).map(r => r.item)
+      : registry.templates;
+    return results.filter(tpl => {
       const matchesCategory = !activeCategory || tpl.category === activeCategory;
       const matchesTrust = !activeTrust || tpl.trust === activeTrust;
-      return matchesSearch && matchesCategory && matchesTrust;
+      return matchesCategory && matchesTrust;
     });
   });
 
