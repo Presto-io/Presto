@@ -253,6 +253,16 @@ define CREATE_DMG
 	@echo "==> Creating DMG..."
 	@command -v create-dmg >/dev/null 2>&1 || \
 		{ echo "Error: create-dmg not found. Install with: brew install create-dmg"; exit 1; }
+	@# Detach any mounted instances of the target DMG to avoid "resource busy"
+	@DMG_PATH="$(DIST)/$(APP_NAME)-$(VERSION)-macOS-$(1).dmg"; \
+		if [ -f "$$DMG_PATH" ]; then \
+			hdiutil info -plist 2>/dev/null | \
+			perl -ne 'if(/<string>(\/dev\/disk\d+)<\/string>/){$$d=$$1} if(/<string>.*\Q'"$$DMG_PATH"'\E<\/string>/){print "$$d\n"}' | \
+			while read dev; do \
+				echo "    Detaching $$dev ($$DMG_PATH)..."; \
+				hdiutil detach "$$dev" -force 2>/dev/null || true; \
+			done; \
+		fi
 	@rm -f "$(DIST)/$(APP_NAME)-$(VERSION)-macOS-$(1).dmg"
 	create-dmg \
 		--volname "$(APP_NAME)" \
