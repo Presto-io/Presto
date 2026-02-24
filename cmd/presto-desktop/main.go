@@ -17,12 +17,12 @@ import (
 	"strings"
 
 	"github.com/wailsapp/wails/v2"
-	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 	"github.com/wailsapp/wails/v2/pkg/menu"
 	"github.com/wailsapp/wails/v2/pkg/menu/keys"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	macOptions "github.com/wailsapp/wails/v2/pkg/options/mac"
+	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/mrered/presto/internal/api"
 	"github.com/mrered/presto/internal/template"
@@ -163,7 +163,6 @@ func (a *App) readFilePaths(paths []string) []OpenFilesItem {
 }
 
 // OpenFiles opens a native multi-file dialog supporting markdown and ZIP files.
-// Returns file info for each selected file. ZIP files are base64-encoded.
 func (a *App) OpenFiles() ([]OpenFilesItem, error) {
 	paths, err := wailsRuntime.OpenMultipleFilesDialog(a.ctx, wailsRuntime.OpenDialogOptions{
 		Title: "打开文件",
@@ -306,11 +305,11 @@ func (a *App) CheckForUpdate() (*UpdateInfo, error) {
 	}
 
 	// Find a matching asset for the current platform
-	pattern := fmt.Sprintf("%s-%s", runtime.GOOS, runtime.GOARCH)
-	// Normalize: darwin -> macOS for asset naming
-	if runtime.GOOS == "darwin" {
-		pattern = fmt.Sprintf("macOS-%s", runtime.GOARCH)
+	osName := runtime.GOOS
+	if osName == "darwin" {
+		osName = "macOS"
 	}
+	pattern := fmt.Sprintf("%s-%s", osName, runtime.GOARCH)
 	for _, asset := range release.Assets {
 		if strings.Contains(asset.Name, pattern) {
 			info.DownloadURL = asset.BrowserDownloadURL
@@ -353,8 +352,8 @@ func (a *App) SavePDF(markdown string, templateId string, workDir string) error 
 		return fmt.Errorf("template not found: %w", err)
 	}
 
-	exec := a.manager.Executor(tpl)
-	typstOutput, err := exec.Convert(markdown)
+	executor := a.manager.Executor(tpl)
+	typstOutput, err := executor.Convert(markdown)
 	if err != nil {
 		return fmt.Errorf("conversion failed: %w", err)
 	}
@@ -394,18 +393,15 @@ func extractTypstTitle(typ string) string {
 	// Try heading levels 1 through 5
 	for level := 1; level <= 5; level++ {
 		prefix := strings.Repeat("=", level) + " "
+		deeperPrefix := strings.Repeat("=", level+1)
 		for _, line := range lines {
 			trimmed := strings.TrimSpace(line)
 			if !strings.HasPrefix(trimmed, prefix) {
 				continue
 			}
-			// Make sure it's exactly this level, not a deeper one
-			// e.g. "= " is level 1, "== " is level 2
-			if level < 5 {
-				deeper := strings.Repeat("=", level+1)
-				if strings.HasPrefix(trimmed, deeper) {
-					continue
-				}
+			// Skip deeper headings (e.g. "== " when looking for "= ")
+			if level < 5 && strings.HasPrefix(trimmed, deeperPrefix) {
+				continue
 			}
 			content := strings.TrimSpace(trimmed[len(prefix):])
 			title := resolveTypstText(content, lines)
@@ -482,7 +478,8 @@ func findTypstBinary() string {
 
 func main() {
 	home, _ := os.UserHomeDir()
-	templatesDir := filepath.Join(home, ".presto", "templates")
+	prestoDir := filepath.Join(home, ".presto")
+	templatesDir := filepath.Join(prestoDir, "templates")
 	os.MkdirAll(templatesDir, 0755)
 
 	manager := template.NewManager(templatesDir)
@@ -490,7 +487,6 @@ func main() {
 	log.Printf("[presto] using typst: %s", typstBin)
 
 	// Registry cache for SHA256 verification of imported templates
-	prestoDir := filepath.Join(home, ".presto")
 	registry := template.NewRegistryCache(prestoDir)
 	registry.RefreshAsync()
 

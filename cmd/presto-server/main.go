@@ -27,7 +27,8 @@ func main() {
 	}
 
 	home, _ := os.UserHomeDir()
-	templatesDir := filepath.Join(home, ".presto", "templates")
+	prestoDir := filepath.Join(home, ".presto")
+	templatesDir := filepath.Join(prestoDir, "templates")
 	os.MkdirAll(templatesDir, 0755)
 
 	staticDir := os.Getenv("STATIC_DIR")
@@ -46,7 +47,7 @@ func main() {
 	}
 
 	// Font paths: default to ~/.presto/fonts, can override with FONT_PATHS (colon-separated)
-	fontsDir := filepath.Join(home, ".presto", "fonts")
+	fontsDir := filepath.Join(prestoDir, "fonts")
 	os.MkdirAll(fontsDir, 0755)
 	var fontPaths []string
 	if fp := os.Getenv("FONT_PATHS"); fp != "" {
@@ -56,7 +57,6 @@ func main() {
 	}
 
 	// Registry cache for SHA256 verification of imported templates
-	prestoDir := filepath.Join(home, ".presto")
 	registry := template.NewRegistryCache(prestoDir)
 	registry.RefreshAsync()
 
