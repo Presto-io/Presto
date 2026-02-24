@@ -91,6 +91,9 @@ export interface RegistryTemplate {
   previewImage?: string;
 }
 
+/** 通用商店条目类型（将来插件/Skills 有独立字段时改为基接口） */
+export type RegistryItem = RegistryTemplate;
+
 export interface Registry {
   version: number;
   updatedAt: string;

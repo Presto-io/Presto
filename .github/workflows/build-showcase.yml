@@ -6,6 +6,7 @@ on:
     paths:
       - 'frontend/src/routes/showcase/**'
       - 'frontend/src/lib/showcase/**'
+      - 'frontend/src/lib/components/StoreView.svelte'
   workflow_dispatch:
 
 jobs:
