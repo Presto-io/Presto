@@ -22,33 +22,15 @@ func NewExecutor(binaryPath string) *Executor {
 
 // SEC-10: Minimal environment for template execution
 // SEC-12: Timeout via context
-func (e *Executor) Convert(markdown string) (string, error) {
+func (e *Executor) run(args []string, stdin string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), executorTimeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, e.BinaryPath)
+	cmd := exec.CommandContext(ctx, e.BinaryPath, args...)
 	cmd.Env = []string{"PATH=/usr/local/bin:/usr/bin:/bin"}
-	cmd.Stdin = strings.NewReader(markdown)
-
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return "", fmt.Errorf("template execution timed out after %s", executorTimeout)
-		}
-		return "", fmt.Errorf("template execution failed: %w\nstderr: %s", err, stderr.String())
+	if stdin != "" {
+		cmd.Stdin = strings.NewReader(stdin)
 	}
-	return stdout.String(), nil
-}
-
-func (e *Executor) GetManifest() ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), executorTimeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, e.BinaryPath, "--manifest")
-	cmd.Env = []string{"PATH=/usr/local/bin:/usr/bin:/bin"}
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -56,29 +38,33 @@ func (e *Executor) GetManifest() ([]byte, error) {
 
 	if err := cmd.Run(); err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
-			return nil, fmt.Errorf("manifest retrieval timed out after %s", executorTimeout)
+			return nil, fmt.Errorf("execution timed out after %s", executorTimeout)
 		}
-		return nil, fmt.Errorf("manifest retrieval failed: %w\nstderr: %s", err, stderr.String())
+		return nil, fmt.Errorf("execution failed: %w\nstderr: %s", err, stderr.String())
 	}
 	return stdout.Bytes(), nil
 }
 
-func (e *Executor) GetExample() (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), executorTimeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, e.BinaryPath, "--example")
-	cmd.Env = []string{"PATH=/usr/local/bin:/usr/bin:/bin"}
-
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return "", fmt.Errorf("example retrieval timed out after %s", executorTimeout)
-		}
-		return "", fmt.Errorf("example retrieval failed: %w\nstderr: %s", err, stderr.String())
+func (e *Executor) Convert(markdown string) (string, error) {
+	out, err := e.run(nil, markdown)
+	if err != nil {
+		return "", fmt.Errorf("template convert: %w", err)
 	}
-	return stdout.String(), nil
+	return string(out), nil
+}
+
+func (e *Executor) GetManifest() ([]byte, error) {
+	out, err := e.run([]string{"--manifest"}, "")
+	if err != nil {
+		return nil, fmt.Errorf("get manifest: %w", err)
+	}
+	return out, nil
+}
+
+func (e *Executor) GetExample() (string, error) {
+	out, err := e.run([]string{"--example"}, "")
+	if err != nil {
+		return "", fmt.Errorf("get example: %w", err)
+	}
+	return string(out), nil
 }

@@ -2,7 +2,6 @@ package template
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -22,13 +21,11 @@ const (
 	maxRegistrySize = 10 << 20 // 10 MB
 )
 
-// RegistryPlatformInfo holds per-platform binary URL and SHA256.
 type RegistryPlatformInfo struct {
 	URL    string `json:"url"`
 	SHA256 string `json:"sha256"`
 }
 
-// RegistryEntry represents a single template in the registry.
 type RegistryEntry struct {
 	Name      string                          `json:"name"`
 	Version   string                          `json:"version"`
@@ -37,7 +34,6 @@ type RegistryEntry struct {
 	Platforms map[string]RegistryPlatformInfo `json:"platforms"`
 }
 
-// Registry is the top-level registry structure.
 type Registry struct {
 	Version   int             `json:"version"`
 	UpdatedAt string          `json:"updatedAt"`
@@ -54,7 +50,6 @@ const (
 	VerifyMismatch      VerifyResult = "mismatch"
 )
 
-// registryCache wraps cached file metadata.
 type registryCache struct {
 	FetchedAt time.Time `json:"fetchedAt"`
 	Registry  Registry  `json:"registry"`
@@ -69,7 +64,6 @@ type RegistryCache struct {
 	cache *registryCache
 }
 
-// NewRegistryCache creates a new RegistryCache.
 func NewRegistryCache(cacheDir string) *RegistryCache {
 	return &RegistryCache{
 		cacheDir: cacheDir,
@@ -77,7 +71,6 @@ func NewRegistryCache(cacheDir string) *RegistryCache {
 	}
 }
 
-// cachePath returns the full path to the cache file.
 func (rc *RegistryCache) cachePath() string {
 	return filepath.Join(rc.cacheDir, registryCacheFile)
 }
@@ -122,14 +115,10 @@ func (rc *RegistryCache) Load() *Registry {
 	return nil
 }
 
-// RefreshAsync refreshes the registry cache in the background.
 func (rc *RegistryCache) RefreshAsync() {
-	go func() {
-		rc.fetchFromCDN()
-	}()
+	go rc.fetchFromCDN()
 }
 
-// fetchFromCDN downloads the registry from the CDN and updates the cache.
 func (rc *RegistryCache) fetchFromCDN() *Registry {
 	client := &http.Client{Timeout: fetchTimeout}
 	resp, err := client.Get(rc.cdnURL)
@@ -165,7 +154,6 @@ func (rc *RegistryCache) fetchFromCDN() *Registry {
 	rc.cache = cached
 	rc.mu.Unlock()
 
-	// Persist to disk
 	if cacheData, err := json.Marshal(cached); err == nil {
 		if err := os.WriteFile(rc.cachePath(), cacheData, 0644); err != nil {
 			log.Printf("[registry] cache write failed: %v", err)
@@ -176,15 +164,13 @@ func (rc *RegistryCache) fetchFromCDN() *Registry {
 	return &reg
 }
 
-// VerifySHA256 checks a binary's SHA256 against the registry for the given
-// template name and current platform. Returns the verification result.
 func (rc *RegistryCache) VerifySHA256(templateName, actualSHA256 string) VerifyResult {
 	reg := rc.Load()
 	if reg == nil {
 		return VerifyPending
 	}
 
-	platform := runtime.GOOS + "-" + runtime.GOARCH
+	platform := Platform()
 
 	for _, entry := range reg.Templates {
 		if entry.Name != templateName {
@@ -192,7 +178,6 @@ func (rc *RegistryCache) VerifySHA256(templateName, actualSHA256 string) VerifyR
 		}
 		info, ok := entry.Platforms[platform]
 		if !ok || info.SHA256 == "" {
-			// Template is in registry but no hash for this platform
 			return VerifyNotInRegistry
 		}
 		if info.SHA256 == actualSHA256 {
@@ -204,8 +189,6 @@ func (rc *RegistryCache) VerifySHA256(templateName, actualSHA256 string) VerifyR
 	return VerifyNotInRegistry
 }
 
-// LookupTrust returns the trust level for a template from the registry.
-// Returns empty string if not found.
 func (rc *RegistryCache) LookupTrust(templateName string) string {
 	reg := rc.Load()
 	if reg == nil {
@@ -219,7 +202,6 @@ func (rc *RegistryCache) LookupTrust(templateName string) string {
 	return ""
 }
 
-// Platform returns the current platform string (e.g. "darwin-arm64").
 func Platform() string {
-	return fmt.Sprintf("%s-%s", runtime.GOOS, runtime.GOARCH)
+	return runtime.GOOS + "-" + runtime.GOARCH
 }
