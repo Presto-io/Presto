@@ -179,7 +179,7 @@
             <div class="selector-empty-guide">
               <ShoppingBag size={16} />
               <span>尚未安装模板</span>
-              <button class="guide-link" onclick={() => { open = false; goto('/store'); }}>前往模板商店</button>
+              <button class="guide-link" onclick={() => { open = false; goto('/store-templates'); }}>前往模板商店</button>
             </div>
           {:else}
             <div class="selector-empty">无匹配模板</div>
