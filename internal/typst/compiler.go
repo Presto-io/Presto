@@ -150,20 +150,14 @@ func (c *Compiler) CompileToSVG(typstSource, workDir string) ([]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), compileTimeout)
 	defer cancel()
 
-	var dir string
-	var cleanDir bool
-
-	if workDir != "" {
-		dir = workDir
-	} else {
+	ownDir := workDir == ""
+	dir := workDir
+	if ownDir {
 		var err error
 		dir, err = os.MkdirTemp("", "presto-svg-*")
 		if err != nil {
 			return nil, err
 		}
-		cleanDir = true
-	}
-	if cleanDir {
 		defer os.RemoveAll(dir)
 	}
 
@@ -173,7 +167,7 @@ func (c *Compiler) CompileToSVG(typstSource, workDir string) ([]string, error) {
 	if err := os.WriteFile(typFile, []byte(typstSource), 0644); err != nil {
 		return nil, err
 	}
-	if !cleanDir {
+	if !ownDir {
 		defer os.Remove(typFile)
 	}
 
@@ -200,10 +194,9 @@ func (c *Compiler) CompileToSVG(typstSource, workDir string) ([]string, error) {
 		log.Printf("[compile-svg] typst output: %s", output)
 	}
 
-	// Collect SVG pages — use glob as primary method for robustness
+	// Collect SVG pages
 	globPattern := filepath.Join(dir, fmt.Sprintf(".presto-temp-%s-*.svg", suffix))
 	matches, _ := filepath.Glob(globPattern)
-	sort.Strings(matches) // lexicographic sort works for single-digit; re-sort numerically below
 
 	// Sort numerically by extracting page number
 	scanFmt := fmt.Sprintf(".presto-temp-%s-%%d.svg", suffix)
@@ -221,7 +214,7 @@ func (c *Compiler) CompileToSVG(typstSource, workDir string) ([]string, error) {
 			continue
 		}
 		pages = append(pages, string(data))
-		if !cleanDir {
+		if !ownDir {
 			os.Remove(svgFile)
 		}
 	}
@@ -231,7 +224,7 @@ func (c *Compiler) CompileToSVG(typstSource, workDir string) ([]string, error) {
 		data, err := os.ReadFile(svgFile)
 		if err == nil {
 			pages = append(pages, string(data))
-			if !cleanDir {
+			if !ownDir {
 				os.Remove(svgFile)
 			}
 		}
