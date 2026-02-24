@@ -3,6 +3,7 @@
 Presto: Markdown → Typst → PDF 文档转换平台（桌面端 Wails + Web 端 Docker）。模块 `github.com/mrered/presto`。
 
 > 详细架构、构建命令、项目结构、测试方法、环境依赖 → 见 `docs/ai-reference.md`
+> 整体架构设计（模板系统、分发模型、商店、注册表等）→ 见 Presto-homepage 仓库 `docs/specs/Presto-architecture.md`
 
 ## 代码规范
 
