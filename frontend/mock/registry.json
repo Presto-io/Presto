@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-02-23T00:00:00Z",
+  "updatedAt": "2026-02-24T00:00:00Z",
   "templates": [
     {
       "name": "gongwen",
@@ -10,7 +10,12 @@
       "author": "Presto-io",
       "repo": "Presto-io/presto-official-templates",
       "category": "公文",
-      "keywords": ["公文", "红头文件", "通知", "政府"],
+      "keywords": [
+        "公文",
+        "红头文件",
+        "通知",
+        "政府"
+      ],
       "license": "MIT",
       "trust": "official",
       "platforms": {
@@ -41,7 +46,12 @@
       "author": "Presto-io",
       "repo": "Presto-io/presto-official-templates",
       "category": "教育",
-      "keywords": ["教案", "教学设计", "课程", "教育"],
+      "keywords": [
+        "教案",
+        "教学设计",
+        "课程",
+        "教育"
+      ],
       "license": "MIT",
       "trust": "official",
       "platforms": {
@@ -72,7 +82,12 @@
       "author": "DesignStudio",
       "repo": "example/resume-modern",
       "category": "创意",
-      "keywords": ["简历", "求职", "个人介绍", "CV"],
+      "keywords": [
+        "简历",
+        "求职",
+        "个人介绍",
+        "CV"
+      ],
       "license": "MIT",
       "trust": "verified",
       "platforms": {
@@ -90,7 +105,12 @@
       "author": "AcademicTools",
       "repo": "example/thesis-template",
       "category": "教育",
-      "keywords": ["论文", "学术", "毕业论文", "参考文献"],
+      "keywords": [
+        "论文",
+        "学术",
+        "毕业论文",
+        "参考文献"
+      ],
       "license": "Apache-2.0",
       "trust": "verified",
       "platforms": {
@@ -108,7 +128,12 @@
       "author": "BizDocs",
       "repo": "example/meeting-minutes",
       "category": "商务",
-      "keywords": ["会议", "纪要", "企业", "记录"],
+      "keywords": [
+        "会议",
+        "纪要",
+        "企业",
+        "记录"
+      ],
       "license": "MIT",
       "trust": "community"
     },
@@ -120,7 +145,12 @@
       "author": "FinTools",
       "repo": "example/invoice-template",
       "category": "商务",
-      "keywords": ["发票", "财务", "账单", "商业"],
+      "keywords": [
+        "发票",
+        "财务",
+        "账单",
+        "商业"
+      ],
       "license": "MIT",
       "trust": "verified",
       "platforms": {
@@ -138,7 +168,12 @@
       "author": "PosterLab",
       "repo": "example/poster-academic",
       "category": "创意",
-      "keywords": ["海报", "学术", "会议", "展示"],
+      "keywords": [
+        "海报",
+        "学术",
+        "会议",
+        "展示"
+      ],
       "license": "CC-BY-4.0",
       "trust": "community"
     },
@@ -150,7 +185,12 @@
       "author": "ReportHub",
       "repo": "example/report-annual",
       "category": "商务",
-      "keywords": ["年报", "报告", "企业", "总结"],
+      "keywords": [
+        "年报",
+        "报告",
+        "企业",
+        "总结"
+      ],
       "license": "MIT",
       "trust": "community"
     },
@@ -162,8 +202,3753 @@
       "author": "Presto-io",
       "repo": "Presto-io/presto-template-letter",
       "category": "公文",
-      "keywords": ["信函", "公函", "商务信件", "正式"],
+      "keywords": [
+        "信函",
+        "公函",
+        "商务信件",
+        "正式"
+      ],
       "license": "MIT",
+      "trust": "official"
+    },
+    {
+      "name": "公文-红头文件-1",
+      "displayName": "专业红头文件",
+      "description": "专业红头文件，适用于公文场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.1.1",
+      "author": "Presto-io",
+      "repo": "presto-io/公文-红头文件-1",
+      "category": "公文",
+      "keywords": [
+        "公文",
+        "红头文件",
+        "专业",
+        "通知公告"
+      ],
+      "license": "MIT",
+      "trust": "official"
+    },
+    {
+      "name": "公文-红头文件-2-2",
+      "displayName": "简约红头文件",
+      "description": "简约红头文件，适用于公文场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.2.2",
+      "author": "EduPro",
+      "repo": "edupro/公文-红头文件-2-2",
+      "category": "公文",
+      "keywords": [
+        "公文",
+        "红头文件",
+        "简约",
+        "通知公告"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "公文-通知公告-3",
+      "displayName": "现代通知公告",
+      "description": "现代通知公告，适用于公文场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.3.3",
+      "author": "Presto-io",
+      "repo": "presto-io/公文-通知公告-3",
+      "category": "公文",
+      "keywords": [
+        "公文",
+        "通知公告",
+        "现代",
+        "批复意见"
+      ],
+      "license": "Apache-2.0",
+      "trust": "official"
+    },
+    {
+      "name": "公文-通知公告-2-4",
+      "displayName": "经典通知公告",
+      "description": "经典通知公告，适用于公文场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.4.0",
+      "author": "BizFlow",
+      "repo": "bizflow/公文-通知公告-2-4",
+      "category": "公文",
+      "keywords": [
+        "公文",
+        "通知公告",
+        "经典",
+        "批复意见"
+      ],
+      "license": "CC-BY-4.0",
+      "trust": "community"
+    },
+    {
+      "name": "公文-批复意见-5",
+      "displayName": "高级批复意见",
+      "description": "高级批复意见，适用于公文场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.5.1",
+      "author": "Presto-io",
+      "repo": "presto-io/公文-批复意见-5",
+      "category": "公文",
+      "keywords": [
+        "公文",
+        "批复意见",
+        "高级",
+        "请示报告"
+      ],
+      "license": "MIT",
+      "trust": "official"
+    },
+    {
+      "name": "公文-批复意见-2-6",
+      "displayName": "通用批复意见",
+      "description": "通用批复意见，适用于公文场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.6.2",
+      "author": "MedDoc",
+      "repo": "meddoc/公文-批复意见-2-6",
+      "category": "公文",
+      "keywords": [
+        "公文",
+        "批复意见",
+        "通用",
+        "请示报告"
+      ],
+      "license": "GPL-3.0",
+      "trust": "unverified"
+    },
+    {
+      "name": "公文-请示报告-7",
+      "displayName": "定制请示报告",
+      "description": "定制请示报告，适用于公文场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.7.3",
+      "author": "Presto-io",
+      "repo": "presto-io/公文-请示报告-7",
+      "category": "公文",
+      "keywords": [
+        "公文",
+        "请示报告",
+        "定制",
+        "会议纪要"
+      ],
+      "license": "MIT",
+      "trust": "official"
+    },
+    {
+      "name": "公文-会议纪要-8",
+      "displayName": "快速会议纪要",
+      "description": "快速会议纪要，适用于公文场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.8.0",
+      "author": "Presto-io",
+      "repo": "presto-io/公文-会议纪要-8",
+      "category": "公文",
+      "keywords": [
+        "公文",
+        "会议纪要",
+        "快速",
+        "公示公告"
+      ],
+      "license": "MIT",
+      "trust": "official"
+    },
+    {
+      "name": "公文-公示公告-9",
+      "displayName": "精品公示公告",
+      "description": "精品公示公告，适用于公文场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.9.1",
+      "author": "Presto-io",
+      "repo": "presto-io/公文-公示公告-9",
+      "category": "公文",
+      "keywords": [
+        "公文",
+        "公示公告",
+        "精品",
+        "规章制度"
+      ],
+      "license": "MIT",
+      "trust": "official"
+    },
+    {
+      "name": "公文-规章制度-10",
+      "displayName": "智能规章制度",
+      "description": "智能规章制度，适用于公文场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.0.2",
+      "author": "Presto-io",
+      "repo": "presto-io/公文-规章制度-10",
+      "category": "公文",
+      "keywords": [
+        "公文",
+        "规章制度",
+        "智能",
+        "工作总结"
+      ],
+      "license": "MIT",
+      "trust": "official"
+    },
+    {
+      "name": "公文-工作总结-11",
+      "displayName": "极简工作总结",
+      "description": "极简工作总结，适用于公文场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.1.3",
+      "author": "Presto-io",
+      "repo": "presto-io/公文-工作总结-11",
+      "category": "公文",
+      "keywords": [
+        "公文",
+        "工作总结",
+        "极简",
+        "红头文件"
+      ],
+      "license": "Apache-2.0",
+      "trust": "official"
+    },
+    {
+      "name": "教育-教案设计-12",
+      "displayName": "商用教案设计",
+      "description": "商用教案设计，适用于教育场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.2.0",
+      "author": "MfgDoc",
+      "repo": "mfgdoc/教育-教案设计-12",
+      "category": "教育",
+      "keywords": [
+        "教育",
+        "教案设计",
+        "商用",
+        "试卷排版"
+      ],
+      "license": "CC-BY-4.0",
+      "trust": "community"
+    },
+    {
+      "name": "教育-教案设计-2-13",
+      "displayName": "正式教案设计",
+      "description": "正式教案设计，适用于教育场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.3.1",
+      "author": "LitPress",
+      "repo": "litpress/教育-教案设计-2-13",
+      "category": "教育",
+      "keywords": [
+        "教育",
+        "教案设计",
+        "正式",
+        "试卷排版"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "教育-试卷排版-14",
+      "displayName": "多功能试卷排版",
+      "description": "多功能试卷排版，适用于教育场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.4.2",
+      "author": "SportDoc",
+      "repo": "sportdoc/教育-试卷排版-14",
+      "category": "教育",
+      "keywords": [
+        "教育",
+        "试卷排版",
+        "多功能",
+        "课程大纲"
+      ],
+      "license": "GPL-3.0",
+      "trust": "community"
+    },
+    {
+      "name": "教育-试卷排版-2-15",
+      "displayName": "标准试卷排版",
+      "description": "标准试卷排版，适用于教育场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.5.3",
+      "author": "TravelKit",
+      "repo": "travelkit/教育-试卷排版-2-15",
+      "category": "教育",
+      "keywords": [
+        "教育",
+        "试卷排版",
+        "标准",
+        "课程大纲"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "教育-课程大纲-16",
+      "displayName": "专业课程大纲",
+      "description": "专业课程大纲，适用于教育场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.6.0",
+      "author": "SocialPub",
+      "repo": "socialpub/教育-课程大纲-16",
+      "category": "教育",
+      "keywords": [
+        "教育",
+        "课程大纲",
+        "专业",
+        "学生手册"
+      ],
+      "license": "MIT",
+      "trust": "unverified"
+    },
+    {
+      "name": "教育-课程大纲-2-17",
+      "displayName": "简约课程大纲",
+      "description": "简约课程大纲，适用于教育场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.7.1",
+      "author": "GameDev",
+      "repo": "gamedev/教育-课程大纲-2-17",
+      "category": "教育",
+      "keywords": [
+        "教育",
+        "课程大纲",
+        "简约",
+        "学生手册"
+      ],
+      "license": "MIT",
+      "trust": "unverified"
+    },
+    {
+      "name": "教育-学生手册-18",
+      "displayName": "现代学生手册",
+      "description": "现代学生手册，适用于教育场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.8.2",
+      "author": "MusicSheet",
+      "repo": "musicsheet/教育-学生手册-18",
+      "category": "教育",
+      "keywords": [
+        "教育",
+        "学生手册",
+        "现代",
+        "实验报告"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "教育-实验报告-19",
+      "displayName": "经典实验报告",
+      "description": "经典实验报告，适用于教育场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.9.3",
+      "author": "FarmDoc",
+      "repo": "farmdoc/教育-实验报告-19",
+      "category": "教育",
+      "keywords": [
+        "教育",
+        "实验报告",
+        "经典",
+        "毕业论文"
+      ],
+      "license": "Apache-2.0",
+      "trust": "verified"
+    },
+    {
+      "name": "教育-毕业论文-20",
+      "displayName": "高级毕业论文",
+      "description": "高级毕业论文，适用于教育场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.0.0",
+      "author": "Presto-io",
+      "repo": "presto-io/教育-毕业论文-20",
+      "category": "教育",
+      "keywords": [
+        "教育",
+        "毕业论文",
+        "高级",
+        "教学评估"
+      ],
+      "license": "CC-BY-4.0",
+      "trust": "official"
+    },
+    {
+      "name": "教育-教学评估-21",
+      "displayName": "通用教学评估",
+      "description": "通用教学评估，适用于教育场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.1.1",
+      "author": "SmartForm",
+      "repo": "smartform/教育-教学评估-21",
+      "category": "教育",
+      "keywords": [
+        "教育",
+        "教学评估",
+        "通用",
+        "学籍档案"
+      ],
+      "license": "MIT",
+      "trust": "verified"
+    },
+    {
+      "name": "教育-学籍档案-22",
+      "displayName": "定制学籍档案",
+      "description": "定制学籍档案，适用于教育场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.2.2",
+      "author": "QuickPrint",
+      "repo": "quickprint/教育-学籍档案-22",
+      "category": "教育",
+      "keywords": [
+        "教育",
+        "学籍档案",
+        "定制",
+        "教案设计"
+      ],
+      "license": "GPL-3.0",
+      "trust": "community"
+    },
+    {
+      "name": "创意-海报设计-23",
+      "displayName": "快速海报设计",
+      "description": "快速海报设计，适用于创意场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.3.3",
+      "author": "ProLayout",
+      "repo": "prolayout/创意-海报设计-23",
+      "category": "创意",
+      "keywords": [
+        "创意",
+        "海报设计",
+        "快速",
+        "名片排版"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "创意-海报设计-2-24",
+      "displayName": "精品海报设计",
+      "description": "精品海报设计，适用于创意场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.4.0",
+      "author": "TypesetCN",
+      "repo": "typesetcn/创意-海报设计-2-24",
+      "category": "创意",
+      "keywords": [
+        "创意",
+        "海报设计",
+        "精品",
+        "名片排版"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "创意-名片排版-25",
+      "displayName": "智能名片排版",
+      "description": "智能名片排版，适用于创意场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.5.1",
+      "author": "FormatLib",
+      "repo": "formatlib/创意-名片排版-25",
+      "category": "创意",
+      "keywords": [
+        "创意",
+        "名片排版",
+        "智能",
+        "邀请函"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "创意-名片排版-2-26",
+      "displayName": "极简名片排版",
+      "description": "极简名片排版，适用于创意场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.6.2",
+      "author": "PageCraft",
+      "repo": "pagecraft/创意-名片排版-2-26",
+      "category": "创意",
+      "keywords": [
+        "创意",
+        "名片排版",
+        "极简",
+        "邀请函"
+      ],
+      "license": "MIT",
+      "trust": "unverified"
+    },
+    {
+      "name": "创意-邀请函-27",
+      "displayName": "商用邀请函",
+      "description": "商用邀请函，适用于创意场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.7.3",
+      "author": "TemplateX",
+      "repo": "templatex/创意-邀请函-27",
+      "category": "创意",
+      "keywords": [
+        "创意",
+        "邀请函",
+        "商用",
+        "宣传册"
+      ],
+      "license": "Apache-2.0",
+      "trust": "unverified"
+    },
+    {
+      "name": "创意-邀请函-2-28",
+      "displayName": "正式邀请函",
+      "description": "正式邀请函，适用于创意场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.8.0",
+      "author": "DocGenius",
+      "repo": "docgenius/创意-邀请函-2-28",
+      "category": "创意",
+      "keywords": [
+        "创意",
+        "邀请函",
+        "正式",
+        "宣传册"
+      ],
+      "license": "CC-BY-4.0",
+      "trust": "community"
+    },
+    {
+      "name": "创意-宣传册-29",
+      "displayName": "多功能宣传册",
+      "description": "多功能宣传册，适用于创意场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.9.1",
+      "author": "PrintFlow",
+      "repo": "printflow/创意-宣传册-29",
+      "category": "创意",
+      "keywords": [
+        "创意",
+        "宣传册",
+        "多功能",
+        "个人简历"
+      ],
+      "license": "MIT",
+      "trust": "verified"
+    },
+    {
+      "name": "创意-个人简历-30",
+      "displayName": "标准个人简历",
+      "description": "标准个人简历，适用于创意场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.0.2",
+      "author": "Presto-io",
+      "repo": "presto-io/创意-个人简历-30",
+      "category": "创意",
+      "keywords": [
+        "创意",
+        "个人简历",
+        "标准",
+        "作品集"
+      ],
+      "license": "GPL-3.0",
+      "trust": "official"
+    },
+    {
+      "name": "创意-作品集-31",
+      "displayName": "专业作品集",
+      "description": "专业作品集，适用于创意场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.1.3",
+      "author": "DocMaster",
+      "repo": "docmaster/创意-作品集-31",
+      "category": "创意",
+      "keywords": [
+        "创意",
+        "作品集",
+        "专业",
+        "展板设计"
+      ],
+      "license": "MIT",
+      "trust": "verified"
+    },
+    {
+      "name": "创意-展板设计-32",
+      "displayName": "简约展板设计",
+      "description": "简约展板设计，适用于创意场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.2.0",
+      "author": "EduPro",
+      "repo": "edupro/创意-展板设计-32",
+      "category": "创意",
+      "keywords": [
+        "创意",
+        "展板设计",
+        "简约",
+        "贺卡"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "创意-贺卡-33",
+      "displayName": "现代贺卡",
+      "description": "现代贺卡，适用于创意场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.3.1",
+      "author": "CreativeHub",
+      "repo": "creativehub/创意-贺卡-33",
+      "category": "创意",
+      "keywords": [
+        "创意",
+        "贺卡",
+        "现代",
+        "海报设计"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "商务-商业计划书-34",
+      "displayName": "经典商业计划书",
+      "description": "经典商业计划书，适用于商务场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.4.2",
+      "author": "BizFlow",
+      "repo": "bizflow/商务-商业计划书-34",
+      "category": "商务",
+      "keywords": [
+        "商务",
+        "商业计划书",
+        "经典",
+        "合同协议"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "商务-商业计划书-2-35",
+      "displayName": "高级商业计划书",
+      "description": "高级商业计划书，适用于商务场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.5.3",
+      "author": "LegalAid",
+      "repo": "legalaid/商务-商业计划书-2-35",
+      "category": "商务",
+      "keywords": [
+        "商务",
+        "商业计划书",
+        "高级",
+        "合同协议"
+      ],
+      "license": "Apache-2.0",
+      "trust": "community"
+    },
+    {
+      "name": "商务-合同协议-36",
+      "displayName": "通用合同协议",
+      "description": "通用合同协议，适用于商务场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.6.0",
+      "author": "MedDoc",
+      "repo": "meddoc/商务-合同协议-36",
+      "category": "商务",
+      "keywords": [
+        "商务",
+        "合同协议",
+        "通用",
+        "企业报告"
+      ],
+      "license": "CC-BY-4.0",
+      "trust": "unverified"
+    },
+    {
+      "name": "商务-合同协议-2-37",
+      "displayName": "定制合同协议",
+      "description": "定制合同协议，适用于商务场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.7.1",
+      "author": "TechNote",
+      "repo": "technote/商务-合同协议-2-37",
+      "category": "商务",
+      "keywords": [
+        "商务",
+        "合同协议",
+        "定制",
+        "企业报告"
+      ],
+      "license": "MIT",
+      "trust": "unverified"
+    },
+    {
+      "name": "商务-企业报告-38",
+      "displayName": "快速企业报告",
+      "description": "快速企业报告，适用于商务场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.8.2",
+      "author": "FinReport",
+      "repo": "finreport/商务-企业报告-38",
+      "category": "商务",
+      "keywords": [
+        "商务",
+        "企业报告",
+        "快速",
+        "会议议程"
+      ],
+      "license": "GPL-3.0",
+      "trust": "community"
+    },
+    {
+      "name": "商务-企业报告-2-39",
+      "displayName": "精品企业报告",
+      "description": "精品企业报告，适用于商务场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.9.3",
+      "author": "RealtyDoc",
+      "repo": "realtydoc/商务-企业报告-2-39",
+      "category": "商务",
+      "keywords": [
+        "商务",
+        "企业报告",
+        "精品",
+        "会议议程"
+      ],
+      "license": "MIT",
+      "trust": "verified"
+    },
+    {
+      "name": "商务-会议议程-40",
+      "displayName": "智能会议议程",
+      "description": "智能会议议程，适用于商务场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.0.0",
+      "author": "Presto-io",
+      "repo": "presto-io/商务-会议议程-40",
+      "category": "商务",
+      "keywords": [
+        "商务",
+        "会议议程",
+        "智能",
+        "工作周报"
+      ],
+      "license": "MIT",
+      "trust": "official"
+    },
+    {
+      "name": "商务-工作周报-41",
+      "displayName": "极简工作周报",
+      "description": "极简工作周报，适用于商务场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.1.1",
+      "author": "FoodBiz",
+      "repo": "foodbiz/商务-工作周报-41",
+      "category": "商务",
+      "keywords": [
+        "商务",
+        "工作周报",
+        "极简",
+        "项目提案"
+      ],
+      "license": "MIT",
+      "trust": "verified"
+    },
+    {
+      "name": "商务-项目提案-42",
+      "displayName": "商用项目提案",
+      "description": "商用项目提案，适用于商务场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.2.2",
+      "author": "MfgDoc",
+      "repo": "mfgdoc/商务-项目提案-42",
+      "category": "商务",
+      "keywords": [
+        "商务",
+        "项目提案",
+        "商用",
+        "备忘录"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "商务-备忘录-43",
+      "displayName": "正式备忘录",
+      "description": "正式备忘录，适用于商务场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.3.3",
+      "author": "LitPress",
+      "repo": "litpress/商务-备忘录-43",
+      "category": "商务",
+      "keywords": [
+        "商务",
+        "备忘录",
+        "正式",
+        "商务信函"
+      ],
+      "license": "Apache-2.0",
+      "trust": "community"
+    },
+    {
+      "name": "商务-商务信函-44",
+      "displayName": "多功能商务信函",
+      "description": "多功能商务信函，适用于商务场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.4.0",
+      "author": "SportDoc",
+      "repo": "sportdoc/商务-商务信函-44",
+      "category": "商务",
+      "keywords": [
+        "商务",
+        "商务信函",
+        "多功能",
+        "商业计划书"
+      ],
+      "license": "CC-BY-4.0",
+      "trust": "community"
+    },
+    {
+      "name": "法律-起诉状-45",
+      "displayName": "标准起诉状",
+      "description": "标准起诉状，适用于法律场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.5.1",
+      "author": "TravelKit",
+      "repo": "travelkit/法律-起诉状-45",
+      "category": "法律",
+      "keywords": [
+        "法律",
+        "起诉状",
+        "标准",
+        "律师函"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "法律-起诉状-2-46",
+      "displayName": "专业起诉状",
+      "description": "专业起诉状，适用于法律场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.6.2",
+      "author": "SocialPub",
+      "repo": "socialpub/法律-起诉状-2-46",
+      "category": "法律",
+      "keywords": [
+        "法律",
+        "起诉状",
+        "专业",
+        "律师函"
+      ],
+      "license": "GPL-3.0",
+      "trust": "unverified"
+    },
+    {
+      "name": "法律-律师函-47",
+      "displayName": "简约律师函",
+      "description": "简约律师函，适用于法律场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.7.3",
+      "author": "GameDev",
+      "repo": "gamedev/法律-律师函-47",
+      "category": "法律",
+      "keywords": [
+        "法律",
+        "律师函",
+        "简约",
+        "法律意见书"
+      ],
+      "license": "MIT",
+      "trust": "unverified"
+    },
+    {
+      "name": "法律-律师函-2-48",
+      "displayName": "现代律师函",
+      "description": "现代律师函，适用于法律场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.8.0",
+      "author": "MusicSheet",
+      "repo": "musicsheet/法律-律师函-2-48",
+      "category": "法律",
+      "keywords": [
+        "法律",
+        "律师函",
+        "现代",
+        "法律意见书"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "法律-法律意见书-49",
+      "displayName": "经典法律意见书",
+      "description": "经典法律意见书，适用于法律场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.9.1",
+      "author": "FarmDoc",
+      "repo": "farmdoc/法律-法律意见书-49",
+      "category": "法律",
+      "keywords": [
+        "法律",
+        "法律意见书",
+        "经典",
+        "合同审查"
+      ],
+      "license": "MIT",
+      "trust": "verified"
+    },
+    {
+      "name": "法律-法律意见书-2-50",
+      "displayName": "高级法律意见书",
+      "description": "高级法律意见书，适用于法律场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.0.2",
+      "author": "Presto-io",
+      "repo": "presto-io/法律-法律意见书-2-50",
+      "category": "法律",
+      "keywords": [
+        "法律",
+        "法律意见书",
+        "高级",
+        "合同审查"
+      ],
+      "license": "MIT",
+      "trust": "official"
+    },
+    {
+      "name": "法律-合同审查-51",
+      "displayName": "通用合同审查",
+      "description": "通用合同审查，适用于法律场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.1.3",
+      "author": "SmartForm",
+      "repo": "smartform/法律-合同审查-51",
+      "category": "法律",
+      "keywords": [
+        "法律",
+        "合同审查",
+        "通用",
+        "仲裁申请"
+      ],
+      "license": "Apache-2.0",
+      "trust": "verified"
+    },
+    {
+      "name": "法律-仲裁申请-52",
+      "displayName": "定制仲裁申请",
+      "description": "定制仲裁申请，适用于法律场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.2.0",
+      "author": "QuickPrint",
+      "repo": "quickprint/法律-仲裁申请-52",
+      "category": "法律",
+      "keywords": [
+        "法律",
+        "仲裁申请",
+        "定制",
+        "判决书"
+      ],
+      "license": "CC-BY-4.0",
+      "trust": "community"
+    },
+    {
+      "name": "法律-判决书-53",
+      "displayName": "快速判决书",
+      "description": "快速判决书，适用于法律场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.3.1",
+      "author": "ProLayout",
+      "repo": "prolayout/法律-判决书-53",
+      "category": "法律",
+      "keywords": [
+        "法律",
+        "判决书",
+        "快速",
+        "授权委托书"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "法律-授权委托书-54",
+      "displayName": "精品授权委托书",
+      "description": "精品授权委托书，适用于法律场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.4.2",
+      "author": "TypesetCN",
+      "repo": "typesetcn/法律-授权委托书-54",
+      "category": "法律",
+      "keywords": [
+        "法律",
+        "授权委托书",
+        "精品",
+        "法律声明"
+      ],
+      "license": "GPL-3.0",
+      "trust": "community"
+    },
+    {
+      "name": "法律-法律声明-55",
+      "displayName": "智能法律声明",
+      "description": "智能法律声明，适用于法律场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.5.3",
+      "author": "FormatLib",
+      "repo": "formatlib/法律-法律声明-55",
+      "category": "法律",
+      "keywords": [
+        "法律",
+        "法律声明",
+        "智能",
+        "起诉状"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "医疗-病历报告-56",
+      "displayName": "极简病历报告",
+      "description": "极简病历报告，适用于医疗场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.6.0",
+      "author": "PageCraft",
+      "repo": "pagecraft/医疗-病历报告-56",
+      "category": "医疗",
+      "keywords": [
+        "医疗",
+        "病历报告",
+        "极简",
+        "处方笺"
+      ],
+      "license": "MIT",
+      "trust": "unverified"
+    },
+    {
+      "name": "医疗-病历报告-2-57",
+      "displayName": "商用病历报告",
+      "description": "商用病历报告，适用于医疗场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.7.1",
+      "author": "TemplateX",
+      "repo": "templatex/医疗-病历报告-2-57",
+      "category": "医疗",
+      "keywords": [
+        "医疗",
+        "病历报告",
+        "商用",
+        "处方笺"
+      ],
+      "license": "MIT",
+      "trust": "unverified"
+    },
+    {
+      "name": "医疗-处方笺-58",
+      "displayName": "正式处方笺",
+      "description": "正式处方笺，适用于医疗场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.8.2",
+      "author": "DocGenius",
+      "repo": "docgenius/医疗-处方笺-58",
+      "category": "医疗",
+      "keywords": [
+        "医疗",
+        "处方笺",
+        "正式",
+        "检验报告"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "医疗-处方笺-2-59",
+      "displayName": "多功能处方笺",
+      "description": "多功能处方笺，适用于医疗场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.9.3",
+      "author": "PrintFlow",
+      "repo": "printflow/医疗-处方笺-2-59",
+      "category": "医疗",
+      "keywords": [
+        "医疗",
+        "处方笺",
+        "多功能",
+        "检验报告"
+      ],
+      "license": "Apache-2.0",
+      "trust": "verified"
+    },
+    {
+      "name": "医疗-检验报告-60",
+      "displayName": "标准检验报告",
+      "description": "标准检验报告，适用于医疗场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.0.0",
+      "author": "Presto-io",
+      "repo": "presto-io/医疗-检验报告-60",
+      "category": "医疗",
+      "keywords": [
+        "医疗",
+        "检验报告",
+        "标准",
+        "手术记录"
+      ],
+      "license": "CC-BY-4.0",
+      "trust": "official"
+    },
+    {
+      "name": "医疗-检验报告-2-61",
+      "displayName": "专业检验报告",
+      "description": "专业检验报告，适用于医疗场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.1.1",
+      "author": "DocMaster",
+      "repo": "docmaster/医疗-检验报告-2-61",
+      "category": "医疗",
+      "keywords": [
+        "医疗",
+        "检验报告",
+        "专业",
+        "手术记录"
+      ],
+      "license": "MIT",
+      "trust": "verified"
+    },
+    {
+      "name": "医疗-手术记录-62",
+      "displayName": "简约手术记录",
+      "description": "简约手术记录，适用于医疗场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.2.2",
+      "author": "EduPro",
+      "repo": "edupro/医疗-手术记录-62",
+      "category": "医疗",
+      "keywords": [
+        "医疗",
+        "手术记录",
+        "简约",
+        "护理记录"
+      ],
+      "license": "GPL-3.0",
+      "trust": "community"
+    },
+    {
+      "name": "医疗-护理记录-63",
+      "displayName": "现代护理记录",
+      "description": "现代护理记录，适用于医疗场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.3.3",
+      "author": "CreativeHub",
+      "repo": "creativehub/医疗-护理记录-63",
+      "category": "医疗",
+      "keywords": [
+        "医疗",
+        "护理记录",
+        "现代",
+        "出院小结"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "医疗-出院小结-64",
+      "displayName": "经典出院小结",
+      "description": "经典出院小结，适用于医疗场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.4.0",
+      "author": "BizFlow",
+      "repo": "bizflow/医疗-出院小结-64",
+      "category": "医疗",
+      "keywords": [
+        "医疗",
+        "出院小结",
+        "经典",
+        "医学论文"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "医疗-医学论文-65",
+      "displayName": "高级医学论文",
+      "description": "高级医学论文，适用于医疗场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.5.1",
+      "author": "LegalAid",
+      "repo": "legalaid/医疗-医学论文-65",
+      "category": "医疗",
+      "keywords": [
+        "医疗",
+        "医学论文",
+        "高级",
+        "健康档案"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "医疗-健康档案-66",
+      "displayName": "通用健康档案",
+      "description": "通用健康档案，适用于医疗场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.6.2",
+      "author": "MedDoc",
+      "repo": "meddoc/医疗-健康档案-66",
+      "category": "医疗",
+      "keywords": [
+        "医疗",
+        "健康档案",
+        "通用",
+        "病历报告"
+      ],
+      "license": "MIT",
+      "trust": "unverified"
+    },
+    {
+      "name": "科技-技术文档-67",
+      "displayName": "定制技术文档",
+      "description": "定制技术文档，适用于科技场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.7.3",
+      "author": "TechNote",
+      "repo": "technote/科技-技术文档-67",
+      "category": "科技",
+      "keywords": [
+        "科技",
+        "技术文档",
+        "定制",
+        "API文档"
+      ],
+      "license": "Apache-2.0",
+      "trust": "unverified"
+    },
+    {
+      "name": "科技-技术文档-2-68",
+      "displayName": "快速技术文档",
+      "description": "快速技术文档，适用于科技场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.8.0",
+      "author": "FinReport",
+      "repo": "finreport/科技-技术文档-2-68",
+      "category": "科技",
+      "keywords": [
+        "科技",
+        "技术文档",
+        "快速",
+        "API文档"
+      ],
+      "license": "CC-BY-4.0",
+      "trust": "community"
+    },
+    {
+      "name": "科技-api文档-69",
+      "displayName": "精品API文档",
+      "description": "精品API文档，适用于科技场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.9.1",
+      "author": "RealtyDoc",
+      "repo": "realtydoc/科技-api文档-69",
+      "category": "科技",
+      "keywords": [
+        "科技",
+        "API文档",
+        "精品",
+        "白皮书"
+      ],
+      "license": "MIT",
+      "trust": "verified"
+    },
+    {
+      "name": "科技-api文档-2-70",
+      "displayName": "智能API文档",
+      "description": "智能API文档，适用于科技场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.0.2",
+      "author": "Presto-io",
+      "repo": "presto-io/科技-api文档-2-70",
+      "category": "科技",
+      "keywords": [
+        "科技",
+        "API文档",
+        "智能",
+        "白皮书"
+      ],
+      "license": "GPL-3.0",
+      "trust": "official"
+    },
+    {
+      "name": "科技-白皮书-71",
+      "displayName": "极简白皮书",
+      "description": "极简白皮书，适用于科技场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.1.3",
+      "author": "FoodBiz",
+      "repo": "foodbiz/科技-白皮书-71",
+      "category": "科技",
+      "keywords": [
+        "科技",
+        "白皮书",
+        "极简",
+        "产品说明"
+      ],
+      "license": "MIT",
+      "trust": "verified"
+    },
+    {
+      "name": "科技-白皮书-2-72",
+      "displayName": "商用白皮书",
+      "description": "商用白皮书，适用于科技场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.2.0",
+      "author": "MfgDoc",
+      "repo": "mfgdoc/科技-白皮书-2-72",
+      "category": "科技",
+      "keywords": [
+        "科技",
+        "白皮书",
+        "商用",
+        "产品说明"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "科技-产品说明-73",
+      "displayName": "正式产品说明",
+      "description": "正式产品说明，适用于科技场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.3.1",
+      "author": "LitPress",
+      "repo": "litpress/科技-产品说明-73",
+      "category": "科技",
+      "keywords": [
+        "科技",
+        "产品说明",
+        "正式",
+        "测试报告"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "科技-测试报告-74",
+      "displayName": "多功能测试报告",
+      "description": "多功能测试报告，适用于科技场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.4.2",
+      "author": "SportDoc",
+      "repo": "sportdoc/科技-测试报告-74",
+      "category": "科技",
+      "keywords": [
+        "科技",
+        "测试报告",
+        "多功能",
+        "需求文档"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "科技-需求文档-75",
+      "displayName": "标准需求文档",
+      "description": "标准需求文档，适用于科技场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.5.3",
+      "author": "TravelKit",
+      "repo": "travelkit/科技-需求文档-75",
+      "category": "科技",
+      "keywords": [
+        "科技",
+        "需求文档",
+        "标准",
+        "架构设计"
+      ],
+      "license": "Apache-2.0",
+      "trust": "community"
+    },
+    {
+      "name": "科技-架构设计-76",
+      "displayName": "专业架构设计",
+      "description": "专业架构设计，适用于科技场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.6.0",
+      "author": "SocialPub",
+      "repo": "socialpub/科技-架构设计-76",
+      "category": "科技",
+      "keywords": [
+        "科技",
+        "架构设计",
+        "专业",
+        "发布日志"
+      ],
+      "license": "CC-BY-4.0",
+      "trust": "unverified"
+    },
+    {
+      "name": "科技-发布日志-77",
+      "displayName": "简约发布日志",
+      "description": "简约发布日志，适用于科技场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.7.1",
+      "author": "GameDev",
+      "repo": "gamedev/科技-发布日志-77",
+      "category": "科技",
+      "keywords": [
+        "科技",
+        "发布日志",
+        "简约",
+        "技术文档"
+      ],
+      "license": "MIT",
+      "trust": "unverified"
+    },
+    {
+      "name": "金融-财务报表-78",
+      "displayName": "现代财务报表",
+      "description": "现代财务报表，适用于金融场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.8.2",
+      "author": "MusicSheet",
+      "repo": "musicsheet/金融-财务报表-78",
+      "category": "金融",
+      "keywords": [
+        "金融",
+        "财务报表",
+        "现代",
+        "审计报告"
+      ],
+      "license": "GPL-3.0",
+      "trust": "community"
+    },
+    {
+      "name": "金融-财务报表-2-79",
+      "displayName": "经典财务报表",
+      "description": "经典财务报表，适用于金融场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.9.3",
+      "author": "FarmDoc",
+      "repo": "farmdoc/金融-财务报表-2-79",
+      "category": "金融",
+      "keywords": [
+        "金融",
+        "财务报表",
+        "经典",
+        "审计报告"
+      ],
+      "license": "MIT",
+      "trust": "verified"
+    },
+    {
+      "name": "金融-审计报告-80",
+      "displayName": "高级审计报告",
+      "description": "高级审计报告，适用于金融场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.0.0",
+      "author": "Presto-io",
+      "repo": "presto-io/金融-审计报告-80",
+      "category": "金融",
+      "keywords": [
+        "金融",
+        "审计报告",
+        "高级",
+        "投资分析"
+      ],
+      "license": "MIT",
+      "trust": "official"
+    },
+    {
+      "name": "金融-审计报告-2-81",
+      "displayName": "通用审计报告",
+      "description": "通用审计报告，适用于金融场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.1.1",
+      "author": "SmartForm",
+      "repo": "smartform/金融-审计报告-2-81",
+      "category": "金融",
+      "keywords": [
+        "金融",
+        "审计报告",
+        "通用",
+        "投资分析"
+      ],
+      "license": "MIT",
+      "trust": "verified"
+    },
+    {
+      "name": "金融-投资分析-82",
+      "displayName": "定制投资分析",
+      "description": "定制投资分析，适用于金融场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.2.2",
+      "author": "QuickPrint",
+      "repo": "quickprint/金融-投资分析-82",
+      "category": "金融",
+      "keywords": [
+        "金融",
+        "投资分析",
+        "定制",
+        "风控报告"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "金融-投资分析-2-83",
+      "displayName": "快速投资分析",
+      "description": "快速投资分析，适用于金融场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.3.3",
+      "author": "ProLayout",
+      "repo": "prolayout/金融-投资分析-2-83",
+      "category": "金融",
+      "keywords": [
+        "金融",
+        "投资分析",
+        "快速",
+        "风控报告"
+      ],
+      "license": "Apache-2.0",
+      "trust": "community"
+    },
+    {
+      "name": "金融-风控报告-84",
+      "displayName": "精品风控报告",
+      "description": "精品风控报告，适用于金融场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.4.0",
+      "author": "TypesetCN",
+      "repo": "typesetcn/金融-风控报告-84",
+      "category": "金融",
+      "keywords": [
+        "金融",
+        "风控报告",
+        "精品",
+        "基金说明"
+      ],
+      "license": "CC-BY-4.0",
+      "trust": "community"
+    },
+    {
+      "name": "金融-基金说明-85",
+      "displayName": "智能基金说明",
+      "description": "智能基金说明，适用于金融场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.5.1",
+      "author": "FormatLib",
+      "repo": "formatlib/金融-基金说明-85",
+      "category": "金融",
+      "keywords": [
+        "金融",
+        "基金说明",
+        "智能",
+        "保险单"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "金融-保险单-86",
+      "displayName": "极简保险单",
+      "description": "极简保险单，适用于金融场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.6.2",
+      "author": "PageCraft",
+      "repo": "pagecraft/金融-保险单-86",
+      "category": "金融",
+      "keywords": [
+        "金融",
+        "保险单",
+        "极简",
+        "银行对账"
+      ],
+      "license": "GPL-3.0",
+      "trust": "unverified"
+    },
+    {
+      "name": "金融-银行对账-87",
+      "displayName": "商用银行对账",
+      "description": "商用银行对账，适用于金融场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.7.3",
+      "author": "TemplateX",
+      "repo": "templatex/金融-银行对账-87",
+      "category": "金融",
+      "keywords": [
+        "金融",
+        "银行对账",
+        "商用",
+        "税务申报"
+      ],
+      "license": "MIT",
+      "trust": "unverified"
+    },
+    {
+      "name": "金融-税务申报-88",
+      "displayName": "正式税务申报",
+      "description": "正式税务申报，适用于金融场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.8.0",
+      "author": "DocGenius",
+      "repo": "docgenius/金融-税务申报-88",
+      "category": "金融",
+      "keywords": [
+        "金融",
+        "税务申报",
+        "正式",
+        "财务报表"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "房产-房屋合同-89",
+      "displayName": "多功能房屋合同",
+      "description": "多功能房屋合同，适用于房产场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.9.1",
+      "author": "PrintFlow",
+      "repo": "printflow/房产-房屋合同-89",
+      "category": "房产",
+      "keywords": [
+        "房产",
+        "房屋合同",
+        "多功能",
+        "评估报告"
+      ],
+      "license": "MIT",
+      "trust": "verified"
+    },
+    {
+      "name": "房产-房屋合同-2-90",
+      "displayName": "标准房屋合同",
+      "description": "标准房屋合同，适用于房产场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.0.2",
+      "author": "Presto-io",
+      "repo": "presto-io/房产-房屋合同-2-90",
+      "category": "房产",
+      "keywords": [
+        "房产",
+        "房屋合同",
+        "标准",
+        "评估报告"
+      ],
+      "license": "MIT",
+      "trust": "official"
+    },
+    {
+      "name": "房产-评估报告-91",
+      "displayName": "专业评估报告",
+      "description": "专业评估报告，适用于房产场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.1.3",
+      "author": "DocMaster",
+      "repo": "docmaster/房产-评估报告-91",
+      "category": "房产",
+      "keywords": [
+        "房产",
+        "评估报告",
+        "专业",
+        "物业通知"
+      ],
+      "license": "Apache-2.0",
+      "trust": "verified"
+    },
+    {
+      "name": "房产-评估报告-2-92",
+      "displayName": "简约评估报告",
+      "description": "简约评估报告，适用于房产场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.2.0",
+      "author": "EduPro",
+      "repo": "edupro/房产-评估报告-2-92",
+      "category": "房产",
+      "keywords": [
+        "房产",
+        "评估报告",
+        "简约",
+        "物业通知"
+      ],
+      "license": "CC-BY-4.0",
+      "trust": "community"
+    },
+    {
+      "name": "房产-物业通知-93",
+      "displayName": "现代物业通知",
+      "description": "现代物业通知，适用于房产场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.3.1",
+      "author": "CreativeHub",
+      "repo": "creativehub/房产-物业通知-93",
+      "category": "房产",
+      "keywords": [
+        "房产",
+        "物业通知",
+        "现代",
+        "装修方案"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "房产-物业通知-2-94",
+      "displayName": "经典物业通知",
+      "description": "经典物业通知，适用于房产场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.4.2",
+      "author": "BizFlow",
+      "repo": "bizflow/房产-物业通知-2-94",
+      "category": "房产",
+      "keywords": [
+        "房产",
+        "物业通知",
+        "经典",
+        "装修方案"
+      ],
+      "license": "GPL-3.0",
+      "trust": "community"
+    },
+    {
+      "name": "房产-装修方案-95",
+      "displayName": "高级装修方案",
+      "description": "高级装修方案，适用于房产场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.5.3",
+      "author": "LegalAid",
+      "repo": "legalaid/房产-装修方案-95",
+      "category": "房产",
+      "keywords": [
+        "房产",
+        "装修方案",
+        "高级",
+        "交房清单"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "房产-交房清单-96",
+      "displayName": "通用交房清单",
+      "description": "通用交房清单，适用于房产场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.6.0",
+      "author": "MedDoc",
+      "repo": "meddoc/房产-交房清单-96",
+      "category": "房产",
+      "keywords": [
+        "房产",
+        "交房清单",
+        "通用",
+        "租赁协议"
+      ],
+      "license": "MIT",
+      "trust": "unverified"
+    },
+    {
+      "name": "房产-租赁协议-97",
+      "displayName": "定制租赁协议",
+      "description": "定制租赁协议，适用于房产场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.7.1",
+      "author": "TechNote",
+      "repo": "technote/房产-租赁协议-97",
+      "category": "房产",
+      "keywords": [
+        "房产",
+        "租赁协议",
+        "定制",
+        "验收报告"
+      ],
+      "license": "MIT",
+      "trust": "unverified"
+    },
+    {
+      "name": "房产-验收报告-98",
+      "displayName": "快速验收报告",
+      "description": "快速验收报告，适用于房产场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.8.2",
+      "author": "FinReport",
+      "repo": "finreport/房产-验收报告-98",
+      "category": "房产",
+      "keywords": [
+        "房产",
+        "验收报告",
+        "快速",
+        "户型图"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "房产-户型图-99",
+      "displayName": "精品户型图",
+      "description": "精品户型图，适用于房产场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.9.3",
+      "author": "RealtyDoc",
+      "repo": "realtydoc/房产-户型图-99",
+      "category": "房产",
+      "keywords": [
+        "房产",
+        "户型图",
+        "精品",
+        "房屋合同"
+      ],
+      "license": "Apache-2.0",
+      "trust": "verified"
+    },
+    {
+      "name": "物流-运单模板-100",
+      "displayName": "智能运单模板",
+      "description": "智能运单模板，适用于物流场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.0.0",
+      "author": "Presto-io",
+      "repo": "presto-io/物流-运单模板-100",
+      "category": "物流",
+      "keywords": [
+        "物流",
+        "运单模板",
+        "智能",
+        "出货清单"
+      ],
+      "license": "CC-BY-4.0",
+      "trust": "official"
+    },
+    {
+      "name": "物流-运单模板-2-101",
+      "displayName": "极简运单模板",
+      "description": "极简运单模板，适用于物流场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.1.1",
+      "author": "FoodBiz",
+      "repo": "foodbiz/物流-运单模板-2-101",
+      "category": "物流",
+      "keywords": [
+        "物流",
+        "运单模板",
+        "极简",
+        "出货清单"
+      ],
+      "license": "MIT",
+      "trust": "verified"
+    },
+    {
+      "name": "物流-出货清单-102",
+      "displayName": "商用出货清单",
+      "description": "商用出货清单，适用于物流场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.2.2",
+      "author": "MfgDoc",
+      "repo": "mfgdoc/物流-出货清单-102",
+      "category": "物流",
+      "keywords": [
+        "物流",
+        "出货清单",
+        "商用",
+        "仓库报表"
+      ],
+      "license": "GPL-3.0",
+      "trust": "community"
+    },
+    {
+      "name": "物流-出货清单-2-103",
+      "displayName": "正式出货清单",
+      "description": "正式出货清单，适用于物流场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.3.3",
+      "author": "LitPress",
+      "repo": "litpress/物流-出货清单-2-103",
+      "category": "物流",
+      "keywords": [
+        "物流",
+        "出货清单",
+        "正式",
+        "仓库报表"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "物流-仓库报表-104",
+      "displayName": "多功能仓库报表",
+      "description": "多功能仓库报表，适用于物流场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.4.0",
+      "author": "SportDoc",
+      "repo": "sportdoc/物流-仓库报表-104",
+      "category": "物流",
+      "keywords": [
+        "物流",
+        "仓库报表",
+        "多功能",
+        "配送单"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "物流-仓库报表-2-105",
+      "displayName": "标准仓库报表",
+      "description": "标准仓库报表，适用于物流场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.5.1",
+      "author": "TravelKit",
+      "repo": "travelkit/物流-仓库报表-2-105",
+      "category": "物流",
+      "keywords": [
+        "物流",
+        "仓库报表",
+        "标准",
+        "配送单"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "物流-配送单-106",
+      "displayName": "专业配送单",
+      "description": "专业配送单，适用于物流场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.6.2",
+      "author": "SocialPub",
+      "repo": "socialpub/物流-配送单-106",
+      "category": "物流",
+      "keywords": [
+        "物流",
+        "配送单",
+        "专业",
+        "报关单"
+      ],
+      "license": "MIT",
+      "trust": "unverified"
+    },
+    {
+      "name": "物流-报关单-107",
+      "displayName": "简约报关单",
+      "description": "简约报关单，适用于物流场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.7.3",
+      "author": "GameDev",
+      "repo": "gamedev/物流-报关单-107",
+      "category": "物流",
+      "keywords": [
+        "物流",
+        "报关单",
+        "简约",
+        "装箱清单"
+      ],
+      "license": "Apache-2.0",
+      "trust": "unverified"
+    },
+    {
+      "name": "物流-装箱清单-108",
+      "displayName": "现代装箱清单",
+      "description": "现代装箱清单，适用于物流场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.8.0",
+      "author": "MusicSheet",
+      "repo": "musicsheet/物流-装箱清单-108",
+      "category": "物流",
+      "keywords": [
+        "物流",
+        "装箱清单",
+        "现代",
+        "物流合同"
+      ],
+      "license": "CC-BY-4.0",
+      "trust": "community"
+    },
+    {
+      "name": "物流-物流合同-109",
+      "displayName": "经典物流合同",
+      "description": "经典物流合同，适用于物流场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.9.1",
+      "author": "FarmDoc",
+      "repo": "farmdoc/物流-物流合同-109",
+      "category": "物流",
+      "keywords": [
+        "物流",
+        "物流合同",
+        "经典",
+        "库存盘点"
+      ],
+      "license": "MIT",
+      "trust": "verified"
+    },
+    {
+      "name": "物流-库存盘点-110",
+      "displayName": "高级库存盘点",
+      "description": "高级库存盘点，适用于物流场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.0.2",
+      "author": "Presto-io",
+      "repo": "presto-io/物流-库存盘点-110",
+      "category": "物流",
+      "keywords": [
+        "物流",
+        "库存盘点",
+        "高级",
+        "运单模板"
+      ],
+      "license": "GPL-3.0",
+      "trust": "official"
+    },
+    {
+      "name": "餐饮-菜单设计-111",
+      "displayName": "通用菜单设计",
+      "description": "通用菜单设计，适用于餐饮场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.1.3",
+      "author": "SmartForm",
+      "repo": "smartform/餐饮-菜单设计-111",
+      "category": "餐饮",
+      "keywords": [
+        "餐饮",
+        "菜单设计",
+        "通用",
+        "食谱排版"
+      ],
+      "license": "MIT",
+      "trust": "verified"
+    },
+    {
+      "name": "餐饮-菜单设计-2-112",
+      "displayName": "定制菜单设计",
+      "description": "定制菜单设计，适用于餐饮场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.2.0",
+      "author": "QuickPrint",
+      "repo": "quickprint/餐饮-菜单设计-2-112",
+      "category": "餐饮",
+      "keywords": [
+        "餐饮",
+        "菜单设计",
+        "定制",
+        "食谱排版"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "餐饮-食谱排版-113",
+      "displayName": "快速食谱排版",
+      "description": "快速食谱排版，适用于餐饮场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.3.1",
+      "author": "ProLayout",
+      "repo": "prolayout/餐饮-食谱排版-113",
+      "category": "餐饮",
+      "keywords": [
+        "餐饮",
+        "食谱排版",
+        "快速",
+        "卫生许可"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "餐饮-食谱排版-2-114",
+      "displayName": "精品食谱排版",
+      "description": "精品食谱排版，适用于餐饮场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.4.2",
+      "author": "TypesetCN",
+      "repo": "typesetcn/餐饮-食谱排版-2-114",
+      "category": "餐饮",
+      "keywords": [
+        "餐饮",
+        "食谱排版",
+        "精品",
+        "卫生许可"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "餐饮-卫生许可-115",
+      "displayName": "智能卫生许可",
+      "description": "智能卫生许可，适用于餐饮场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.5.3",
+      "author": "FormatLib",
+      "repo": "formatlib/餐饮-卫生许可-115",
+      "category": "餐饮",
+      "keywords": [
+        "餐饮",
+        "卫生许可",
+        "智能",
+        "采购清单"
+      ],
+      "license": "Apache-2.0",
+      "trust": "community"
+    },
+    {
+      "name": "餐饮-卫生许可-2-116",
+      "displayName": "极简卫生许可",
+      "description": "极简卫生许可，适用于餐饮场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.6.0",
+      "author": "PageCraft",
+      "repo": "pagecraft/餐饮-卫生许可-2-116",
+      "category": "餐饮",
+      "keywords": [
+        "餐饮",
+        "卫生许可",
+        "极简",
+        "采购清单"
+      ],
+      "license": "CC-BY-4.0",
+      "trust": "unverified"
+    },
+    {
+      "name": "餐饮-采购清单-117",
+      "displayName": "商用采购清单",
+      "description": "商用采购清单，适用于餐饮场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.7.1",
+      "author": "TemplateX",
+      "repo": "templatex/餐饮-采购清单-117",
+      "category": "餐饮",
+      "keywords": [
+        "餐饮",
+        "采购清单",
+        "商用",
+        "营养分析"
+      ],
+      "license": "MIT",
+      "trust": "unverified"
+    },
+    {
+      "name": "餐饮-营养分析-118",
+      "displayName": "正式营养分析",
+      "description": "正式营养分析，适用于餐饮场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.8.2",
+      "author": "DocGenius",
+      "repo": "docgenius/餐饮-营养分析-118",
+      "category": "餐饮",
+      "keywords": [
+        "餐饮",
+        "营养分析",
+        "正式",
+        "门店手册"
+      ],
+      "license": "GPL-3.0",
+      "trust": "community"
+    },
+    {
+      "name": "餐饮-门店手册-119",
+      "displayName": "多功能门店手册",
+      "description": "多功能门店手册，适用于餐饮场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.9.3",
+      "author": "PrintFlow",
+      "repo": "printflow/餐饮-门店手册-119",
+      "category": "餐饮",
+      "keywords": [
+        "餐饮",
+        "门店手册",
+        "多功能",
+        "加盟协议"
+      ],
+      "license": "MIT",
+      "trust": "verified"
+    },
+    {
+      "name": "餐饮-加盟协议-120",
+      "displayName": "标准加盟协议",
+      "description": "标准加盟协议，适用于餐饮场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.0.0",
+      "author": "Presto-io",
+      "repo": "presto-io/餐饮-加盟协议-120",
+      "category": "餐饮",
+      "keywords": [
+        "餐饮",
+        "加盟协议",
+        "标准",
+        "活动海报"
+      ],
+      "license": "MIT",
+      "trust": "official"
+    },
+    {
+      "name": "餐饮-活动海报-121",
+      "displayName": "专业活动海报",
+      "description": "专业活动海报，适用于餐饮场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.1.1",
+      "author": "DocMaster",
+      "repo": "docmaster/餐饮-活动海报-121",
+      "category": "餐饮",
+      "keywords": [
+        "餐饮",
+        "活动海报",
+        "专业",
+        "菜单设计"
+      ],
+      "license": "MIT",
+      "trust": "verified"
+    },
+    {
+      "name": "制造-质检报告-122",
+      "displayName": "简约质检报告",
+      "description": "简约质检报告，适用于制造场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.2.2",
+      "author": "EduPro",
+      "repo": "edupro/制造-质检报告-122",
+      "category": "制造",
+      "keywords": [
+        "制造",
+        "质检报告",
+        "简约",
+        "工艺文档"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "制造-质检报告-2-123",
+      "displayName": "现代质检报告",
+      "description": "现代质检报告，适用于制造场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.3.3",
+      "author": "CreativeHub",
+      "repo": "creativehub/制造-质检报告-2-123",
+      "category": "制造",
+      "keywords": [
+        "制造",
+        "质检报告",
+        "现代",
+        "工艺文档"
+      ],
+      "license": "Apache-2.0",
+      "trust": "community"
+    },
+    {
+      "name": "制造-工艺文档-124",
+      "displayName": "经典工艺文档",
+      "description": "经典工艺文档，适用于制造场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.4.0",
+      "author": "BizFlow",
+      "repo": "bizflow/制造-工艺文档-124",
+      "category": "制造",
+      "keywords": [
+        "制造",
+        "工艺文档",
+        "经典",
+        "BOM清单"
+      ],
+      "license": "CC-BY-4.0",
+      "trust": "community"
+    },
+    {
+      "name": "制造-工艺文档-2-125",
+      "displayName": "高级工艺文档",
+      "description": "高级工艺文档，适用于制造场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.5.1",
+      "author": "LegalAid",
+      "repo": "legalaid/制造-工艺文档-2-125",
+      "category": "制造",
+      "keywords": [
+        "制造",
+        "工艺文档",
+        "高级",
+        "BOM清单"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "制造-bom清单-126",
+      "displayName": "通用BOM清单",
+      "description": "通用BOM清单，适用于制造场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.6.2",
+      "author": "MedDoc",
+      "repo": "meddoc/制造-bom清单-126",
+      "category": "制造",
+      "keywords": [
+        "制造",
+        "BOM清单",
+        "通用",
+        "生产计划"
+      ],
+      "license": "GPL-3.0",
+      "trust": "unverified"
+    },
+    {
+      "name": "制造-bom清单-2-127",
+      "displayName": "定制BOM清单",
+      "description": "定制BOM清单，适用于制造场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.7.3",
+      "author": "TechNote",
+      "repo": "technote/制造-bom清单-2-127",
+      "category": "制造",
+      "keywords": [
+        "制造",
+        "BOM清单",
+        "定制",
+        "生产计划"
+      ],
+      "license": "MIT",
+      "trust": "unverified"
+    },
+    {
+      "name": "制造-生产计划-128",
+      "displayName": "快速生产计划",
+      "description": "快速生产计划，适用于制造场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.8.0",
+      "author": "FinReport",
+      "repo": "finreport/制造-生产计划-128",
+      "category": "制造",
+      "keywords": [
+        "制造",
+        "生产计划",
+        "快速",
+        "设备台账"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "制造-设备台账-129",
+      "displayName": "精品设备台账",
+      "description": "精品设备台账，适用于制造场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.9.1",
+      "author": "RealtyDoc",
+      "repo": "realtydoc/制造-设备台账-129",
+      "category": "制造",
+      "keywords": [
+        "制造",
+        "设备台账",
+        "精品",
+        "安全规程"
+      ],
+      "license": "MIT",
+      "trust": "verified"
+    },
+    {
+      "name": "制造-安全规程-130",
+      "displayName": "智能安全规程",
+      "description": "智能安全规程，适用于制造场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.0.2",
+      "author": "Presto-io",
+      "repo": "presto-io/制造-安全规程-130",
+      "category": "制造",
+      "keywords": [
+        "制造",
+        "安全规程",
+        "智能",
+        "检测报告"
+      ],
+      "license": "MIT",
+      "trust": "official"
+    },
+    {
+      "name": "制造-检测报告-131",
+      "displayName": "极简检测报告",
+      "description": "极简检测报告，适用于制造场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.1.3",
+      "author": "FoodBiz",
+      "repo": "foodbiz/制造-检测报告-131",
+      "category": "制造",
+      "keywords": [
+        "制造",
+        "检测报告",
+        "极简",
+        "作业指导书"
+      ],
+      "license": "Apache-2.0",
+      "trust": "verified"
+    },
+    {
+      "name": "制造-作业指导书-132",
+      "displayName": "商用作业指导书",
+      "description": "商用作业指导书，适用于制造场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.2.0",
+      "author": "MfgDoc",
+      "repo": "mfgdoc/制造-作业指导书-132",
+      "category": "制造",
+      "keywords": [
+        "制造",
+        "作业指导书",
+        "商用",
+        "质检报告"
+      ],
+      "license": "CC-BY-4.0",
+      "trust": "community"
+    },
+    {
+      "name": "文学-小说排版-133",
+      "displayName": "正式小说排版",
+      "description": "正式小说排版，适用于文学场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.3.1",
+      "author": "LitPress",
+      "repo": "litpress/文学-小说排版-133",
+      "category": "文学",
+      "keywords": [
+        "文学",
+        "小说排版",
+        "正式",
+        "诗集模板"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "文学-小说排版-2-134",
+      "displayName": "多功能小说排版",
+      "description": "多功能小说排版，适用于文学场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.4.2",
+      "author": "SportDoc",
+      "repo": "sportdoc/文学-小说排版-2-134",
+      "category": "文学",
+      "keywords": [
+        "文学",
+        "小说排版",
+        "多功能",
+        "诗集模板"
+      ],
+      "license": "GPL-3.0",
+      "trust": "community"
+    },
+    {
+      "name": "文学-诗集模板-135",
+      "displayName": "标准诗集模板",
+      "description": "标准诗集模板，适用于文学场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.5.3",
+      "author": "TravelKit",
+      "repo": "travelkit/文学-诗集模板-135",
+      "category": "文学",
+      "keywords": [
+        "文学",
+        "诗集模板",
+        "标准",
+        "散文集"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "文学-诗集模板-2-136",
+      "displayName": "专业诗集模板",
+      "description": "专业诗集模板，适用于文学场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.6.0",
+      "author": "SocialPub",
+      "repo": "socialpub/文学-诗集模板-2-136",
+      "category": "文学",
+      "keywords": [
+        "文学",
+        "诗集模板",
+        "专业",
+        "散文集"
+      ],
+      "license": "MIT",
+      "trust": "unverified"
+    },
+    {
+      "name": "文学-散文集-137",
+      "displayName": "简约散文集",
+      "description": "简约散文集，适用于文学场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.7.1",
+      "author": "GameDev",
+      "repo": "gamedev/文学-散文集-137",
+      "category": "文学",
+      "keywords": [
+        "文学",
+        "散文集",
+        "简约",
+        "剧本格式"
+      ],
+      "license": "MIT",
+      "trust": "unverified"
+    },
+    {
+      "name": "文学-散文集-2-138",
+      "displayName": "现代散文集",
+      "description": "现代散文集，适用于文学场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.8.2",
+      "author": "MusicSheet",
+      "repo": "musicsheet/文学-散文集-2-138",
+      "category": "文学",
+      "keywords": [
+        "文学",
+        "散文集",
+        "现代",
+        "剧本格式"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "文学-剧本格式-139",
+      "displayName": "经典剧本格式",
+      "description": "经典剧本格式，适用于文学场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.9.3",
+      "author": "FarmDoc",
+      "repo": "farmdoc/文学-剧本格式-139",
+      "category": "文学",
+      "keywords": [
+        "文学",
+        "剧本格式",
+        "经典",
+        "书信集"
+      ],
+      "license": "Apache-2.0",
+      "trust": "verified"
+    },
+    {
+      "name": "文学-书信集-140",
+      "displayName": "高级书信集",
+      "description": "高级书信集，适用于文学场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.0.0",
+      "author": "Presto-io",
+      "repo": "presto-io/文学-书信集-140",
+      "category": "文学",
+      "keywords": [
+        "文学",
+        "书信集",
+        "高级",
+        "日记本"
+      ],
+      "license": "CC-BY-4.0",
+      "trust": "official"
+    },
+    {
+      "name": "文学-日记本-141",
+      "displayName": "通用日记本",
+      "description": "通用日记本，适用于文学场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.1.1",
+      "author": "SmartForm",
+      "repo": "smartform/文学-日记本-141",
+      "category": "文学",
+      "keywords": [
+        "文学",
+        "日记本",
+        "通用",
+        "读书笔记"
+      ],
+      "license": "MIT",
+      "trust": "verified"
+    },
+    {
+      "name": "文学-读书笔记-142",
+      "displayName": "定制读书笔记",
+      "description": "定制读书笔记，适用于文学场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.2.2",
+      "author": "QuickPrint",
+      "repo": "quickprint/文学-读书笔记-142",
+      "category": "文学",
+      "keywords": [
+        "文学",
+        "读书笔记",
+        "定制",
+        "出版稿件"
+      ],
+      "license": "GPL-3.0",
+      "trust": "community"
+    },
+    {
+      "name": "文学-出版稿件-143",
+      "displayName": "快速出版稿件",
+      "description": "快速出版稿件，适用于文学场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.3.3",
+      "author": "ProLayout",
+      "repo": "prolayout/文学-出版稿件-143",
+      "category": "文学",
+      "keywords": [
+        "文学",
+        "出版稿件",
+        "快速",
+        "小说排版"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "体育-赛事手册-144",
+      "displayName": "精品赛事手册",
+      "description": "精品赛事手册，适用于体育场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.4.0",
+      "author": "TypesetCN",
+      "repo": "typesetcn/体育-赛事手册-144",
+      "category": "体育",
+      "keywords": [
+        "体育",
+        "赛事手册",
+        "精品",
+        "训练计划"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "体育-赛事手册-2-145",
+      "displayName": "智能赛事手册",
+      "description": "智能赛事手册，适用于体育场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.5.1",
+      "author": "FormatLib",
+      "repo": "formatlib/体育-赛事手册-2-145",
+      "category": "体育",
+      "keywords": [
+        "体育",
+        "赛事手册",
+        "智能",
+        "训练计划"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "体育-训练计划-146",
+      "displayName": "极简训练计划",
+      "description": "极简训练计划，适用于体育场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.6.2",
+      "author": "PageCraft",
+      "repo": "pagecraft/体育-训练计划-146",
+      "category": "体育",
+      "keywords": [
+        "体育",
+        "训练计划",
+        "极简",
+        "成绩公报"
+      ],
+      "license": "MIT",
+      "trust": "unverified"
+    },
+    {
+      "name": "体育-训练计划-2-147",
+      "displayName": "商用训练计划",
+      "description": "商用训练计划，适用于体育场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.7.3",
+      "author": "TemplateX",
+      "repo": "templatex/体育-训练计划-2-147",
+      "category": "体育",
+      "keywords": [
+        "体育",
+        "训练计划",
+        "商用",
+        "成绩公报"
+      ],
+      "license": "Apache-2.0",
+      "trust": "unverified"
+    },
+    {
+      "name": "体育-成绩公报-148",
+      "displayName": "正式成绩公报",
+      "description": "正式成绩公报，适用于体育场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.8.0",
+      "author": "DocGenius",
+      "repo": "docgenius/体育-成绩公报-148",
+      "category": "体育",
+      "keywords": [
+        "体育",
+        "成绩公报",
+        "正式",
+        "裁判报告"
+      ],
+      "license": "CC-BY-4.0",
+      "trust": "community"
+    },
+    {
+      "name": "体育-成绩公报-2-149",
+      "displayName": "多功能成绩公报",
+      "description": "多功能成绩公报，适用于体育场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.9.1",
+      "author": "PrintFlow",
+      "repo": "printflow/体育-成绩公报-2-149",
+      "category": "体育",
+      "keywords": [
+        "体育",
+        "成绩公报",
+        "多功能",
+        "裁判报告"
+      ],
+      "license": "MIT",
+      "trust": "verified"
+    },
+    {
+      "name": "体育-裁判报告-150",
+      "displayName": "标准裁判报告",
+      "description": "标准裁判报告，适用于体育场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.0.2",
+      "author": "Presto-io",
+      "repo": "presto-io/体育-裁判报告-150",
+      "category": "体育",
+      "keywords": [
+        "体育",
+        "裁判报告",
+        "标准",
+        "运动处方"
+      ],
+      "license": "GPL-3.0",
+      "trust": "official"
+    },
+    {
+      "name": "体育-运动处方-151",
+      "displayName": "专业运动处方",
+      "description": "专业运动处方，适用于体育场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.1.3",
+      "author": "DocMaster",
+      "repo": "docmaster/体育-运动处方-151",
+      "category": "体育",
+      "keywords": [
+        "体育",
+        "运动处方",
+        "专业",
+        "体测报告"
+      ],
+      "license": "MIT",
+      "trust": "verified"
+    },
+    {
+      "name": "体育-体测报告-152",
+      "displayName": "简约体测报告",
+      "description": "简约体测报告，适用于体育场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.2.0",
+      "author": "EduPro",
+      "repo": "edupro/体育-体测报告-152",
+      "category": "体育",
+      "keywords": [
+        "体育",
+        "体测报告",
+        "简约",
+        "赛程表"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "体育-赛程表-153",
+      "displayName": "现代赛程表",
+      "description": "现代赛程表，适用于体育场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.3.1",
+      "author": "CreativeHub",
+      "repo": "creativehub/体育-赛程表-153",
+      "category": "体育",
+      "keywords": [
+        "体育",
+        "赛程表",
+        "现代",
+        "奖状证书"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "体育-奖状证书-154",
+      "displayName": "经典奖状证书",
+      "description": "经典奖状证书，适用于体育场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.4.2",
+      "author": "BizFlow",
+      "repo": "bizflow/体育-奖状证书-154",
+      "category": "体育",
+      "keywords": [
+        "体育",
+        "奖状证书",
+        "经典",
+        "赛事手册"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "旅游-行程单-155",
+      "displayName": "高级行程单",
+      "description": "高级行程单，适用于旅游场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.5.3",
+      "author": "LegalAid",
+      "repo": "legalaid/旅游-行程单-155",
+      "category": "旅游",
+      "keywords": [
+        "旅游",
+        "行程单",
+        "高级",
+        "导游词"
+      ],
+      "license": "Apache-2.0",
+      "trust": "community"
+    },
+    {
+      "name": "旅游-行程单-2-156",
+      "displayName": "通用行程单",
+      "description": "通用行程单，适用于旅游场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.6.0",
+      "author": "MedDoc",
+      "repo": "meddoc/旅游-行程单-2-156",
+      "category": "旅游",
+      "keywords": [
+        "旅游",
+        "行程单",
+        "通用",
+        "导游词"
+      ],
+      "license": "CC-BY-4.0",
+      "trust": "unverified"
+    },
+    {
+      "name": "旅游-导游词-157",
+      "displayName": "定制导游词",
+      "description": "定制导游词，适用于旅游场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.7.1",
+      "author": "TechNote",
+      "repo": "technote/旅游-导游词-157",
+      "category": "旅游",
+      "keywords": [
+        "旅游",
+        "导游词",
+        "定制",
+        "景区手册"
+      ],
+      "license": "MIT",
+      "trust": "unverified"
+    },
+    {
+      "name": "旅游-导游词-2-158",
+      "displayName": "快速导游词",
+      "description": "快速导游词，适用于旅游场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.8.2",
+      "author": "FinReport",
+      "repo": "finreport/旅游-导游词-2-158",
+      "category": "旅游",
+      "keywords": [
+        "旅游",
+        "导游词",
+        "快速",
+        "景区手册"
+      ],
+      "license": "GPL-3.0",
+      "trust": "community"
+    },
+    {
+      "name": "旅游-景区手册-159",
+      "displayName": "精品景区手册",
+      "description": "精品景区手册，适用于旅游场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.9.3",
+      "author": "RealtyDoc",
+      "repo": "realtydoc/旅游-景区手册-159",
+      "category": "旅游",
+      "keywords": [
+        "旅游",
+        "景区手册",
+        "精品",
+        "旅行攻略"
+      ],
+      "license": "MIT",
+      "trust": "verified"
+    },
+    {
+      "name": "旅游-景区手册-2-160",
+      "displayName": "智能景区手册",
+      "description": "智能景区手册，适用于旅游场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.0.0",
+      "author": "Presto-io",
+      "repo": "presto-io/旅游-景区手册-2-160",
+      "category": "旅游",
+      "keywords": [
+        "旅游",
+        "景区手册",
+        "智能",
+        "旅行攻略"
+      ],
+      "license": "MIT",
+      "trust": "official"
+    },
+    {
+      "name": "旅游-旅行攻略-161",
+      "displayName": "极简旅行攻略",
+      "description": "极简旅行攻略，适用于旅游场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.1.1",
+      "author": "FoodBiz",
+      "repo": "foodbiz/旅游-旅行攻略-161",
+      "category": "旅游",
+      "keywords": [
+        "旅游",
+        "旅行攻略",
+        "极简",
+        "预订确认"
+      ],
+      "license": "MIT",
+      "trust": "verified"
+    },
+    {
+      "name": "旅游-预订确认-162",
+      "displayName": "商用预订确认",
+      "description": "商用预订确认，适用于旅游场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.2.2",
+      "author": "MfgDoc",
+      "repo": "mfgdoc/旅游-预订确认-162",
+      "category": "旅游",
+      "keywords": [
+        "旅游",
+        "预订确认",
+        "商用",
+        "签证材料"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "旅游-签证材料-163",
+      "displayName": "正式签证材料",
+      "description": "正式签证材料，适用于旅游场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.3.3",
+      "author": "LitPress",
+      "repo": "litpress/旅游-签证材料-163",
+      "category": "旅游",
+      "keywords": [
+        "旅游",
+        "签证材料",
+        "正式",
+        "旅行日志"
+      ],
+      "license": "Apache-2.0",
+      "trust": "community"
+    },
+    {
+      "name": "旅游-旅行日志-164",
+      "displayName": "多功能旅行日志",
+      "description": "多功能旅行日志，适用于旅游场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.4.0",
+      "author": "SportDoc",
+      "repo": "sportdoc/旅游-旅行日志-164",
+      "category": "旅游",
+      "keywords": [
+        "旅游",
+        "旅行日志",
+        "多功能",
+        "费用清单"
+      ],
+      "license": "CC-BY-4.0",
+      "trust": "community"
+    },
+    {
+      "name": "旅游-费用清单-165",
+      "displayName": "标准费用清单",
+      "description": "标准费用清单，适用于旅游场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.5.1",
+      "author": "TravelKit",
+      "repo": "travelkit/旅游-费用清单-165",
+      "category": "旅游",
+      "keywords": [
+        "旅游",
+        "费用清单",
+        "标准",
+        "行程单"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "社交-朋友圈图文-166",
+      "displayName": "专业朋友圈图文",
+      "description": "专业朋友圈图文，适用于社交场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.6.2",
+      "author": "SocialPub",
+      "repo": "socialpub/社交-朋友圈图文-166",
+      "category": "社交",
+      "keywords": [
+        "社交",
+        "朋友圈图文",
+        "专业",
+        "微信推文"
+      ],
+      "license": "GPL-3.0",
+      "trust": "unverified"
+    },
+    {
+      "name": "社交-朋友圈图文-2-167",
+      "displayName": "简约朋友圈图文",
+      "description": "简约朋友圈图文，适用于社交场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.7.3",
+      "author": "GameDev",
+      "repo": "gamedev/社交-朋友圈图文-2-167",
+      "category": "社交",
+      "keywords": [
+        "社交",
+        "朋友圈图文",
+        "简约",
+        "微信推文"
+      ],
+      "license": "MIT",
+      "trust": "unverified"
+    },
+    {
+      "name": "社交-微信推文-168",
+      "displayName": "现代微信推文",
+      "description": "现代微信推文，适用于社交场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.8.0",
+      "author": "MusicSheet",
+      "repo": "musicsheet/社交-微信推文-168",
+      "category": "社交",
+      "keywords": [
+        "社交",
+        "微信推文",
+        "现代",
+        "自媒体排版"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "社交-微信推文-2-169",
+      "displayName": "经典微信推文",
+      "description": "经典微信推文，适用于社交场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.9.1",
+      "author": "FarmDoc",
+      "repo": "farmdoc/社交-微信推文-2-169",
+      "category": "社交",
+      "keywords": [
+        "社交",
+        "微信推文",
+        "经典",
+        "自媒体排版"
+      ],
+      "license": "MIT",
+      "trust": "verified"
+    },
+    {
+      "name": "社交-自媒体排版-170",
+      "displayName": "高级自媒体排版",
+      "description": "高级自媒体排版，适用于社交场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.0.2",
+      "author": "Presto-io",
+      "repo": "presto-io/社交-自媒体排版-170",
+      "category": "社交",
+      "keywords": [
+        "社交",
+        "自媒体排版",
+        "高级",
+        "社群公告"
+      ],
+      "license": "MIT",
+      "trust": "official"
+    },
+    {
+      "name": "社交-自媒体排版-2-171",
+      "displayName": "通用自媒体排版",
+      "description": "通用自媒体排版，适用于社交场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.1.3",
+      "author": "SmartForm",
+      "repo": "smartform/社交-自媒体排版-2-171",
+      "category": "社交",
+      "keywords": [
+        "社交",
+        "自媒体排版",
+        "通用",
+        "社群公告"
+      ],
+      "license": "Apache-2.0",
+      "trust": "verified"
+    },
+    {
+      "name": "社交-社群公告-172",
+      "displayName": "定制社群公告",
+      "description": "定制社群公告，适用于社交场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.2.0",
+      "author": "QuickPrint",
+      "repo": "quickprint/社交-社群公告-172",
+      "category": "社交",
+      "keywords": [
+        "社交",
+        "社群公告",
+        "定制",
+        "活动邀请"
+      ],
+      "license": "CC-BY-4.0",
+      "trust": "community"
+    },
+    {
+      "name": "社交-活动邀请-173",
+      "displayName": "快速活动邀请",
+      "description": "快速活动邀请，适用于社交场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.3.1",
+      "author": "ProLayout",
+      "repo": "prolayout/社交-活动邀请-173",
+      "category": "社交",
+      "keywords": [
+        "社交",
+        "活动邀请",
+        "快速",
+        "个人主页"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "社交-个人主页-174",
+      "displayName": "精品个人主页",
+      "description": "精品个人主页，适用于社交场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.4.2",
+      "author": "TypesetCN",
+      "repo": "typesetcn/社交-个人主页-174",
+      "category": "社交",
+      "keywords": [
+        "社交",
+        "个人主页",
+        "精品",
+        "直播脚本"
+      ],
+      "license": "GPL-3.0",
+      "trust": "community"
+    },
+    {
+      "name": "社交-直播脚本-175",
+      "displayName": "智能直播脚本",
+      "description": "智能直播脚本，适用于社交场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.5.3",
+      "author": "FormatLib",
+      "repo": "formatlib/社交-直播脚本-175",
+      "category": "社交",
+      "keywords": [
+        "社交",
+        "直播脚本",
+        "智能",
+        "粉丝通讯"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "社交-粉丝通讯-176",
+      "displayName": "极简粉丝通讯",
+      "description": "极简粉丝通讯，适用于社交场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.6.0",
+      "author": "PageCraft",
+      "repo": "pagecraft/社交-粉丝通讯-176",
+      "category": "社交",
+      "keywords": [
+        "社交",
+        "粉丝通讯",
+        "极简",
+        "朋友圈图文"
+      ],
+      "license": "MIT",
+      "trust": "unverified"
+    },
+    {
+      "name": "游戏-游戏文档-177",
+      "displayName": "商用游戏文档",
+      "description": "商用游戏文档，适用于游戏场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.7.1",
+      "author": "TemplateX",
+      "repo": "templatex/游戏-游戏文档-177",
+      "category": "游戏",
+      "keywords": [
+        "游戏",
+        "游戏文档",
+        "商用",
+        "角色设定"
+      ],
+      "license": "MIT",
+      "trust": "unverified"
+    },
+    {
+      "name": "游戏-游戏文档-2-178",
+      "displayName": "正式游戏文档",
+      "description": "正式游戏文档，适用于游戏场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.8.2",
+      "author": "DocGenius",
+      "repo": "docgenius/游戏-游戏文档-2-178",
+      "category": "游戏",
+      "keywords": [
+        "游戏",
+        "游戏文档",
+        "正式",
+        "角色设定"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "游戏-角色设定-179",
+      "displayName": "多功能角色设定",
+      "description": "多功能角色设定，适用于游戏场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.9.3",
+      "author": "PrintFlow",
+      "repo": "printflow/游戏-角色设定-179",
+      "category": "游戏",
+      "keywords": [
+        "游戏",
+        "角色设定",
+        "多功能",
+        "世界观设定"
+      ],
+      "license": "Apache-2.0",
+      "trust": "verified"
+    },
+    {
+      "name": "游戏-角色设定-2-180",
+      "displayName": "标准角色设定",
+      "description": "标准角色设定，适用于游戏场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.0.0",
+      "author": "Presto-io",
+      "repo": "presto-io/游戏-角色设定-2-180",
+      "category": "游戏",
+      "keywords": [
+        "游戏",
+        "角色设定",
+        "标准",
+        "世界观设定"
+      ],
+      "license": "CC-BY-4.0",
+      "trust": "official"
+    },
+    {
+      "name": "游戏-世界观设定-181",
+      "displayName": "专业世界观设定",
+      "description": "专业世界观设定，适用于游戏场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.1.1",
+      "author": "DocMaster",
+      "repo": "docmaster/游戏-世界观设定-181",
+      "category": "游戏",
+      "keywords": [
+        "游戏",
+        "世界观设定",
+        "专业",
+        "任务脚本"
+      ],
+      "license": "MIT",
+      "trust": "verified"
+    },
+    {
+      "name": "游戏-世界观设定-2-182",
+      "displayName": "简约世界观设定",
+      "description": "简约世界观设定，适用于游戏场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.2.2",
+      "author": "EduPro",
+      "repo": "edupro/游戏-世界观设定-2-182",
+      "category": "游戏",
+      "keywords": [
+        "游戏",
+        "世界观设定",
+        "简约",
+        "任务脚本"
+      ],
+      "license": "GPL-3.0",
+      "trust": "community"
+    },
+    {
+      "name": "游戏-任务脚本-183",
+      "displayName": "现代任务脚本",
+      "description": "现代任务脚本，适用于游戏场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.3.3",
+      "author": "CreativeHub",
+      "repo": "creativehub/游戏-任务脚本-183",
+      "category": "游戏",
+      "keywords": [
+        "游戏",
+        "任务脚本",
+        "现代",
+        "数值表格"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "游戏-数值表格-184",
+      "displayName": "经典数值表格",
+      "description": "经典数值表格，适用于游戏场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.4.0",
+      "author": "BizFlow",
+      "repo": "bizflow/游戏-数值表格-184",
+      "category": "游戏",
+      "keywords": [
+        "游戏",
+        "数值表格",
+        "经典",
+        "测试用例"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "游戏-测试用例-185",
+      "displayName": "高级测试用例",
+      "description": "高级测试用例，适用于游戏场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.5.1",
+      "author": "LegalAid",
+      "repo": "legalaid/游戏-测试用例-185",
+      "category": "游戏",
+      "keywords": [
+        "游戏",
+        "测试用例",
+        "高级",
+        "更新日志"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "游戏-更新日志-186",
+      "displayName": "通用更新日志",
+      "description": "通用更新日志，适用于游戏场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.6.2",
+      "author": "MedDoc",
+      "repo": "meddoc/游戏-更新日志-186",
+      "category": "游戏",
+      "keywords": [
+        "游戏",
+        "更新日志",
+        "通用",
+        "玩家手册"
+      ],
+      "license": "MIT",
+      "trust": "unverified"
+    },
+    {
+      "name": "游戏-玩家手册-187",
+      "displayName": "定制玩家手册",
+      "description": "定制玩家手册，适用于游戏场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.7.3",
+      "author": "TechNote",
+      "repo": "technote/游戏-玩家手册-187",
+      "category": "游戏",
+      "keywords": [
+        "游戏",
+        "玩家手册",
+        "定制",
+        "游戏文档"
+      ],
+      "license": "Apache-2.0",
+      "trust": "unverified"
+    },
+    {
+      "name": "音乐-乐谱排版-188",
+      "displayName": "快速乐谱排版",
+      "description": "快速乐谱排版，适用于音乐场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.8.0",
+      "author": "FinReport",
+      "repo": "finreport/音乐-乐谱排版-188",
+      "category": "音乐",
+      "keywords": [
+        "音乐",
+        "乐谱排版",
+        "快速",
+        "演出节目单"
+      ],
+      "license": "CC-BY-4.0",
+      "trust": "community"
+    },
+    {
+      "name": "音乐-乐谱排版-2-189",
+      "displayName": "精品乐谱排版",
+      "description": "精品乐谱排版，适用于音乐场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.9.1",
+      "author": "RealtyDoc",
+      "repo": "realtydoc/音乐-乐谱排版-2-189",
+      "category": "音乐",
+      "keywords": [
+        "音乐",
+        "乐谱排版",
+        "精品",
+        "演出节目单"
+      ],
+      "license": "MIT",
+      "trust": "verified"
+    },
+    {
+      "name": "音乐-演出节目单-190",
+      "displayName": "智能演出节目单",
+      "description": "智能演出节目单，适用于音乐场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.0.2",
+      "author": "Presto-io",
+      "repo": "presto-io/音乐-演出节目单-190",
+      "category": "音乐",
+      "keywords": [
+        "音乐",
+        "演出节目单",
+        "智能",
+        "歌词排版"
+      ],
+      "license": "GPL-3.0",
+      "trust": "official"
+    },
+    {
+      "name": "音乐-演出节目单-2-191",
+      "displayName": "极简演出节目单",
+      "description": "极简演出节目单，适用于音乐场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.1.3",
+      "author": "FoodBiz",
+      "repo": "foodbiz/音乐-演出节目单-2-191",
+      "category": "音乐",
+      "keywords": [
+        "音乐",
+        "演出节目单",
+        "极简",
+        "歌词排版"
+      ],
+      "license": "MIT",
+      "trust": "verified"
+    },
+    {
+      "name": "音乐-歌词排版-192",
+      "displayName": "商用歌词排版",
+      "description": "商用歌词排版，适用于音乐场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.2.0",
+      "author": "MfgDoc",
+      "repo": "mfgdoc/音乐-歌词排版-192",
+      "category": "音乐",
+      "keywords": [
+        "音乐",
+        "歌词排版",
+        "商用",
+        "音乐评论"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "音乐-歌词排版-2-193",
+      "displayName": "正式歌词排版",
+      "description": "正式歌词排版，适用于音乐场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.3.1",
+      "author": "LitPress",
+      "repo": "litpress/音乐-歌词排版-2-193",
+      "category": "音乐",
+      "keywords": [
+        "音乐",
+        "歌词排版",
+        "正式",
+        "音乐评论"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "音乐-音乐评论-194",
+      "displayName": "多功能音乐评论",
+      "description": "多功能音乐评论，适用于音乐场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.4.2",
+      "author": "SportDoc",
+      "repo": "sportdoc/音乐-音乐评论-194",
+      "category": "音乐",
+      "keywords": [
+        "音乐",
+        "音乐评论",
+        "多功能",
+        "专辑介绍"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "音乐-专辑介绍-195",
+      "displayName": "标准专辑介绍",
+      "description": "标准专辑介绍，适用于音乐场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.5.3",
+      "author": "TravelKit",
+      "repo": "travelkit/音乐-专辑介绍-195",
+      "category": "音乐",
+      "keywords": [
+        "音乐",
+        "专辑介绍",
+        "标准",
+        "演唱会手册"
+      ],
+      "license": "Apache-2.0",
+      "trust": "community"
+    },
+    {
+      "name": "音乐-演唱会手册-196",
+      "displayName": "专业演唱会手册",
+      "description": "专业演唱会手册，适用于音乐场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.6.0",
+      "author": "SocialPub",
+      "repo": "socialpub/音乐-演唱会手册-196",
+      "category": "音乐",
+      "keywords": [
+        "音乐",
+        "演唱会手册",
+        "专业",
+        "音乐课程"
+      ],
+      "license": "CC-BY-4.0",
+      "trust": "unverified"
+    },
+    {
+      "name": "音乐-音乐课程-197",
+      "displayName": "简约音乐课程",
+      "description": "简约音乐课程，适用于音乐场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.7.1",
+      "author": "GameDev",
+      "repo": "gamedev/音乐-音乐课程-197",
+      "category": "音乐",
+      "keywords": [
+        "音乐",
+        "音乐课程",
+        "简约",
+        "练习记录"
+      ],
+      "license": "MIT",
+      "trust": "unverified"
+    },
+    {
+      "name": "音乐-练习记录-198",
+      "displayName": "现代练习记录",
+      "description": "现代练习记录，适用于音乐场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.8.2",
+      "author": "MusicSheet",
+      "repo": "musicsheet/音乐-练习记录-198",
+      "category": "音乐",
+      "keywords": [
+        "音乐",
+        "练习记录",
+        "现代",
+        "乐谱排版"
+      ],
+      "license": "GPL-3.0",
+      "trust": "community"
+    },
+    {
+      "name": "摄影-作品集排版-199",
+      "displayName": "经典作品集排版",
+      "description": "经典作品集排版，适用于摄影场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.9.3",
+      "author": "FarmDoc",
+      "repo": "farmdoc/摄影-作品集排版-199",
+      "category": "摄影",
+      "keywords": [
+        "摄影",
+        "作品集排版",
+        "经典",
+        "拍摄脚本"
+      ],
+      "license": "MIT",
+      "trust": "verified"
+    },
+    {
+      "name": "摄影-作品集排版-2-200",
+      "displayName": "高级作品集排版",
+      "description": "高级作品集排版，适用于摄影场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.0.0",
+      "author": "Presto-io",
+      "repo": "presto-io/摄影-作品集排版-2-200",
+      "category": "摄影",
+      "keywords": [
+        "摄影",
+        "作品集排版",
+        "高级",
+        "拍摄脚本"
+      ],
+      "license": "MIT",
+      "trust": "official"
+    },
+    {
+      "name": "摄影-拍摄脚本-201",
+      "displayName": "通用拍摄脚本",
+      "description": "通用拍摄脚本，适用于摄影场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.1.1",
+      "author": "SmartForm",
+      "repo": "smartform/摄影-拍摄脚本-201",
+      "category": "摄影",
+      "keywords": [
+        "摄影",
+        "拍摄脚本",
+        "通用",
+        "器材清单"
+      ],
+      "license": "MIT",
+      "trust": "verified"
+    },
+    {
+      "name": "摄影-拍摄脚本-2-202",
+      "displayName": "定制拍摄脚本",
+      "description": "定制拍摄脚本，适用于摄影场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.2.2",
+      "author": "QuickPrint",
+      "repo": "quickprint/摄影-拍摄脚本-2-202",
+      "category": "摄影",
+      "keywords": [
+        "摄影",
+        "拍摄脚本",
+        "定制",
+        "器材清单"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "摄影-器材清单-203",
+      "displayName": "快速器材清单",
+      "description": "快速器材清单，适用于摄影场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.3.3",
+      "author": "ProLayout",
+      "repo": "prolayout/摄影-器材清单-203",
+      "category": "摄影",
+      "keywords": [
+        "摄影",
+        "器材清单",
+        "快速",
+        "后期教程"
+      ],
+      "license": "Apache-2.0",
+      "trust": "community"
+    },
+    {
+      "name": "摄影-器材清单-2-204",
+      "displayName": "精品器材清单",
+      "description": "精品器材清单，适用于摄影场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.4.0",
+      "author": "TypesetCN",
+      "repo": "typesetcn/摄影-器材清单-2-204",
+      "category": "摄影",
+      "keywords": [
+        "摄影",
+        "器材清单",
+        "精品",
+        "后期教程"
+      ],
+      "license": "CC-BY-4.0",
+      "trust": "community"
+    },
+    {
+      "name": "摄影-后期教程-205",
+      "displayName": "智能后期教程",
+      "description": "智能后期教程，适用于摄影场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.5.1",
+      "author": "FormatLib",
+      "repo": "formatlib/摄影-后期教程-205",
+      "category": "摄影",
+      "keywords": [
+        "摄影",
+        "后期教程",
+        "智能",
+        "摄影合同"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "摄影-摄影合同-206",
+      "displayName": "极简摄影合同",
+      "description": "极简摄影合同，适用于摄影场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.6.2",
+      "author": "PageCraft",
+      "repo": "pagecraft/摄影-摄影合同-206",
+      "category": "摄影",
+      "keywords": [
+        "摄影",
+        "摄影合同",
+        "极简",
+        "影展手册"
+      ],
+      "license": "GPL-3.0",
+      "trust": "unverified"
+    },
+    {
+      "name": "摄影-影展手册-207",
+      "displayName": "商用影展手册",
+      "description": "商用影展手册，适用于摄影场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.7.3",
+      "author": "TemplateX",
+      "repo": "templatex/摄影-影展手册-207",
+      "category": "摄影",
+      "keywords": [
+        "摄影",
+        "影展手册",
+        "商用",
+        "照片故事"
+      ],
+      "license": "MIT",
+      "trust": "unverified"
+    },
+    {
+      "name": "摄影-照片故事-208",
+      "displayName": "正式照片故事",
+      "description": "正式照片故事，适用于摄影场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.8.0",
+      "author": "DocGenius",
+      "repo": "docgenius/摄影-照片故事-208",
+      "category": "摄影",
+      "keywords": [
+        "摄影",
+        "照片故事",
+        "正式",
+        "客户报价"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "摄影-客户报价-209",
+      "displayName": "多功能客户报价",
+      "description": "多功能客户报价，适用于摄影场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.9.1",
+      "author": "PrintFlow",
+      "repo": "printflow/摄影-客户报价-209",
+      "category": "摄影",
+      "keywords": [
+        "摄影",
+        "客户报价",
+        "多功能",
+        "作品集排版"
+      ],
+      "license": "MIT",
+      "trust": "verified"
+    },
+    {
+      "name": "农业-种植方案-210",
+      "displayName": "标准种植方案",
+      "description": "标准种植方案，适用于农业场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.0.2",
+      "author": "Presto-io",
+      "repo": "presto-io/农业-种植方案-210",
+      "category": "农业",
+      "keywords": [
+        "农业",
+        "种植方案",
+        "标准",
+        "农药记录"
+      ],
+      "license": "MIT",
+      "trust": "official"
+    },
+    {
+      "name": "农业-种植方案-2-211",
+      "displayName": "专业种植方案",
+      "description": "专业种植方案，适用于农业场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.1.3",
+      "author": "DocMaster",
+      "repo": "docmaster/农业-种植方案-2-211",
+      "category": "农业",
+      "keywords": [
+        "农业",
+        "种植方案",
+        "专业",
+        "农药记录"
+      ],
+      "license": "Apache-2.0",
+      "trust": "verified"
+    },
+    {
+      "name": "农业-农药记录-212",
+      "displayName": "简约农药记录",
+      "description": "简约农药记录，适用于农业场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.2.0",
+      "author": "EduPro",
+      "repo": "edupro/农业-农药记录-212",
+      "category": "农业",
+      "keywords": [
+        "农业",
+        "农药记录",
+        "简约",
+        "土壤报告"
+      ],
+      "license": "CC-BY-4.0",
+      "trust": "community"
+    },
+    {
+      "name": "农业-农药记录-2-213",
+      "displayName": "现代农药记录",
+      "description": "现代农药记录，适用于农业场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.3.1",
+      "author": "CreativeHub",
+      "repo": "creativehub/农业-农药记录-2-213",
+      "category": "农业",
+      "keywords": [
+        "农业",
+        "农药记录",
+        "现代",
+        "土壤报告"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "农业-土壤报告-214",
+      "displayName": "经典土壤报告",
+      "description": "经典土壤报告，适用于农业场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.4.2",
+      "author": "BizFlow",
+      "repo": "bizflow/农业-土壤报告-214",
+      "category": "农业",
+      "keywords": [
+        "农业",
+        "土壤报告",
+        "经典",
+        "产量统计"
+      ],
+      "license": "GPL-3.0",
+      "trust": "community"
+    },
+    {
+      "name": "农业-土壤报告-2-215",
+      "displayName": "高级土壤报告",
+      "description": "高级土壤报告，适用于农业场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.5.3",
+      "author": "LegalAid",
+      "repo": "legalaid/农业-土壤报告-2-215",
+      "category": "农业",
+      "keywords": [
+        "农业",
+        "土壤报告",
+        "高级",
+        "产量统计"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "农业-产量统计-216",
+      "displayName": "通用产量统计",
+      "description": "通用产量统计，适用于农业场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "2.6.0",
+      "author": "MedDoc",
+      "repo": "meddoc/农业-产量统计-216",
+      "category": "农业",
+      "keywords": [
+        "农业",
+        "产量统计",
+        "通用",
+        "养殖日志"
+      ],
+      "license": "MIT",
+      "trust": "unverified"
+    },
+    {
+      "name": "农业-养殖日志-217",
+      "displayName": "定制养殖日志",
+      "description": "定制养殖日志，适用于农业场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "3.7.1",
+      "author": "TechNote",
+      "repo": "technote/农业-养殖日志-217",
+      "category": "农业",
+      "keywords": [
+        "农业",
+        "养殖日志",
+        "定制",
+        "农产品检测"
+      ],
+      "license": "MIT",
+      "trust": "unverified"
+    },
+    {
+      "name": "农业-农产品检测-218",
+      "displayName": "快速农产品检测",
+      "description": "快速农产品检测，适用于农业场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "4.8.2",
+      "author": "FinReport",
+      "repo": "finreport/农业-农产品检测-218",
+      "category": "农业",
+      "keywords": [
+        "农业",
+        "农产品检测",
+        "快速",
+        "合作社章程"
+      ],
+      "license": "MIT",
+      "trust": "community"
+    },
+    {
+      "name": "农业-合作社章程-219",
+      "displayName": "精品合作社章程",
+      "description": "精品合作社章程，适用于农业场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "5.9.3",
+      "author": "RealtyDoc",
+      "repo": "realtydoc/农业-合作社章程-219",
+      "category": "农业",
+      "keywords": [
+        "农业",
+        "合作社章程",
+        "精品",
+        "农技推广"
+      ],
+      "license": "Apache-2.0",
+      "trust": "verified"
+    },
+    {
+      "name": "农业-农技推广-220",
+      "displayName": "智能农技推广",
+      "description": "智能农技推广，适用于农业场景，支持自定义内容和格式调整，开箱即用。",
+      "version": "1.0.0",
+      "author": "Presto-io",
+      "repo": "presto-io/农业-农技推广-220",
+      "category": "农业",
+      "keywords": [
+        "农业",
+        "农技推广",
+        "智能",
+        "种植方案"
+      ],
+      "license": "CC-BY-4.0",
       "trust": "official"
     }
   ]

@@ -17,6 +17,9 @@
   let readmeContent = $state('');
   let readmeLoading = $state(false);
   let previewWidth = $state(0);
+  let currentPage = $state(1);
+  let pageSize = $state(24);
+  const pageSizeOptions = [12, 24, 48, 96];
 
   let registry = $derived(registryStore.registry);
   let loading = $derived(registryStore.loading);
@@ -65,6 +68,15 @@
       return matchesCategory && matchesTrust;
     });
   });
+
+  // Reset page when filters change
+  $effect(() => {
+    searchQuery; activeCategory; activeTrust;
+    currentPage = 1;
+  });
+
+  let totalPages = $derived(Math.max(1, Math.ceil(filteredTemplates.length / pageSize)));
+  let pagedTemplates = $derived(filteredTemplates.slice((currentPage - 1) * pageSize, currentPage * pageSize));
 
   let hasUnverified = $derived(
     registry?.templates.some(t => t.trust === 'unverified') ?? false
@@ -359,7 +371,7 @@
         </div>
       {:else}
         <div class="card-grid">
-          {#each filteredTemplates as tpl (tpl.name)}
+          {#each pagedTemplates as tpl (tpl.name)}
             {@const badge = trustBadge[tpl.trust]}
             {@const BadgeIcon = badge.icon}
             <button class="tpl-card" onclick={() => selectTemplate(tpl.name)}>
@@ -377,6 +389,30 @@
               </div>
             </button>
           {/each}
+        </div>
+        <!-- Pagination -->
+        <div class="pagination">
+          <div class="page-info">
+            <span>{filteredTemplates.length} 个模板</span>
+            <select class="page-size-select" bind:value={pageSize} onchange={() => currentPage = 1}>
+              {#each pageSizeOptions as size}
+                <option value={size}>{size} / 页</option>
+              {/each}
+            </select>
+          </div>
+          {#if totalPages > 1}
+            <div class="page-controls">
+              <button class="page-btn" disabled={currentPage <= 1} onclick={() => currentPage--}>&lsaquo;</button>
+              {#each Array.from({length: totalPages}, (_, i) => i + 1) as p}
+                {#if p === 1 || p === totalPages || (p >= currentPage - 1 && p <= currentPage + 1)}
+                  <button class="page-btn" class:active={currentPage === p} onclick={() => currentPage = p}>{p}</button>
+                {:else if p === currentPage - 2 || p === currentPage + 2}
+                  <span class="page-ellipsis">…</span>
+                {/if}
+              {/each}
+              <button class="page-btn" disabled={currentPage >= totalPages} onclick={() => currentPage++}>&rsaquo;</button>
+            </div>
+          {/if}
         </div>
       {/if}
     {/if}
@@ -518,6 +554,10 @@
     overflow-x: auto;
     scrollbar-width: none;
     -ms-overflow-style: none;
+    position: relative;
+    mask-image: linear-gradient(to right, black calc(100% - 32px), transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, black calc(100% - 32px), transparent 100%);
+    padding-right: 8px;
   }
   .category-scroll::-webkit-scrollbar { display: none; }
   .segmented-control {
@@ -651,12 +691,64 @@
   /* Card Grid */
   .card-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 240px));
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     align-content: start;
     gap: var(--space-md);
     overflow-y: auto;
     flex: 1;
   }
+
+  /* Pagination */
+  .pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-md) 0 0;
+    flex-shrink: 0;
+  }
+  .page-info {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    font-size: 0.75rem;
+    color: var(--color-muted);
+  }
+  .page-size-select {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    color: var(--color-text);
+    font-size: 0.75rem;
+    font-family: var(--font-ui);
+    padding: 2px 6px;
+    cursor: pointer;
+    outline: none;
+  }
+  .page-size-select:focus { border-color: var(--color-accent-border); }
+  .page-controls {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+  .page-btn {
+    min-width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    color: var(--color-muted);
+    font-size: 0.75rem;
+    font-family: var(--font-ui);
+    cursor: pointer;
+    transition: all var(--transition);
+  }
+  .page-btn:hover:not(:disabled) { color: var(--color-text); border-color: var(--color-accent-border); }
+  .page-btn.active { background: var(--color-accent-bg); color: var(--color-accent); border-color: var(--color-accent-border); }
+  .page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .page-ellipsis { color: var(--color-muted); font-size: 0.75rem; padding: 0 4px; }
   .tpl-card {
     display: flex;
     flex-direction: column;
