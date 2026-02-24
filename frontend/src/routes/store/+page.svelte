@@ -54,6 +54,10 @@
     });
   });
 
+  let hasUnverified = $derived(
+    registry?.templates.some(t => t.trust === 'unverified') ?? false
+  );
+
   let selectedTemplate = $derived(
     registry?.templates.find(t => t.name === selectedId) ?? null
   );
@@ -185,31 +189,35 @@
           </button>
         {/if}
       </div>
-      <!-- Row 2: Segmented Control + Trust Toggles -->
+      <!-- Row 2: Trust Toggles (left) + Categories (right, scrollable) -->
       <div class="controls-row">
-        <div class="segmented-control" style="--segment-index:{activeCategory === null ? 0 : categories.findIndex(c => c.id === activeCategory) + 1};--segment-count:{categories.length + 1}">
-          <div class="segment-track"></div>
-          <button class="segment" class:active={!activeCategory} onclick={() => activeCategory = null}>全部</button>
-          {#each categories as cat (cat.id)}
-            <button class="segment" class:active={activeCategory === cat.id} onclick={() => activeCategory = activeCategory === cat.id ? null : cat.id}>{cat.label.zh}</button>
+        <div class="trust-toggles">
+          {#each Object.entries(trustBadge) as [key, badge] (key)}
+            {#if key !== 'unverified' || hasUnverified}
+              {@const BadgeIcon = badge.icon}
+              <button
+                class="trust-toggle"
+                class:active={activeTrust === key}
+                style="--toggle-color:{badge.color || 'var(--color-muted)'}"
+                onclick={() => activeTrust = activeTrust === key ? null : key}
+                title={badge.label}
+              >
+                <span class="trust-dot"></span>
+                <BadgeIcon size={13} />
+                <span class="trust-label">{badge.label}</span>
+              </button>
+            {/if}
           {/each}
         </div>
         <div class="controls-sep"></div>
-        <div class="trust-toggles">
-          {#each Object.entries(trustBadge) as [key, badge] (key)}
-            {@const BadgeIcon = badge.icon}
-            <button
-              class="trust-toggle"
-              class:active={activeTrust === key}
-              style="--toggle-color:{badge.color || 'var(--color-muted)'}"
-              onclick={() => activeTrust = activeTrust === key ? null : key}
-              title={badge.label}
-            >
-              <span class="trust-dot"></span>
-              <BadgeIcon size={13} />
-              <span class="trust-label">{badge.label}</span>
-            </button>
-          {/each}
+        <div class="category-scroll">
+          <div class="segmented-control" style="--segment-index:{activeCategory === null ? 0 : categories.findIndex(c => c.id === activeCategory) + 1};--segment-count:{categories.length + 1}">
+            <div class="segment-track"></div>
+            <button class="segment" class:active={!activeCategory} onclick={() => activeCategory = null}>全部</button>
+            {#each categories as cat (cat.id)}
+              <button class="segment" class:active={activeCategory === cat.id} onclick={() => activeCategory = activeCategory === cat.id ? null : cat.id}>{cat.label.zh}</button>
+            {/each}
+          </div>
         </div>
       </div>
     </div>
@@ -492,15 +500,22 @@
   }
 
   /* Segmented Control */
+  .category-scroll {
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .category-scroll::-webkit-scrollbar { display: none; }
   .segmented-control {
     position: relative;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     background: var(--color-surface);
     border-radius: var(--radius-md);
     padding: 3px;
     border: 1px solid var(--color-border);
-    flex-shrink: 0;
   }
   .segment-track {
     position: absolute;
