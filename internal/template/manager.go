@@ -24,6 +24,14 @@ func NewManager(templatesDir string) *Manager {
 	return &Manager{TemplatesDir: templatesDir}
 }
 
+func templateBinaryName(name string) string {
+	bin := "presto-template-" + name
+	if runtime.GOOS == "windows" {
+		bin += ".exe"
+	}
+	return bin
+}
+
 func (m *Manager) List() ([]InstalledTemplate, error) {
 	entries, err := os.ReadDir(m.TemplatesDir)
 	if err != nil {
@@ -51,11 +59,7 @@ func (m *Manager) List() ([]InstalledTemplate, error) {
 			continue
 		}
 
-		binaryName := fmt.Sprintf("presto-template-%s", manifest.Name)
-		if runtime.GOOS == "windows" {
-			binaryName += ".exe"
-		}
-		binaryPath := filepath.Join(tplDir, binaryName)
+		binaryPath := filepath.Join(tplDir, templateBinaryName(manifest.Name))
 
 		if _, err := os.Stat(binaryPath); err != nil {
 			continue
@@ -106,7 +110,6 @@ func (m *Manager) Executor(t *InstalledTemplate) *Executor {
 	return NewExecutor(t.BinaryPath)
 }
 
-// Exists checks if a template with the given name is installed.
 func (m *Manager) Exists(name string) bool {
 	tplDir := filepath.Join(m.TemplatesDir, name)
 	manifestPath := filepath.Join(tplDir, "manifest.json")
@@ -114,7 +117,6 @@ func (m *Manager) Exists(name string) bool {
 	return err == nil
 }
 
-// UniqueTemplateName returns a unique name by appending -2, -3, etc. if needed.
 func (m *Manager) UniqueTemplateName(name string) string {
 	if !m.Exists(name) {
 		return name
@@ -127,7 +129,6 @@ func (m *Manager) UniqueTemplateName(name string) string {
 	}
 }
 
-// UpdateDisplayName updates the displayName field in a template's manifest.json.
 func (m *Manager) UpdateDisplayName(name, newDisplayName string) error {
 	name = filepath.Base(name)
 	tplDir := filepath.Join(m.TemplatesDir, name)
@@ -193,21 +194,13 @@ func (m *Manager) Rename(oldName, newName string) error {
 
 // renameDiskTemplate renames a template's binary, manifest, and directory on disk.
 func renameDiskTemplate(templatesDir string, t *InstalledTemplate, newName string) error {
-	oldName := t.Manifest.Name
+	oldBinaryName := templateBinaryName(t.Manifest.Name)
+	newBinaryName := templateBinaryName(newName)
 
-	oldBinaryName := fmt.Sprintf("presto-template-%s", oldName)
-	newBinaryName := fmt.Sprintf("presto-template-%s", newName)
-	if runtime.GOOS == "windows" {
-		oldBinaryName += ".exe"
-		newBinaryName += ".exe"
-	}
-
-	// Rename binary file
 	if err := os.Rename(filepath.Join(t.Dir, oldBinaryName), filepath.Join(t.Dir, newBinaryName)); err != nil {
 		return fmt.Errorf("rename binary: %w", err)
 	}
 
-	// Update manifest name
 	t.Manifest.Name = newName
 	data, err := json.MarshalIndent(t.Manifest, "", "  ")
 	if err != nil {
@@ -217,7 +210,6 @@ func renameDiskTemplate(templatesDir string, t *InstalledTemplate, newName strin
 		return fmt.Errorf("write manifest: %w", err)
 	}
 
-	// Rename directory
 	newDir := filepath.Join(templatesDir, newName)
 	if err := os.Rename(t.Dir, newDir); err != nil {
 		return fmt.Errorf("rename dir: %w", err)

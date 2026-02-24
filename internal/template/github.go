@@ -63,10 +63,10 @@ func validateName(name string) error {
 }
 
 // SEC-18: HTTP response status validation
-func checkHTTPStatus(resp *http.Response, context string) error {
+func checkHTTPStatus(resp *http.Response, op string) error {
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		return fmt.Errorf("%s: HTTP %d: %s", context, resp.StatusCode, string(body))
+		return fmt.Errorf("%s: HTTP %d: %s", op, resp.StatusCode, string(body))
 	}
 	return nil
 }
@@ -96,13 +96,11 @@ type GitHubAsset struct {
 }
 
 func DiscoverTemplates() ([]GitHubRepo, error) {
-	// SEC-20: Use custom client with timeout
 	resp, err := httpClient.Get("https://api.github.com/search/repositories?q=topic:presto-template&sort=stars")
 	if err != nil {
 		return nil, fmt.Errorf("discover templates: %w", err)
 	}
 	defer resp.Body.Close()
-
 	// SEC-18: Check HTTP status code
 	if err := checkHTTPStatus(resp, "discover templates"); err != nil {
 		return nil, err
@@ -145,10 +143,8 @@ func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
 		expectedHash = strings.ToLower(opts.ExpectedSHA256)
 		log.Printf("[templates] registry install: %s/%s (SHA256 from registry)", owner, repo)
 	} else {
-		// Fallback: fetch from GitHub release (for unrecorded/manual installs)
 		log.Printf("[templates] discovery install: %s/%s (fetching from release)", owner, repo)
 
-		// Fetch latest release metadata (SEC-18, SEC-20)
 		apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", owner, repo)
 		resp, err := httpClient.Get(apiURL)
 		if err != nil {
@@ -166,21 +162,15 @@ func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
 		}
 
 		// Find platform-specific binary asset (try both dash and underscore separators)
+		platform := runtime.GOOS + "-" + runtime.GOARCH
+		platformAlt := runtime.GOOS + "_" + runtime.GOARCH
 		var assetName string
-		patterns := []string{
-			fmt.Sprintf("%s-%s", runtime.GOOS, runtime.GOARCH),
-			fmt.Sprintf("%s_%s", runtime.GOOS, runtime.GOARCH),
-		}
-		for _, pattern := range patterns {
-			for _, asset := range release.Assets {
-				if strings.Contains(asset.Name, pattern) {
-					downloadURL = asset.BrowserDownloadURL
-					assetName = asset.Name
-					break
-				}
-			}
-			if downloadURL != "" {
-				break
+	assetSearch:
+		for _, asset := range release.Assets {
+			if strings.Contains(asset.Name, platform) || strings.Contains(asset.Name, platformAlt) {
+				downloadURL = asset.BrowserDownloadURL
+				assetName = asset.Name
+				break assetSearch
 			}
 		}
 		if downloadURL == "" {
@@ -188,28 +178,7 @@ func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
 		}
 
 		// SEC-01: Try to fetch checksums from release assets (same-source, weaker)
-		for _, asset := range release.Assets {
-			if asset.Name == "checksums.txt" || asset.Name == "SHA256SUMS" {
-				checksumResp, cerr := httpClient.Get(asset.BrowserDownloadURL)
-				if cerr == nil {
-					defer checksumResp.Body.Close()
-					if checksumResp.StatusCode >= 200 && checksumResp.StatusCode < 300 {
-						body, _ := io.ReadAll(io.LimitReader(checksumResp.Body, 1<<20))
-						for _, line := range strings.Split(string(body), "\n") {
-							fields := strings.Fields(line)
-							if len(fields) >= 2 {
-								fname := strings.TrimPrefix(fields[1], "*")
-								if fname == assetName {
-									expectedHash = strings.ToLower(fields[0])
-									break
-								}
-							}
-						}
-					}
-				}
-				break
-			}
-		}
+		expectedHash = lookupChecksumFromRelease(release.Assets, assetName)
 	}
 
 	// SEC-07: Validate download URL domain
@@ -221,7 +190,6 @@ func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
 		return fmt.Errorf("download URL host not allowed: %s", parsedURL.Host)
 	}
 
-	// Download binary (SEC-18, SEC-20)
 	binResp, err := httpClient.Get(downloadURL)
 	if err != nil {
 		return fmt.Errorf("download binary: %w", err)
@@ -241,13 +209,12 @@ func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
 	// SEC-01: Verify checksum if available
 	if expectedHash != "" {
 		actualHash := sha256.Sum256(data)
-		actualHashHex := hex.EncodeToString(actualHash[:])
-		if actualHashHex != expectedHash {
-			return fmt.Errorf("SHA256 mismatch: expected %s, got %s", expectedHash, actualHashHex)
+		actualHex := hex.EncodeToString(actualHash[:])
+		if actualHex != expectedHash {
+			return fmt.Errorf("SHA256 mismatch: expected %s, got %s", expectedHash, actualHex)
 		}
 	}
 
-	// Write binary to temp file, then run --manifest to extract metadata
 	tmpFile, err := os.CreateTemp("", "presto-template-*")
 	if err != nil {
 		return fmt.Errorf("create temp file: %w", err)
@@ -266,7 +233,6 @@ func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
 		return fmt.Errorf("chmod temp binary: %w", err)
 	}
 
-	// Run --manifest to extract template metadata
 	executor := NewExecutor(tmpPath)
 	manifestBytes, err := executor.GetManifest()
 	if err != nil {
@@ -295,13 +261,8 @@ func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
 		return fmt.Errorf("create template dir: %w", err)
 	}
 
-	// Name binary per convention: presto-template-{name}
-	binaryName := fmt.Sprintf("presto-template-%s", manifest.Name)
-	if runtime.GOOS == "windows" {
-		binaryName += ".exe"
-	}
+	binaryName := templateBinaryName(manifest.Name)
 
-	// Write binary to final location
 	binPath := filepath.Join(tplDir, binaryName)
 	if err := os.WriteFile(binPath, data, 0700); err != nil {
 		return fmt.Errorf("write binary: %w", err)
@@ -313,6 +274,34 @@ func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
 	}
 
 	return nil
+}
+
+// SEC-01: lookupChecksumFromRelease searches release assets for a checksum file
+// and returns the SHA256 hash for the given asset name (same-source, weaker).
+func lookupChecksumFromRelease(assets []GitHubAsset, assetName string) string {
+	for _, asset := range assets {
+		if asset.Name != "checksums.txt" && asset.Name != "SHA256SUMS" {
+			continue
+		}
+		resp, err := httpClient.Get(asset.BrowserDownloadURL)
+		if err != nil {
+			return ""
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			return ""
+		}
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+		for _, line := range strings.Split(string(body), "\n") {
+			fields := strings.Fields(line)
+			if len(fields) >= 2 && strings.TrimPrefix(fields[1], "*") == assetName {
+				return strings.ToLower(fields[0])
+			}
+		}
+		return ""
+	}
+	return ""
 }
 
 // SEC-05: Secure uninstall with path traversal protection
