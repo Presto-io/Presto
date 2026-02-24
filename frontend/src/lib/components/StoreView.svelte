@@ -1218,4 +1218,51 @@
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
   }
+
+  /* ============================================
+     Mobile Responsive (< 768px)
+     Card grid: single column full-width
+     Master-detail: hide sidebar, detail full-screen
+     ============================================ */
+  @media (max-width: 767px) {
+    .page {
+      padding: var(--space-md);
+    }
+    .page.web-mode {
+      padding-top: var(--space-md);
+    }
+
+    /* Card grid: single column */
+    .card-grid {
+      grid-template-columns: 1fr;
+    }
+
+    /* Master-detail: hide sidebar, detail takes full width */
+    .master-detail {
+      gap: 0;
+    }
+    .store-nav {
+      display: none;
+    }
+    .store-detail {
+      padding-right: 0;
+    }
+
+    /* Back button: larger touch target on mobile */
+    .btn-back-grid {
+      width: 32px;
+      height: 32px;
+    }
+
+    /* Category bar: tighter spacing */
+    .filter-toolbar {
+      margin-bottom: var(--space-md);
+    }
+
+    /* Pagination: compact */
+    .pagination {
+      flex-wrap: wrap;
+      gap: var(--space-sm);
+    }
+  }
 </style>
