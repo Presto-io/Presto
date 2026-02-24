@@ -152,7 +152,7 @@
 
   function togglePanel(id: 'tpl-manage' | 'tpl-store') {
     if (id === 'tpl-store') {
-      goto('/store');
+      goto('/store-templates');
       return;
     }
     if (activePanel === id) {
