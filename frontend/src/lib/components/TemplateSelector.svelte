@@ -2,7 +2,8 @@
   import { onMount } from 'svelte';
   import { fly } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
-  import { ChevronDown, Search, AlertTriangle } from 'lucide-svelte';
+  import { ChevronDown, Search, AlertTriangle, ShoppingBag } from 'lucide-svelte';
+  import { goto } from '$app/navigation';
   import { templateStore } from '$lib/stores/templates.svelte';
 
   let {
@@ -174,7 +175,15 @@
           </button>
         {/each}
         {#if filtered.length === 0}
-          <div class="selector-empty">无匹配模板</div>
+          {#if templates.length === 0}
+            <div class="selector-empty-guide">
+              <ShoppingBag size={16} />
+              <span>尚未安装模板</span>
+              <button class="guide-link" onclick={() => { open = false; goto('/store'); }}>前往模板商店</button>
+            </div>
+          {:else}
+            <div class="selector-empty">无匹配模板</div>
+          {/if}
         {/if}
       </div>
     </div>
@@ -306,5 +315,27 @@
     text-align: center;
     color: var(--color-muted);
     font-size: 12px;
+  }
+  .selector-empty-guide {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-lg) var(--space-md);
+    color: var(--color-muted);
+    font-size: 12px;
+  }
+  .guide-link {
+    background: none;
+    border: none;
+    color: var(--color-accent);
+    font-size: 12px;
+    font-family: var(--font-ui);
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .guide-link:hover {
+    opacity: 0.8;
   }
 </style>

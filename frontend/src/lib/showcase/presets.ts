@@ -1,13 +1,13 @@
 // Mock data for showcase pages
 
 export const mockTemplates = [
-  { name: '公文模板', author: 'Presto 官方', keywords: ['政务', '公文'], installed: true, builtin: true },
-  { name: '教案模板（实操）', author: 'Presto 官方', keywords: ['教育', '教案'], installed: true, builtin: true },
-  { name: '会议纪要', author: 'Presto 官方', keywords: ['办公', '会议'], installed: true, builtin: false },
-  { name: '学术论文', author: '社区贡献', keywords: ['学术', '论文'], installed: true, builtin: false },
-  { name: '个人简历', author: '社区贡献', keywords: ['求职', '简历'], installed: true, builtin: false },
-  { name: '合同协议', author: '社区贡献', keywords: ['法务', '合同'], installed: true, builtin: false },
-  { name: '周报模板', author: '社区贡献', keywords: ['办公', '汇报'], installed: true, builtin: false },
+  { name: '公文模板', author: 'Presto 官方', keywords: ['政务', '公文'], installed: true },
+  { name: '教案模板（实操）', author: 'Presto 官方', keywords: ['教育', '教案'], installed: true },
+  { name: '会议纪要', author: 'Presto 官方', keywords: ['办公', '会议'], installed: true },
+  { name: '学术论文', author: '社区贡献', keywords: ['学术', '论文'], installed: true },
+  { name: '个人简历', author: '社区贡献', keywords: ['求职', '简历'], installed: true },
+  { name: '合同协议', author: '社区贡献', keywords: ['法务', '合同'], installed: true },
+  { name: '周报模板', author: '社区贡献', keywords: ['办公', '汇报'], installed: true },
 ];
 
 export const mockFiles = [

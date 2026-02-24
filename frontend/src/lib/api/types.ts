@@ -10,7 +10,7 @@ export interface Template {
   description: string;
   version: string;
   author: string;
-  builtin: boolean;
+  builtin?: boolean;
   keywords?: string[];
   missingFonts?: MissingFont[];
 }
@@ -55,6 +55,12 @@ export interface BatchImportResult {
   templates: { name: string; displayName: string; status: string }[];
   markdownFiles: { name: string; content: string; detectedTemplate?: string; workDir?: string }[];
   workDir?: string;
+}
+
+export type VerifyResult = 'verified' | 'not_in_registry' | 'pending' | 'mismatch';
+
+export interface ImportResult extends Template {
+  verified: VerifyResult;
 }
 
 export interface RegistryCategory {

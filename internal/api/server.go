@@ -17,6 +17,7 @@ type Server struct {
 	mux            *http.ServeMux
 	manager        *template.Manager
 	compiler       *typst.Compiler
+	registry       *template.RegistryCache
 	availableFonts map[string]bool // cached from typst fonts at startup
 }
 
@@ -27,6 +28,7 @@ type ServerOptions struct {
 	TypstBin     string
 	APIKey       string   // empty = desktop mode (no auth required)
 	FontPaths    []string // additional font directories for typst
+	Registry     *template.RegistryCache
 }
 
 func NewServer(opts ServerOptions) http.Handler {
@@ -44,6 +46,7 @@ func NewServer(opts ServerOptions) http.Handler {
 		mux:            http.NewServeMux(),
 		manager:        template.NewManager(opts.TemplatesDir),
 		compiler:       compiler,
+		registry:       opts.Registry,
 		availableFonts: compiler.ListFonts(),
 	}
 

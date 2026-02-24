@@ -49,7 +49,7 @@ var markdownExts = map[string]bool{
 
 // ProcessBatchZip processes ZIP data: extracts templates and markdown files.
 // Shared by the HTTP handler and the desktop Wails binding.
-func ProcessBatchZip(zipData []byte, mgr *template.Manager) (*BatchImportResult, error) {
+func ProcessBatchZip(zipData []byte, mgr *template.Manager, registry *template.RegistryCache) (*BatchImportResult, error) {
 	zr, err := zip.NewReader(bytes.NewReader(zipData), int64(len(zipData)))
 	if err != nil {
 		return nil, fmt.Errorf("invalid ZIP file: %w", err)
@@ -141,15 +141,6 @@ func ProcessBatchZip(zipData []byte, mgr *template.Manager) (*BatchImportResult,
 		status := "installed"
 
 		if mgr.Exists(name) {
-			if template.IsOfficial(name) {
-				status = "skipped"
-				importedTemplates = append(importedTemplates, TemplateImportStatus{
-					Name:        name,
-					DisplayName: manifest.DisplayName,
-					Status:      status,
-				})
-				continue
-			}
 			// Always overwrite for batch import
 			if err := mgr.Uninstall(name); err != nil {
 				log.Printf("[batch] import: failed to uninstall %q: %v", name, err)
@@ -158,7 +149,7 @@ func ProcessBatchZip(zipData []byte, mgr *template.Manager) (*BatchImportResult,
 			status = "overwritten"
 		}
 
-		result, err := importTemplateFromZipDir(zr, root, name, mgr)
+		result, err := importTemplateFromZipDir(zr, root, name, mgr, registry)
 		if err != nil {
 			log.Printf("[batch] import: failed to import template %q: %v", name, err)
 			continue
@@ -256,7 +247,7 @@ func (s *Server) handleBatchImportZip(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := ProcessBatchZip(data, s.manager)
+	result, err := ProcessBatchZip(data, s.manager, s.registry)
 	if err != nil {
 		log.Printf("[batch] import: %v", err)
 		writeJSONError(w, err.Error(), http.StatusBadRequest)

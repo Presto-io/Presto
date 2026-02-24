@@ -3,7 +3,6 @@ package template
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -131,9 +130,6 @@ func (m *Manager) UniqueTemplateName(name string) string {
 // UpdateDisplayName updates the displayName field in a template's manifest.json.
 func (m *Manager) UpdateDisplayName(name, newDisplayName string) error {
 	name = filepath.Base(name)
-	if IsOfficial(name) {
-		return fmt.Errorf("cannot modify built-in template")
-	}
 	tplDir := filepath.Join(m.TemplatesDir, name)
 	manifestPath := filepath.Join(tplDir, "manifest.json")
 
@@ -164,12 +160,6 @@ func (m *Manager) Rename(oldName, newName string) error {
 	}
 	if err := validateName(newName); err != nil {
 		return fmt.Errorf("invalid new name: %w", err)
-	}
-	if IsOfficial(oldName) {
-		return fmt.Errorf("cannot rename built-in template")
-	}
-	if IsOfficial(newName) {
-		return fmt.Errorf("cannot use built-in template name")
 	}
 	if oldName == newName {
 		return nil
@@ -245,68 +235,4 @@ func uniqueNameInSet(base string, used map[string]bool) string {
 			return candidate
 		}
 	}
-}
-
-// EnsureOfficialTemplates copies bundled official templates from bundleDir
-// to the user's templates directory, always overwriting to keep them in sync.
-// bundleDir should contain subdirectories for each official template,
-// e.g. bundleDir/gongwen/manifest.json and bundleDir/gongwen/presto-template-gongwen.
-func (m *Manager) EnsureOfficialTemplates(bundleDir string) {
-	if bundleDir == "" {
-		return
-	}
-	if _, err := os.Stat(bundleDir); err != nil {
-		return
-	}
-	for name := range OfficialTemplates {
-		tplDir := filepath.Join(m.TemplatesDir, name)
-		binaryName := fmt.Sprintf("presto-template-%s", name)
-		if runtime.GOOS == "windows" {
-			binaryName += ".exe"
-		}
-
-		manifestDst := filepath.Join(tplDir, "manifest.json")
-		binaryDst := filepath.Join(tplDir, binaryName)
-
-		// Source paths in the bundle
-		manifestSrc := filepath.Join(bundleDir, name, "manifest.json")
-		binarySrc := filepath.Join(bundleDir, name, binaryName)
-		if _, err := os.Stat(manifestSrc); err != nil {
-			log.Printf("[templates] bundled template %s not found at %s", name, bundleDir)
-			continue
-		}
-		if _, err := os.Stat(binarySrc); err != nil {
-			log.Printf("[templates] bundled binary %s not found at %s", binaryName, bundleDir)
-			continue
-		}
-
-		if err := os.MkdirAll(tplDir, 0755); err != nil {
-			log.Printf("[templates] failed to create dir for %s: %v", name, err)
-			continue
-		}
-		if err := copyFile(manifestSrc, manifestDst, 0644); err != nil {
-			log.Printf("[templates] failed to copy manifest for %s: %v", name, err)
-			continue
-		}
-		if err := copyFile(binarySrc, binaryDst, 0755); err != nil {
-			log.Printf("[templates] failed to copy binary for %s: %v", name, err)
-			continue
-		}
-		log.Printf("[templates] synced bundled template: %s", name)
-	}
-}
-
-func copyFile(src, dst string, perm os.FileMode) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, perm)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-	_, err = io.Copy(out, in)
-	return err
 }
