@@ -238,17 +238,26 @@
   let importingZip = $state(false);
   let zipInput: HTMLInputElement | undefined = $state();
   let conflictModal = $state<{ file: File; conflicts: string[] } | null>(null);
-  let importToast = $state<{ message: string; type: 'success' | 'error' } | null>(null);
+  let importToast = $state<{ message: string; type: 'success' | 'error' | 'warning' | 'info' } | null>(null);
   let importToastTimer: ReturnType<typeof setTimeout>;
 
-  function showImportToast(message: string, type: 'success' | 'error') {
+  function showImportToast(message: string, type: 'success' | 'error' | 'warning' | 'info') {
     clearTimeout(importToastTimer);
     importToast = { message, type };
-    importToastTimer = setTimeout(() => { importToast = null; }, 2500);
+    const duration = type === 'success' ? 2500 : 4000;
+    importToastTimer = setTimeout(() => { importToast = null; }, duration);
   }
 
   function handleImportZipClick() {
     zipInput?.click();
+  }
+
+  function importVerifyInfo(tpls: { verified?: string }[]): { suffix: string; type: 'success' | 'warning' | 'info' } {
+    const hasNotInRegistry = tpls.some(t => t.verified === 'not_in_registry');
+    const hasPending = tpls.some(t => t.verified === 'pending');
+    if (hasNotInRegistry) return { suffix: ' — 未在注册表中，无法验证来源', type: 'warning' };
+    if (hasPending) return { suffix: ' — 待验证，联网后可确认', type: 'info' };
+    return { suffix: ' — 已验证', type: 'success' };
   }
 
   async function handleZipFileSelected(e: Event) {
@@ -262,7 +271,8 @@
       installed = (await listTemplates()) ?? [];
       installedLoaded = true;
       const names = tpls.map(t => t.displayName || t.name).join('、');
-      showImportToast(`模板 "${names}" 导入成功`, 'success');
+      const verify = importVerifyInfo(tpls);
+      showImportToast(`模板 "${names}" 导入成功${verify.suffix}`, verify.type);
     } catch (err: any) {
       if (err.conflicts) {
         conflictModal = { file, conflicts: err.conflicts };
@@ -284,8 +294,9 @@
       installed = (await listTemplates()) ?? [];
       installedLoaded = true;
       const names = tpls.map(t => t.displayName || t.name).join('、');
-      const suffix = strategy === 'rename' ? '（已自动重命名）' : strategy === 'skip' ? '（已跳过重复）' : '（已覆盖）';
-      showImportToast(`模板 "${names}" 导入成功${suffix}`, 'success');
+      const strategySuffix = strategy === 'rename' ? '（已自动重命名）' : strategy === 'skip' ? '（已跳过重复）' : '（已覆盖）';
+      const verify = importVerifyInfo(tpls);
+      showImportToast(`模板 "${names}" 导入成功${strategySuffix}${verify.suffix}`, verify.type);
     } catch (err) {
       showImportToast(err instanceof Error ? err.message : String(err), 'error');
     } finally {
@@ -459,9 +470,6 @@
                         {:else}
                           <span class="tpl-name">{tpl.displayName || tpl.name}</span>
                           <span class="tpl-version">v{tpl.version}</span>
-                          {#if tpl.builtin}
-                            <span class="badge-builtin">内置</span>
-                          {/if}
                         {/if}
                       </div>
                       <p class="tpl-desc">{tpl.description}</p>
@@ -474,8 +482,7 @@
                       {/if}
                       <span class="tpl-author">{tpl.author}</span>
                     </div>
-                    {#if !tpl.builtin}
-                      <div class="tpl-actions">
+                    <div class="tpl-actions">
                         {#if renamingTpl !== tpl.name}
                           <button
                             class="btn-rename"
@@ -494,7 +501,6 @@
                           <span>卸载</span>
                         </button>
                       </div>
-                    {/if}
                   </div>
                 {/each}
               </div>
@@ -757,7 +763,7 @@
 {/if}
 
 {#if importToast}
-  <div class="import-toast" class:toast-error={importToast.type === 'error'}>
+  <div class="import-toast" class:toast-error={importToast.type === 'error'} class:toast-warning={importToast.type === 'warning'} class:toast-info={importToast.type === 'info'}>
     {importToast.message}
   </div>
 {/if}
@@ -1440,6 +1446,8 @@
     animation: toast-in 200ms ease-out;
   }
   .import-toast.toast-error { background: var(--color-danger); }
+  .import-toast.toast-warning { background: var(--color-warning); color: #1a1a1a; }
+  .import-toast.toast-info { background: var(--color-accent); }
   @keyframes toast-in {
     from { opacity: 0; transform: translateX(-50%) translateY(8px); }
     to { opacity: 1; transform: translateX(-50%) translateY(0); }

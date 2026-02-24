@@ -10,7 +10,6 @@
     version: string;
     author: string;
     keywords: string[];
-    builtin: boolean;
   }
 
   const templates: ShowcaseTemplate[] = mockTemplates.map((t, i) => ({
@@ -26,7 +25,6 @@
     version: i < 2 ? '1.0.0' : i < 4 ? '0.9.0' : '0.8.0',
     author: t.author,
     keywords: t.keywords,
-    builtin: t.builtin,
   }));
 
   let tplSearch = $state('');
@@ -124,9 +122,6 @@
                   <div class="tpl-name-row">
                     <span class="tpl-name">{tpl.displayName}</span>
                     <span class="tpl-version">v{tpl.version}</span>
-                    {#if tpl.builtin}
-                      <span class="badge-builtin">内置</span>
-                    {/if}
                   </div>
                   <p class="tpl-desc">{tpl.description}</p>
                   {#if tpl.keywords.length > 0}
@@ -138,8 +133,7 @@
                   {/if}
                   <span class="tpl-author">{tpl.author}</span>
                 </div>
-                {#if !tpl.builtin}
-                  <div class="tpl-actions">
+                <div class="tpl-actions">
                     <button class="btn-rename" aria-label="重命名">
                       <Pencil size={12} />
                     </button>
@@ -148,7 +142,6 @@
                       <span>卸载</span>
                     </button>
                   </div>
-                {/if}
               </div>
             {/each}
           </div>

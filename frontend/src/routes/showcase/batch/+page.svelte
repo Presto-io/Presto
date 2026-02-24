@@ -4,8 +4,8 @@
 
   // Mock template list for the left nav
   const mockTemplateNav = [
-    { name: 'gongwen', displayName: '类公文模板', builtin: true },
-    { name: 'jiaoan-shicao', displayName: '实操教案模板', builtin: true },
+    { name: 'gongwen', displayName: '类公文模板' },
+    { name: 'jiaoan-shicao', displayName: '实操教案模板' },
   ];
 
   // Build file list with IDs
@@ -144,9 +144,6 @@
             ondrop={(e) => handleTemplateDrop(e, tpl.name)}
           >
             <span class="nav-item-name">{tpl.displayName}</span>
-            {#if tpl.builtin}
-              <span class="badge-builtin">内置</span>
-            {/if}
             {#if groupFileCount(tpl.name) > 0}
               <span class="nav-item-count">{groupFileCount(tpl.name)}</span>
             {/if}

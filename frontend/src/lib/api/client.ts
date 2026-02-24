@@ -1,4 +1,4 @@
-import type { Template, Manifest, GitHubRepo, BatchImportResult, RegistryTemplate, PlatformInfo } from './types';
+import type { Template, Manifest, GitHubRepo, BatchImportResult, ImportResult, RegistryTemplate, PlatformInfo } from './types';
 
 const BASE = import.meta.env.VITE_API_URL || '';
 
@@ -173,7 +173,7 @@ export interface ImportConflictError {
 export async function importTemplateZip(
   file: File,
   onConflict?: 'overwrite' | 'skip' | 'rename',
-): Promise<Template[]> {
+): Promise<ImportResult[]> {
   const formData = new FormData();
   formData.append('file', file);
   const params = onConflict ? `?onConflict=${onConflict}` : '';

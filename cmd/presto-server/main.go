@@ -30,14 +30,6 @@ func main() {
 	templatesDir := filepath.Join(home, ".presto", "templates")
 	os.MkdirAll(templatesDir, 0755)
 
-	// Auto-install bundled official templates if missing
-	mgr := template.NewManager(templatesDir)
-	exePath, _ := os.Executable()
-	if exePath != "" {
-		bundleDir := filepath.Join(filepath.Dir(exePath), "templates")
-		mgr.EnsureOfficialTemplates(bundleDir)
-	}
-
 	staticDir := os.Getenv("STATIC_DIR")
 	if staticDir == "" {
 		staticDir = "frontend/build"
@@ -63,12 +55,18 @@ func main() {
 		fontPaths = []string{fontsDir}
 	}
 
+	// Registry cache for SHA256 verification of imported templates
+	prestoDir := filepath.Join(home, ".presto")
+	registry := template.NewRegistryCache(prestoDir)
+	registry.RefreshAsync()
+
 	srv := api.NewServer(api.ServerOptions{
 		TemplatesDir: templatesDir,
 		StaticDir:    staticDir,
 		TypstBin:     "typst",
 		APIKey:       apiKey,
 		FontPaths:    fontPaths,
+		Registry:     registry,
 	})
 
 	addr := fmt.Sprintf("%s:%s", host, port)

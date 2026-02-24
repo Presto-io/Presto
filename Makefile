@@ -1,4 +1,4 @@
-.PHONY: frontend server desktop templates install-templates build dev run-desktop clean \
+.PHONY: frontend server desktop build dev run-desktop clean \
        _build-macos-arm64 _build-macos-amd64 \
        dist-macos dist-macos-arm64 dist-macos-amd64 dist-macos-universal \
        dist-dmg dist-dmg-arm64 dist-dmg-amd64 dist-dmg-universal \
@@ -23,11 +23,6 @@ TYPST_DARWIN_AMD64 := typst-x86_64-apple-darwin.tar.xz
 TYPST_WINDOWS_AMD64:= typst-x86_64-pc-windows-msvc.zip
 TYPST_LINUX_AMD64  := typst-x86_64-unknown-linux-musl.tar.xz
 
-# Official templates (downloaded from GitHub Releases)
-TPL_REPO     := Presto-io/presto-official-templates
-TPL_VERSION  ?= v1.0.0
-TPL_NAMES    := gongwen jiaoan-shicao
-
 # ─── Development ─────────────────────────────────────────
 
 frontend:
@@ -42,32 +37,12 @@ desktop: frontend
 		CGO_LDFLAGS="-framework UniformTypeIdentifiers" \
 		go build -tags "$(WAILS_TAGS)" -ldflags "$(LDFLAGS)" -o bin/presto-desktop $(DESKTOP_SRC)/
 
-templates:
-	@mkdir -p bin
-	@for tpl in $(TPL_NAMES); do \
-		echo "==> Downloading template $$tpl..."; \
-		gh release download $(TPL_VERSION) --repo $(TPL_REPO) \
-			-p "presto-template-$$tpl-$(shell go env GOOS)-$(shell go env GOARCH)" \
-			-D bin/ --clobber; \
-		mv "bin/presto-template-$$tpl-$(shell go env GOOS)-$(shell go env GOARCH)" \
-			"bin/presto-template-$$tpl"; \
-		chmod +x "bin/presto-template-$$tpl"; \
-	done
-
-install-templates: templates
-	@for tpl in $(TPL_NAMES); do \
-		mkdir -p "$$HOME/.presto/templates/$$tpl"; \
-		cp "bin/presto-template-$$tpl" "$$HOME/.presto/templates/$$tpl/presto-template-$$tpl"; \
-		"bin/presto-template-$$tpl" --manifest > "$$HOME/.presto/templates/$$tpl/manifest.json"; \
-		echo "==> Installed $$tpl"; \
-	done
-
-build: server templates
+build: server
 
 dev:
 	go run ./cmd/presto-server/
 
-run-desktop: install-templates
+run-desktop:
 	cd frontend && VITE_MOCK=1 npm run build
 	cp -r frontend/build/* $(DESKTOP_EMBED)/
 	rm -rf $(DESKTOP_EMBED)/mock && cp -r frontend/mock $(DESKTOP_EMBED)/mock
@@ -86,31 +61,6 @@ else
 _frontend-embed: frontend
 	cp -r frontend/build/* $(DESKTOP_EMBED)/
 endif
-
-# Download official template binaries for a given platform
-# Usage: $(MAKE) _download-templates TPL_SUFFIX=<os-arch>
-_download-templates:
-	@mkdir -p $(DIST)/_bin
-	@for tpl in $(TPL_NAMES); do \
-		OUT="$(DIST)/_bin/presto-template-$$tpl-$(TPL_SUFFIX)"; \
-		if [ ! -f "$$OUT" ]; then \
-			echo "==> Downloading template $$tpl ($(TPL_SUFFIX))..."; \
-			gh release download $(TPL_VERSION) --repo $(TPL_REPO) \
-				-p "presto-template-$$tpl-$(TPL_SUFFIX)*" \
-				-D $(DIST)/_bin/ --clobber; \
-			chmod +x "$$OUT" 2>/dev/null || true; \
-		fi; \
-	done
-
-# Extract manifest.json from a native template binary
-# Usage: $(MAKE) _extract-manifests TPL_SUFFIX=<os-arch>
-_extract-manifests:
-	@for tpl in $(TPL_NAMES); do \
-		BIN="$(DIST)/_bin/presto-template-$$tpl-$(TPL_SUFFIX)"; \
-		DST="$(DIST)/_manifests/$$tpl/manifest.json"; \
-		mkdir -p "$$(dirname $$DST)"; \
-		"$$BIN" --manifest > "$$DST"; \
-	done
 
 # Download typst binary for a given platform
 # Usage: $(MAKE) _download-typst TYPST_ARCHIVE=<name> TYPST_OUT=<path> [TYPST_SHA256=<hash>]
@@ -150,10 +100,8 @@ _build-macos-arm64: _frontend-embed
 		-o $(DIST)/_bin/presto-darwin-arm64 $(DESKTOP_SRC)/ ) & PID_GO=$$!; \
 	( $(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_DARWIN_ARM64) \
 		TYPST_OUT=$(DIST)/_bin/typst-darwin-arm64 ) & PID_TYPST=$$!; \
-	( $(MAKE) _download-templates TPL_SUFFIX=darwin-arm64 ) & PID_TPL=$$!; \
 	wait $$PID_GO || exit 1; \
-	wait $$PID_TYPST || exit 1; \
-	wait $$PID_TPL || exit 1
+	wait $$PID_TYPST || exit 1
 
 _build-macos-amd64: _frontend-embed
 	@mkdir -p $(DIST)/_bin
@@ -164,10 +112,8 @@ _build-macos-amd64: _frontend-embed
 		-o $(DIST)/_bin/presto-darwin-amd64 $(DESKTOP_SRC)/ ) & PID_GO=$$!; \
 	( $(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_DARWIN_AMD64) \
 		TYPST_OUT=$(DIST)/_bin/typst-darwin-amd64 ) & PID_TYPST=$$!; \
-	( $(MAKE) _download-templates TPL_SUFFIX=darwin-amd64 ) & PID_TPL=$$!; \
 	wait $$PID_GO || exit 1; \
-	wait $$PID_TYPST || exit 1; \
-	wait $$PID_TPL || exit 1
+	wait $$PID_TYPST || exit 1
 
 dist-macos-arm64: _build-macos-arm64
 	@$(MAKE) _bundle-app GOARCH=arm64 TYPST_BIN=$(DIST)/_bin/typst-darwin-arm64
@@ -176,15 +122,10 @@ dist-macos-amd64: _build-macos-amd64
 	@$(MAKE) _bundle-app GOARCH=amd64 TYPST_BIN=$(DIST)/_bin/typst-darwin-amd64
 
 dist-macos-universal: _build-macos-arm64 _build-macos-amd64
-	@echo "==> Extracting manifests..."
-	@$(MAKE) _extract-manifests TPL_SUFFIX=darwin-arm64
 	@echo "==> Creating universal .app..."
 	@mkdir -p "$(DIST)/$(APP_NAME).app/Contents/MacOS"
 	@mkdir -p "$(DIST)/$(APP_NAME).app/Contents/Resources"
 	@mkdir -p "$(DIST)/$(APP_NAME).app/Contents/Resources/zh-Hans.lproj"
-	@for tpl in $(TPL_NAMES); do \
-		mkdir -p "$(DIST)/$(APP_NAME).app/Contents/Resources/templates/$$tpl"; \
-	done
 	lipo -create \
 		$(DIST)/_bin/presto-darwin-arm64 \
 		$(DIST)/_bin/presto-darwin-amd64 \
@@ -193,14 +134,6 @@ dist-macos-universal: _build-macos-arm64 _build-macos-amd64
 		$(DIST)/_bin/typst-darwin-arm64 \
 		$(DIST)/_bin/typst-darwin-amd64 \
 		-output "$(DIST)/$(APP_NAME).app/Contents/Resources/typst"
-	@for tpl in $(TPL_NAMES); do \
-		lipo -create \
-			$(DIST)/_bin/presto-template-$$tpl-darwin-arm64 \
-			$(DIST)/_bin/presto-template-$$tpl-darwin-amd64 \
-			-output "$(DIST)/$(APP_NAME).app/Contents/Resources/templates/$$tpl/presto-template-$$tpl"; \
-		cp "$(DIST)/_manifests/$$tpl/manifest.json" \
-			"$(DIST)/$(APP_NAME).app/Contents/Resources/templates/$$tpl/"; \
-	done
 	cp packaging/macos/Info.plist "$(DIST)/$(APP_NAME).app/Contents/"
 	sed -i '' 's/0\.1\.0/$(VERSION)/g' "$(DIST)/$(APP_NAME).app/Contents/Info.plist"
 	@if [ -f packaging/macos/icon.icns ]; then \
@@ -213,22 +146,12 @@ dist-macos: dist-macos-arm64
 
 # Internal: create .app bundle for a single arch
 _bundle-app:
-	@$(MAKE) _extract-manifests TPL_SUFFIX=darwin-$(GOARCH)
 	@mkdir -p "$(DIST)/$(APP_NAME).app/Contents/MacOS"
 	@mkdir -p "$(DIST)/$(APP_NAME).app/Contents/Resources"
 	@mkdir -p "$(DIST)/$(APP_NAME).app/Contents/Resources/zh-Hans.lproj"
-	@for tpl in $(TPL_NAMES); do \
-		mkdir -p "$(DIST)/$(APP_NAME).app/Contents/Resources/templates/$$tpl"; \
-	done
 	cp $(DIST)/_bin/presto-darwin-$(GOARCH) \
 		"$(DIST)/$(APP_NAME).app/Contents/MacOS/$(APP_NAME)"
 	cp $(TYPST_BIN) "$(DIST)/$(APP_NAME).app/Contents/Resources/typst"
-	@for tpl in $(TPL_NAMES); do \
-		cp "$(DIST)/_bin/presto-template-$$tpl-darwin-$(GOARCH)" \
-			"$(DIST)/$(APP_NAME).app/Contents/Resources/templates/$$tpl/presto-template-$$tpl"; \
-		cp "$(DIST)/_manifests/$$tpl/manifest.json" \
-			"$(DIST)/$(APP_NAME).app/Contents/Resources/templates/$$tpl/"; \
-	done
 	cp packaging/macos/Info.plist "$(DIST)/$(APP_NAME).app/Contents/"
 	sed -i '' 's/0\.1\.0/$(VERSION)/g' "$(DIST)/$(APP_NAME).app/Contents/Info.plist"
 	@if [ -f packaging/macos/icon.icns ]; then \
@@ -304,20 +227,9 @@ dist-windows-amd64: _frontend-embed
 		-o "$(DIST)/$(APP_NAME)-$(VERSION)-windows.exe" $(DESKTOP_SRC)/ ) & PID_GO=$$!; \
 	( $(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_WINDOWS_AMD64) \
 		TYPST_OUT=$(DIST)/typst.exe ) & PID_TYPST=$$!; \
-	( $(MAKE) _download-templates TPL_SUFFIX=windows-amd64.exe ) & PID_TPL=$$!; \
 	wait $$PID_GO || exit 1; \
-	wait $$PID_TYPST || exit 1; \
-	wait $$PID_TPL || exit 1
-	@$(MAKE) _extract-manifests TPL_SUFFIX=darwin-$(shell go env GOARCH) 2>/dev/null || \
-		$(MAKE) _download-templates TPL_SUFFIX=darwin-$(shell go env GOARCH) && \
-		$(MAKE) _extract-manifests TPL_SUFFIX=darwin-$(shell go env GOARCH)
-	@for tpl in $(TPL_NAMES); do \
-		mkdir -p "$(DIST)/templates/$$tpl"; \
-		cp "$(DIST)/_bin/presto-template-$$tpl-windows-amd64.exe" \
-			"$(DIST)/templates/$$tpl/presto-template-$$tpl.exe"; \
-		cp "$(DIST)/_manifests/$$tpl/manifest.json" "$(DIST)/templates/$$tpl/"; \
-	done
-	@echo "==> $(DIST)/$(APP_NAME)-$(VERSION)-windows.exe + typst.exe + templates/"
+	wait $$PID_TYPST || exit 1
+	@echo "==> $(DIST)/$(APP_NAME)-$(VERSION)-windows.exe + typst.exe"
 
 dist-windows: dist-windows-amd64
 
@@ -339,18 +251,8 @@ dist-linux-amd64: frontend
 			cp -r frontend/build/* cmd/presto-desktop/build/ && \
 			go build -tags "$(WAILS_TAGS)" -ldflags "$(LDFLAGS)" \
 				-o dist/$(APP_NAME)-$(VERSION)-linux $(DESKTOP_SRC)/'
-	@$(MAKE) _download-templates TPL_SUFFIX=linux-amd64
 	@$(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_LINUX_AMD64) TYPST_OUT=$(DIST)/typst-linux
-	@$(MAKE) _extract-manifests TPL_SUFFIX=darwin-$(shell go env GOARCH) 2>/dev/null || \
-		$(MAKE) _download-templates TPL_SUFFIX=darwin-$(shell go env GOARCH) && \
-		$(MAKE) _extract-manifests TPL_SUFFIX=darwin-$(shell go env GOARCH)
-	@for tpl in $(TPL_NAMES); do \
-		mkdir -p "$(DIST)/templates/$$tpl"; \
-		cp "$(DIST)/_bin/presto-template-$$tpl-linux-amd64" \
-			"$(DIST)/templates/$$tpl/presto-template-$$tpl"; \
-		cp "$(DIST)/_manifests/$$tpl/manifest.json" "$(DIST)/templates/$$tpl/"; \
-	done
-	@echo "==> $(DIST)/$(APP_NAME)-$(VERSION)-linux + typst-linux + templates/"
+	@echo "==> $(DIST)/$(APP_NAME)-$(VERSION)-linux + typst-linux"
 
 dist-linux: dist-linux-amd64
 
