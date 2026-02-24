@@ -18,7 +18,8 @@ const config = {
 				'/showcase/templates',
 				'/showcase/drop',
 				'/showcase/hero',
-				'/showcase/editor'
+				'/showcase/editor',
+				'/showcase/store-templates'
 			]
 		}
 	},
