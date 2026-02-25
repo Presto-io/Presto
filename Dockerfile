@@ -45,7 +45,12 @@ RUN apk add --no-cache curl && \
 FROM --platform=$BUILDPLATFORM alpine:3.21 AS template-downloader
 ARG TARGETARCH
 ARG TPL_VERSION=v1.0.0
-RUN apk add --no-cache curl jq && \
+# SEC-29: SHA256 checksums for template binaries (update when TPL_VERSION changes)
+ARG TPL_GONGWEN_SHA256_AMD64=""
+ARG TPL_GONGWEN_SHA256_ARM64=""
+ARG TPL_JIAOAN_SHICAO_SHA256_AMD64=""
+ARG TPL_JIAOAN_SHICAO_SHA256_ARM64=""
+RUN apk add --no-cache curl && \
     TEMPLATES="gongwen jiaoan-shicao" && \
     SUFFIX="linux-${TARGETARCH}" && \
     for tpl in $TEMPLATES; do \
@@ -53,6 +58,18 @@ RUN apk add --no-cache curl jq && \
       echo "Downloading presto-template-${tpl}-${SUFFIX}..." && \
       curl -sSL -o "/templates/$tpl/presto-template-$tpl" \
         "https://github.com/Presto-io/presto-official-templates/releases/download/${TPL_VERSION}/presto-template-${tpl}-${SUFFIX}" && \
+      # SEC-29: Verify SHA256 before executing binary \
+      TPL_VAR=$(echo "$tpl" | tr '-' '_' | tr '[:lower:]' '[:upper:]') && \
+      if [ "$TARGETARCH" = "arm64" ]; then \
+        eval "EXPECTED_SHA=\${TPL_${TPL_VAR}_SHA256_ARM64}"; \
+      else \
+        eval "EXPECTED_SHA=\${TPL_${TPL_VAR}_SHA256_AMD64}"; \
+      fi && \
+      if [ -n "$EXPECTED_SHA" ]; then \
+        echo "${EXPECTED_SHA}  /templates/$tpl/presto-template-$tpl" | sha256sum -c - || exit 1; \
+      else \
+        echo "WARNING: No SHA256 checksum provided for template $tpl ($TARGETARCH)"; \
+      fi && \
       chmod +x "/templates/$tpl/presto-template-$tpl" && \
       "/templates/$tpl/presto-template-$tpl" --manifest > "/templates/$tpl/manifest.json"; \
     done
