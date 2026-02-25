@@ -99,7 +99,8 @@ func (s *Server) handleImportTemplate(w http.ResponseWriter, r *http.Request) {
 	for _, root := range roots {
 		manifest, err := readManifestFromZip(zr, root)
 		if err != nil {
-			writeJSONError(w, err.Error(), http.StatusBadRequest)
+			log.Printf("[templates] import: manifest read error in root %q: %v", root, err)
+			writeJSONError(w, "invalid template package", http.StatusBadRequest) // SEC-35
 			return
 		}
 		entries = append(entries, templateEntry{root: root, manifest: manifest})
@@ -146,7 +147,7 @@ func (s *Server) handleImportTemplate(w http.ResponseWriter, r *http.Request) {
 		result, err := importTemplateFromZipDir(zr, entry.root, name, s.manager, s.registry)
 		if err != nil {
 			log.Printf("[templates] import: failed for root %q: %v", entry.root, err)
-			writeJSONError(w, err.Error(), http.StatusBadRequest)
+			writeJSONError(w, "import failed", http.StatusBadRequest) // SEC-35
 			return
 		}
 		imported = append(imported, *result)
