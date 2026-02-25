@@ -113,7 +113,7 @@ func ProcessBatchZip(zipData []byte, mgr *template.Manager, registry *template.R
 			continue
 		}
 
-		if err := os.WriteFile(destPath, fileData, 0644); err != nil {
+		if err := os.WriteFile(destPath, fileData, 0600); err != nil { // SEC-45
 			continue
 		}
 
