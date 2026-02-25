@@ -302,7 +302,7 @@ func importTemplateFromZipDir(zr *zip.Reader, prefix string, installName string,
 		}
 	}
 
-	if err := os.WriteFile(filepath.Join(tplDir, "manifest.json"), manifestData, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(tplDir, "manifest.json"), manifestData, 0600); err != nil { // SEC-45
 		return nil, fmt.Errorf("failed to write manifest")
 	}
 

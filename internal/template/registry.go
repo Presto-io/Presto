@@ -2,6 +2,7 @@ package template
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -120,7 +121,20 @@ func (rc *RegistryCache) RefreshAsync() {
 }
 
 func (rc *RegistryCache) fetchFromCDN() *Registry {
-	client := &http.Client{Timeout: fetchTimeout}
+	// SEC-46: Validate redirects to prevent CDN hijacking
+	client := &http.Client{
+		Timeout: fetchTimeout,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			host := req.URL.Host
+			if host != "presto.c-1o.top" && !isAllowedDownloadHost(host) {
+				return fmt.Errorf("redirect to disallowed host: %s", host)
+			}
+			if len(via) >= 10 {
+				return fmt.Errorf("too many redirects")
+			}
+			return nil
+		},
+	}
 	resp, err := client.Get(rc.cdnURL)
 	if err != nil {
 		log.Printf("[registry] fetch failed: %v", err)
@@ -155,7 +169,7 @@ func (rc *RegistryCache) fetchFromCDN() *Registry {
 	rc.mu.Unlock()
 
 	if cacheData, err := json.Marshal(cached); err == nil {
-		if err := os.WriteFile(rc.cachePath(), cacheData, 0644); err != nil {
+		if err := os.WriteFile(rc.cachePath(), cacheData, 0600); err != nil { // SEC-45
 			log.Printf("[registry] cache write failed: %v", err)
 		}
 	}
