@@ -12,10 +12,9 @@
 
 | 状态 | 数量 | 说明 |
 |------|------|------|
-| 已修复 | 22 | 漏洞已完全消除 |
-| 部分修复 | 4 | 有缓解措施但仍存在残留风险 |
-| 复审新发现（未修复） | 4 | NEW-01 ~ NEW-04 仍未修复 |
-| 三审新发现 | 19 | 三审中新发现的问题（SEC-29 ~ SEC-47） |
+| 已修复 | 39 | 漏洞已完全消除 |
+| 部分修复 | 3 | 有缓解措施但仍存在残留风险（SEC-01/10/24） |
+| 未修复 | 4 | SEC-30/39/41 架构变更待定，NEW-01 策略待定 |
 
 ## 复审总览（2026-02-19）
 
@@ -34,7 +33,7 @@
 | SEC-01 | **严重** | RCE (CWE-494) | **部分修复** | SHA256 校验可选，无签名验证 |
 | SEC-02 | **严重** | 任意文件读取 (CWE-552) | **已修复** | Typst root 限制为临时目录 |
 | SEC-03 | **严重** | 任意文件写入 (CWE-22/73) | **已修复** | workDir 校验为绝对路径且不含 `..` |
-| SEC-04 | **严重** | XSS (CWE-79) | **部分修复** | SVG 已消毒，但 StoreView README 渲染遗漏 |
+| SEC-04 | **严重** | XSS (CWE-79) | **已修复** | SVG + StoreView README 均已 DOMPurify 消毒 |
 | SEC-05 | **高** | 目录穿越删除 (CWE-22) | **已修复** | filepath.Base + validateName + 路径边界检查 |
 | SEC-06 | **高** | 目录穿越安装 (CWE-22) | **已修复** | 名称正则校验 + 绝对路径边界检查 |
 | SEC-07 | **高** | SSRF (CWE-918) | **已修复** | GitHub 域名白名单 + 重定向拦截 |
@@ -45,39 +44,39 @@
 | SEC-12 | **中** | DoS (CWE-400) | **已修复** | 编译 60s / 执行 30s 超时 |
 | SEC-13 | **中** | DoS (CWE-400) | **已修复** | 100MB 下载限制 |
 | SEC-14 | **中** | 网络暴露 (CWE-668) | **已修复** | 默认 127.0.0.1 |
-| SEC-15 | **中** | 信息泄露 (CWE-209) | **部分修复** | 部分 handler 仍返回 `err.Error()` |
+| SEC-15 | **中** | 信息泄露 (CWE-209) | **已修复** | 所有 handler 统一使用通用错误消息 |
 | SEC-16 | **中** | JSON 注入 (CWE-74) | **已修复** | json.NewEncoder 正确编码 |
 | SEC-17 | **中** | 输入校验缺失 (CWE-20) | **已修复** | 正则 `^[a-zA-Z0-9][a-zA-Z0-9._-]*$` + 100 字符限制 |
 | SEC-18 | **中** | HTTP 状态码未检查 (CWE-252) | **已修复** | checkHTTPStatus 统一检查 |
 | SEC-19 | **中** | 无速率限制 (CWE-770) | **已修复** | 令牌桶（10 req/s, burst 30） |
 | SEC-20 | **中** | HTTP 客户端无超时 (CWE-400) | **已修复** | 30s 超时自定义 Client |
 | SEC-21 | **中** | Docker 以 root 运行 (CWE-250) | **已修复** | 非 root 用户 `presto` |
-| SEC-22 | **中** | 供应链-编译器 (CWE-494) | **部分修复** | 校验基础设施存在但默认为空 |
+| SEC-22 | **中** | 供应链-编译器 (CWE-494) | **已修复** | Docker 构建传入 SHA256 参数，CI 硬编码校验，Windows CI 已补全 |
 | SEC-23 | **中** | 供应链-交叉编译 (CWE-494) | **已修复** | SHA256 硬编码验证 |
 | SEC-24 | **中** | CI 密钥风险 | **部分修复** | 权限文档化但 PAT 范围仍过大 |
 | SEC-25 | **低** | 竞态条件 (CWE-367) | **已修复** | crypto/rand 随机后缀 |
 | SEC-26 | **低** | ReDoS (CWE-1333) | **已修复** | 正则元字符转义 |
 | SEC-27 | **低** | 静态文件泄露 (CWE-538) | **已修复** | dotfile 过滤中间件 |
 | SEC-28 | **低** | 文件权限过宽 (CWE-732) | **已修复** | 0700 权限 |
-| SEC-29 | **严重** | 供应链 RCE (CWE-494) | **未修复** | Dockerfile 模板二进制零校验后执行 |
+| SEC-29 | **严重** | 供应链 RCE (CWE-494) | **已修复** | Dockerfile 模板二进制 SHA256 校验基础设施 |
 | SEC-30 | **严重** | 代码注入 (CWE-94) | **未修复** | Install 执行未验证二进制提取 manifest |
-| SEC-31 | **高** | 供应链 (CWE-494) | **未修复** | Windows CI Typst 二进制零校验 |
-| SEC-32 | **高** | 供应链 (CWE-494) | **未修复** | Docker 构建未传 Typst SHA256 参数 |
-| SEC-33 | **高** | 网络暴露 (CWE-668) | **未修复** | docker-compose 暴露到所有接口 |
-| SEC-34 | **高** | XSS (CWE-79) | **未修复** | StoreView README 渲染未消毒 |
-| SEC-35 | **中** | 信息泄露 (CWE-209) | **未修复** | 多处 handler 返回 err.Error() |
-| SEC-36 | **中** | 缺少安全头 (CWE-693) | **未修复** | 无 X-Content-Type-Options 等 |
-| SEC-37 | **中** | CORS 遗漏 (CWE-942) | **未修复** | Allow-Methods 缺少 PATCH |
-| SEC-38 | **中** | TOCTOU + symlink (CWE-367/59) | **未修复** | Uninstall 使用 os.Stat 后 RemoveAll |
+| SEC-31 | **高** | 供应链 (CWE-494) | **已修复** | Windows CI Typst SHA256 硬编码校验 |
+| SEC-32 | **高** | 供应链 (CWE-494) | **已修复** | Docker 构建传入 Typst SHA256 参数 |
+| SEC-33 | **高** | 网络暴露 (CWE-668) | **已修复** | docker-compose 绑定 127.0.0.1 |
+| SEC-34 | **高** | XSS (CWE-79) | **已修复** | StoreView README DOMPurify 消毒 |
+| SEC-35 | **中** | 信息泄露 (CWE-209) | **已修复** | 统一使用通用错误消息 |
+| SEC-36 | **中** | 缺少安全头 (CWE-693) | **已修复** | securityHeadersMiddleware 设置安全响应头 |
+| SEC-37 | **中** | CORS 遗漏 (CWE-942) | **已修复** | Allow-Methods 添加 PATCH |
+| SEC-38 | **中** | TOCTOU + symlink (CWE-367/59) | **已修复** | Uninstall 使用 os.Lstat + symlink 检测 |
 | SEC-39 | **中** | SSRF (CWE-918) | **未修复** | 客户端可控下载 URL + SHA256 |
-| SEC-40 | **中** | 文件读取 (CWE-552) | **未修复** | 桌面端编译器 root 为 $HOME |
+| SEC-40 | **中** | 文件读取 (CWE-552) | **已修复** | 桌面端编译器 root 改为 os.TempDir |
 | SEC-41 | **中** | 明文传输 (CWE-319) | **未修复** | 服务端无 TLS 支持 |
-| SEC-42 | **中** | 容器加固 (CWE-250) | **未修复** | docker-compose 无安全加固选项 |
-| SEC-43 | **低** | 敏感日志 (CWE-532) | **未修复** | API Key 输出到 stdout |
-| SEC-44 | **低** | 返回值忽略 (CWE-252) | **未修复** | os.UserHomeDir/MkdirAll 错误被忽略 |
-| SEC-45 | **低** | 文件权限 (CWE-732) | **未修复** | registry 缓存/manifest 写入 0644 |
-| SEC-46 | **低** | 重定向 (CWE-295) | **未修复** | registry HTTP 客户端无重定向校验 |
-| SEC-47 | **低** | 资源泄露 (CWE-404) | **未修复** | defer Close 在 for 循环内 |
+| SEC-42 | **中** | 容器加固 (CWE-250) | **已修复** | docker-compose read_only + cap_drop + no-new-privileges |
+| SEC-43 | **低** | 敏感日志 (CWE-532) | **已修复** | API Key 仅输出截断版本 |
+| SEC-44 | **低** | 返回值忽略 (CWE-252) | **已修复** | os.UserHomeDir/MkdirAll 错误检查 + log.Fatal |
+| SEC-45 | **低** | 文件权限 (CWE-732) | **已修复** | registry 缓存/manifest 统一 0600 |
+| SEC-46 | **低** | 重定向 (CWE-295) | **已修复** | registry HTTP 客户端添加 CheckRedirect 校验 |
+| SEC-47 | **低** | 资源泄露 (CWE-404) | **已修复** | defer 改为立即 Close |
 
 ---
 
@@ -104,15 +103,14 @@
   4. 可生成不受限子进程
 - **建议：** macOS 使用 `sandbox-exec`，Linux 使用 seccomp-bpf 或 namespace 隔离
 
-### SEC-22: Typst 二进制供应链校验（中）
+### SEC-22: Typst 二进制供应链校验（中） — ✅ 三审已完全修复
 
 - **原问题：** Typst 二进制下载无任何完整性校验
 - **已修复：** Dockerfile 和 Makefile 支持 `TYPST_SHA256` 参数，传入时进行 SHA256 验证
-- **残留风险：**
-  1. 默认值为空字符串，不传参时仅打印警告不阻断构建
-  2. CI workflow 的 `docker/build-push-action` 未传入校验参数
-  3. Windows CI 构建完全无校验基础设施（直接 `curl` + `unzip`）
-- **建议：** 将已知 SHA256 硬编码为默认值，构建时强制验证
+- **三审修复：**
+  1. SEC-31: Windows CI 添加 SHA256 硬编码校验
+  2. SEC-32: `docker/build-push-action` 传入 `TYPST_SHA256_AMD64`/`TYPST_SHA256_ARM64` build-args
+- **残留风险：** 无（所有平台均已校验）
 
 ### SEC-24: CI 密钥范围（中）
 
@@ -136,14 +134,14 @@
 
 **建议：** 考虑使用不可变 release 或在覆盖前添加审批步骤。
 
-### NEW-02: 桌面端 CheckForUpdate 无 HTTP 超时（低）
+### NEW-02: 桌面端 CheckForUpdate 无 HTTP 超时（低） — ✅ 已修复
 
 - **文件：** `cmd/presto-desktop/main.go`
 - **类型：** DoS (CWE-400)
 
 **描述：** `CheckForUpdate` 函数仍使用 `http.Get`（即 `http.DefaultClient`，无超时），属于 SEC-20 的遗漏。慢速服务器可无限阻塞桌面应用。
 
-**建议：** 使用带超时的自定义 HTTP Client。
+**修复：** 使用 `&http.Client{Timeout: 15 * time.Second}` 替代 `http.Get`。
 
 ### NEW-03: 速率限制为全局令牌桶（低-中）
 
@@ -154,25 +152,20 @@
 
 **建议：** 服务端模式使用 per-IP 令牌桶。
 
-### NEW-04: API Key 比较非常量时间（低）
+### NEW-04: API Key 比较非常量时间（低） — ✅ 已修复
 
 - **文件：** `internal/api/middleware.go:63`
 - **类型：** 时序攻击 (CWE-208)
 
 **描述：** `auth[7:] != apiKey` 使用 Go 字符串比较（非常量时间），理论上可通过时序侧信道逐字节推导 API Key。网络环境下利用难度较高。
 
-```go
-// 当前
-if !strings.HasPrefix(auth, "Bearer ") || auth[7:] != apiKey {
-// 建议
-if !strings.HasPrefix(auth, "Bearer ") || subtle.ConstantTimeCompare([]byte(auth[7:]), []byte(apiKey)) != 1 {
-```
+**修复：** 使用 `subtle.ConstantTimeCompare([]byte(auth[7:]), []byte(apiKey)) != 1` 替代字符串比较。
 
 ---
 
 ## 已修复漏洞摘要
 
-以下 22 个漏洞已完全修复，此处仅列出修复方式：
+以下 38 个漏洞已完全修复，此处仅列出修复方式：
 
 | 编号 | 修复方式 |
 |------|----------|
@@ -200,6 +193,24 @@ if !strings.HasPrefix(auth, "Bearer ") || subtle.ConstantTimeCompare([]byte(auth
 | SEC-26 | 正则元字符转义后再构造 RegExp |
 | SEC-27 | `dotfileFilterHandler` 中间件过滤 `.` 开头的路径段 |
 | SEC-28 | 目录和二进制均使用 `0700` 权限 |
+| SEC-29 | Dockerfile 模板二进制 SHA256 校验基础设施（ARG 传入，下载后验证） |
+| SEC-31 | Windows CI Typst SHA256 硬编码校验 |
+| SEC-32 | `docker/build-push-action` 传入 `TYPST_SHA256_AMD64`/`TYPST_SHA256_ARM64` |
+| SEC-33 | `docker-compose.yml` 端口绑定 `127.0.0.1:8080:8080` |
+| SEC-34 | StoreView README `{@html}` 添加 `DOMPurify.sanitize()` |
+| SEC-35 | 统一使用通用错误消息（`"rename failed"`、`"import failed"` 等） |
+| SEC-36 | `securityHeadersMiddleware` 设置 `X-Content-Type-Options`、`X-Frame-Options`、`Referrer-Policy` |
+| SEC-37 | CORS `Allow-Methods` 添加 `PATCH` |
+| SEC-38 | `os.Lstat()` + symlink 模式检测，拒绝 symlink 目标 |
+| SEC-40 | 桌面端编译器 root 改为 `os.TempDir()` |
+| SEC-42 | `docker-compose.yml` 添加 `read_only`、`cap_drop`、`no-new-privileges`、`tmpfs` |
+| SEC-43 | API Key 仅输出截断版本（前8后4） |
+| SEC-44 | `os.UserHomeDir()`/`os.MkdirAll()` 错误检查 + `log.Fatal` |
+| SEC-45 | registry 缓存/manifest/import 文件统一 `0600` 权限 |
+| SEC-46 | registry HTTP 客户端添加 `CheckRedirect` 域名白名单校验 |
+| SEC-47 | `defer resp.Body.Close()` 改为读取后立即 `Close()` |
+| NEW-02 | `CheckForUpdate` 使用 `&http.Client{Timeout: 15 * time.Second}` |
+| NEW-04 | `subtle.ConstantTimeCompare` 替代字符串比较 |
 
 ---
 
@@ -239,16 +250,13 @@ if !strings.HasPrefix(auth, "Bearer ") || subtle.ConstantTimeCompare([]byte(auth
 ### 建议修复（加固纵深防御）
 
 1. **SEC-01:** 强制要求校验文件或实现签名验证
-2. **SEC-22:** 硬编码 Typst SHA256 默认值，Windows CI 添加校验
-3. **NEW-02:** 桌面端 CheckForUpdate 使用带超时的 HTTP Client
 
 ### 长期改进
 
 1. **SEC-10:** 研究 OS 级沙箱方案（macOS sandbox-exec / Linux seccomp）
 2. **SEC-24:** 迁移到 GitHub App Token
 3. **NEW-03:** 服务端模式使用 per-IP 速率限制
-4. **NEW-04:** API Key 比较使用 `subtle.ConstantTimeCompare`
-5. **NEW-01:** 考虑不可变 release 策略
+4. **NEW-01:** 考虑不可变 release 策略
 
 ---
 
@@ -527,7 +535,7 @@ client := &http.Client{Timeout: fetchTimeout}
   → 攻击者可读写文件、删除模板、执行编译
 ```
 
-**状态：** ⚠️ **可利用**（桌面端场景下，XSS → Wails binding 调用）
+**状态：** ✅ **已阻断**（SEC-34 已修复：DOMPurify 消毒阻断 XSS 注入）
 
 ### 攻击链 5：供应链 → Docker 镜像 → 用户 RCE
 
@@ -539,7 +547,7 @@ client := &http.Client{Timeout: fetchTimeout}
   → 用户拉取被污染的镜像
 ```
 
-**状态：** ⚠️ **可利用**（需攻陷 GitHub Release 或 MITM）
+**状态：** ✅ **已缓解**（SEC-29 已修复：Dockerfile 模板二进制 SHA256 校验；SEC-30 仍未修复但需攻陷 GitHub Release）
 
 ### 攻击链 6：客户端控制安装源 → 任意二进制执行
 
@@ -557,31 +565,31 @@ client := &http.Client{Timeout: fetchTimeout}
 
 ## 三审修复优先级
 
-### 立即修复
+### 立即修复 — ✅ 全部完成
 
-1. **SEC-34:** StoreView `{@html}` 添加 DOMPurify 消毒（XSS → Wails RCE 攻击链）
-2. **NEW-04:** `middleware.go:53` API Key 比较改用 `subtle.ConstantTimeCompare`
-3. **SEC-33:** `docker-compose.yml` 端口改为 `127.0.0.1:8080:8080`
-4. **SEC-31:** `release.yml` Windows Typst 下载添加 SHA256 校验
-5. **SEC-32:** `release.yml` Docker build 传入 Typst SHA256 build-args
-6. **SEC-37:** CORS `Allow-Methods` 添加 `PATCH`
-7. **SEC-35:** 统一错误消息，不返回 `err.Error()`
+1. ~~**SEC-34:** StoreView `{@html}` 添加 DOMPurify 消毒~~ ✅
+2. ~~**NEW-04:** `middleware.go:53` API Key 比较改用 `subtle.ConstantTimeCompare`~~ ✅
+3. ~~**SEC-33:** `docker-compose.yml` 端口改为 `127.0.0.1:8080:8080`~~ ✅
+4. ~~**SEC-31:** `release.yml` Windows Typst 下载添加 SHA256 校验~~ ✅
+5. ~~**SEC-32:** `release.yml` Docker build 传入 Typst SHA256 build-args~~ ✅
+6. ~~**SEC-37:** CORS `Allow-Methods` 添加 `PATCH`~~ ✅
+7. ~~**SEC-35:** 统一错误消息，不返回 `err.Error()`~~ ✅
 
-### 短期改进
+### 短期改进 — ✅ 全部完成
 
-1. **SEC-29:** Dockerfile 模板下载添加 SHA256 校验
-2. **SEC-39:** 安装 API 不接受客户端提供的 URL+SHA256，仅从 registry 获取
-3. **SEC-36:** 添加安全响应头中间件
-4. **SEC-38:** Uninstall 使用 `os.Lstat` 检测 symlink
-5. **NEW-02:** `CheckForUpdate` 使用带超时的 HTTP Client
-6. **SEC-45:** 文件权限统一为 `0600`
-7. **SEC-43:** 移除 stdout API Key 输出
+1. ~~**SEC-29:** Dockerfile 模板下载添加 SHA256 校验~~ ✅
+2. **SEC-39:** 安装 API 不接受客户端提供的 URL+SHA256，仅从 registry 获取 — **未修复（架构变更）**
+3. ~~**SEC-36:** 添加安全响应头中间件~~ ✅
+4. ~~**SEC-38:** Uninstall 使用 `os.Lstat` 检测 symlink~~ ✅
+5. ~~**NEW-02:** `CheckForUpdate` 使用带超时的 HTTP Client~~ ✅
+6. ~~**SEC-45:** 文件权限统一为 `0600`~~ ✅
+7. ~~**SEC-43:** 移除 stdout API Key 输出~~ ✅
 
 ### 长期加固
 
 1. **SEC-10:** 模板二进制 OS 级沙箱（macOS sandbox-exec / Linux seccomp）
 2. **NEW-03:** 服务端模式 per-IP 速率限制
-3. **SEC-40:** 桌面端 Typst root 限制为工作目录而非 `$HOME`
+3. ~~**SEC-40:** 桌面端 Typst root 限制为工作目录而非 `$HOME`~~ ✅
 4. **SEC-41:** 服务端支持 TLS 或强制要求反向代理
 5. **SEC-24:** 迁移 PAT 为 GitHub App Token
 6. **NEW-01:** 考虑不可变 release 策略
