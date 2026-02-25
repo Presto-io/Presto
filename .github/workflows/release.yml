@@ -95,9 +95,11 @@ jobs:
           - goarch: amd64
             cc: gcc
             typst_archive: typst-x86_64-pc-windows-msvc.zip
+            typst_sha256: "51353994ac83218c3497052e89b2c432c53b9d4439cdc1b361e2ea4798ebfc13"
           - goarch: arm64
             cc: aarch64-w64-mingw32-gcc
             typst_archive: typst-aarch64-pc-windows-msvc.zip
+            typst_sha256: "1c4aaa0de000ab1787dda354c34f4fa1fe3c2525d3d038e692a3d7daa333d551"
     steps:
       - uses: actions/checkout@v4
 
@@ -149,6 +151,13 @@ jobs:
       - name: Download typst
         run: |
           curl -sL "https://github.com/typst/typst/releases/download/v${{ env.TYPST_VERSION }}/${{ matrix.typst_archive }}" -o typst.zip
+          # SEC-31: Verify typst binary integrity
+          EXPECTED_HASH="${{ matrix.typst_sha256 }}"
+          echo "${EXPECTED_HASH}  typst.zip" | sha256sum -c - || {
+            echo "ERROR: typst checksum verification failed!"
+            echo "If upgrading the version, update the typst_sha256 in the matrix."
+            exit 1
+          }
           unzip -qo typst.zip -d typst-tmp
           find typst-tmp -name 'typst.exe' | head -1 | xargs -I{} cp {} dist/typst.exe
 
@@ -279,6 +288,10 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # SEC-32: Pass Typst SHA256 checksums for build-time verification
+          build-args: |
+            TYPST_SHA256_AMD64=a6044cbad2a954deb921167e257e120ac0a16b20339ec01121194ff9d394996d
+            TYPST_SHA256_ARM64=491b101aa40a3a7ea82a3f8a6232cabb4e6a7e233810082e5ac812d43fdcd47a
 
   # ── GitHub Release ──────────────────────────────────────────
   release:
