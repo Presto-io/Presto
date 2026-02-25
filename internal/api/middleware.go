@@ -12,9 +12,9 @@ import (
 var allowedOrigins = map[string]bool{
 	"http://localhost:8080":   true,
 	"http://localhost:5173":   true,
-	"http://127.0.0.1:8080":  true,
-	"http://127.0.0.1:5173":  true,
-	"wails://wails":          true,
+	"http://127.0.0.1:8080":   true,
+	"http://127.0.0.1:5173":   true,
+	"wails://wails":           true,
 	"https://wails.localhost": true,
 }
 
@@ -39,26 +39,16 @@ func corsMiddleware(next http.Handler) http.Handler {
 func authMiddleware(apiKey string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// No auth if no API key configured (desktop mode)
-			if apiKey == "" {
+			requiresAuth := apiKey != "" &&
+				r.Method != "OPTIONS" &&
+				strings.HasPrefix(r.URL.Path, "/api/") &&
+				r.URL.Path != "/api/health"
+
+			if !requiresAuth {
 				next.ServeHTTP(w, r)
 				return
 			}
-			// Health endpoint always accessible
-			if r.URL.Path == "/api/health" {
-				next.ServeHTTP(w, r)
-				return
-			}
-			// Skip auth for non-API paths (static files)
-			if !strings.HasPrefix(r.URL.Path, "/api/") {
-				next.ServeHTTP(w, r)
-				return
-			}
-			// OPTIONS handled by CORS middleware before auth
-			if r.Method == "OPTIONS" {
-				next.ServeHTTP(w, r)
-				return
-			}
+
 			auth := r.Header.Get("Authorization")
 			if !strings.HasPrefix(auth, "Bearer ") || auth[7:] != apiKey {
 				writeJSONError(w, "unauthorized", http.StatusUnauthorized)

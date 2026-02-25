@@ -76,6 +76,16 @@ func (s *Server) handleConvert(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(convertResponse{Typst: typstOutput})
 }
 
+// resolveWorkDir extracts the work directory from the request header or query
+// parameter and validates it (SEC-03).
+func resolveWorkDir(r *http.Request) (string, error) {
+	workDir := r.Header.Get("X-Work-Dir")
+	if workDir == "" {
+		workDir = r.URL.Query().Get("workDir")
+	}
+	return workDir, validateWorkDir(workDir)
+}
+
 func (s *Server) handleCompile(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
 	body, err := io.ReadAll(r.Body)
@@ -85,11 +95,8 @@ func (s *Server) handleCompile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	workDir := r.Header.Get("X-Work-Dir")
-	if workDir == "" {
-		workDir = r.URL.Query().Get("workDir")
-	}
-	if err := validateWorkDir(workDir); err != nil {
+	workDir, err := resolveWorkDir(r)
+	if err != nil {
 		log.Printf("[compile] invalid workDir %q: %v", workDir, err)
 		writeJSONError(w, "invalid work directory", http.StatusBadRequest)
 		return
@@ -117,11 +124,8 @@ func (s *Server) handleCompileSVG(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	workDir := r.Header.Get("X-Work-Dir")
-	if workDir == "" {
-		workDir = r.URL.Query().Get("workDir")
-	}
-	if err := validateWorkDir(workDir); err != nil {
+	workDir, err := resolveWorkDir(r)
+	if err != nil {
 		log.Printf("[compile-svg] invalid workDir %q: %v", workDir, err)
 		writeJSONError(w, "invalid work directory", http.StatusBadRequest)
 		return
