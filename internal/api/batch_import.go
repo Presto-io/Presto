@@ -78,11 +78,7 @@ func ProcessBatchZip(zipData []byte, mgr *template.Manager, registry *template.R
 	// Extract non-template files to workDir, preserving directory structure
 	var mdFiles []string // relative paths of markdown files
 	for _, f := range zr.File {
-		if f.FileInfo().IsDir() {
-			continue
-		}
-		// Skip macOS resource forks and hidden files
-		if strings.Contains(f.Name, "__MACOSX") || strings.HasPrefix(path.Base(f.Name), ".") {
+		if skipZipEntry(f) {
 			continue
 		}
 		// Skip files that belong to template directories
@@ -129,7 +125,7 @@ func ProcessBatchZip(zipData []byte, mgr *template.Manager, registry *template.R
 	}
 
 	// Import templates (always overwrite if same name exists)
-	var importedTemplates []TemplateImportStatus
+	importedTemplates := make([]TemplateImportStatus, 0)
 	for _, root := range templateRoots {
 		manifest, err := readManifestFromZip(zr, root)
 		if err != nil {
@@ -163,7 +159,7 @@ func ProcessBatchZip(zipData []byte, mgr *template.Manager, registry *template.R
 	}
 
 	// Read markdown files and extract template field from frontmatter
-	var markdownEntries []MarkdownFileEntry
+	markdownEntries := make([]MarkdownFileEntry, 0, len(mdFiles))
 	for _, relPath := range mdFiles {
 		absPath := filepath.Join(workDir, filepath.FromSlash(relPath))
 		content, err := os.ReadFile(absPath)
@@ -182,19 +178,9 @@ func ProcessBatchZip(zipData []byte, mgr *template.Manager, registry *template.R
 			entry.WorkDir = filepath.Join(workDir, filepath.FromSlash(fileDir))
 		}
 
-		detected := extractFrontmatterTemplate(string(content))
-		if detected != "" {
-			entry.DetectedTemplate = detected
-		}
+		entry.DetectedTemplate = extractFrontmatterTemplate(string(content))
 
 		markdownEntries = append(markdownEntries, entry)
-	}
-
-	if importedTemplates == nil {
-		importedTemplates = []TemplateImportStatus{}
-	}
-	if markdownEntries == nil {
-		markdownEntries = []MarkdownFileEntry{}
 	}
 
 	result := &BatchImportResult{
