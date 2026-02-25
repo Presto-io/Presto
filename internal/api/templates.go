@@ -45,7 +45,7 @@ func (s *Server) handleListTemplates(w http.ResponseWriter, r *http.Request) {
 		MissingFonts []missingFont `json:"missingFonts,omitempty"`
 	}
 
-	var result []templateInfo
+	result := make([]templateInfo, 0, len(templates))
 	for _, t := range templates {
 		info := templateInfo{
 			Name:        t.Manifest.Name,
@@ -53,7 +53,6 @@ func (s *Server) handleListTemplates(w http.ResponseWriter, r *http.Request) {
 			Description: t.Manifest.Description,
 			Version:     t.Manifest.Version,
 			Author:      t.Manifest.Author,
-			Builtin:     false,
 			Keywords:    t.Manifest.Keywords,
 		}
 		for _, f := range t.Manifest.RequiredFonts {
@@ -66,10 +65,6 @@ func (s *Server) handleListTemplates(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		result = append(result, info)
-	}
-
-	if result == nil {
-		result = []templateInfo{}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

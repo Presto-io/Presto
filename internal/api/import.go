@@ -119,7 +119,7 @@ func (s *Server) handleImportTemplate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var imported []importResult
+	imported := make([]importResult, 0, len(entries))
 	for _, entry := range entries {
 		name := entry.manifest.Name
 
@@ -150,10 +150,6 @@ func (s *Server) handleImportTemplate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		imported = append(imported, *result)
-	}
-
-	if imported == nil {
-		imported = []importResult{}
 	}
 
 	log.Printf("[templates] imported %d template(s) from ZIP", len(imported))
@@ -188,16 +184,19 @@ func readManifestFromZip(zr *zip.Reader, prefix string) (*template.Manifest, err
 	return nil, fmt.Errorf("no manifest.json found in %q", prefix)
 }
 
+// skipZipEntry returns true for macOS resource forks and hidden files.
+func skipZipEntry(f *zip.File) bool {
+	return f.FileInfo().IsDir() ||
+		strings.Contains(f.Name, "__MACOSX") ||
+		strings.HasPrefix(path.Base(f.Name), ".")
+}
+
 // findTemplateRoots discovers all directories containing manifest.json in the ZIP.
 // Uses path (not filepath) because ZIP entries always use forward slashes.
 func findTemplateRoots(zr *zip.Reader) []string {
 	seen := make(map[string]bool)
 	for _, f := range zr.File {
-		if f.FileInfo().IsDir() {
-			continue
-		}
-		// Skip macOS resource forks and hidden files
-		if strings.Contains(f.Name, "__MACOSX") || strings.HasPrefix(path.Base(f.Name), ".") {
+		if skipZipEntry(f) {
 			continue
 		}
 		if path.Base(f.Name) == "manifest.json" {
@@ -221,11 +220,7 @@ func findTemplateRoots(zr *zip.Reader) []string {
 func filesInPrefix(zr *zip.Reader, prefix string) []*zip.File {
 	var result []*zip.File
 	for _, f := range zr.File {
-		if f.FileInfo().IsDir() {
-			continue
-		}
-		// Skip macOS resource forks and hidden files
-		if strings.Contains(f.Name, "__MACOSX") || strings.HasPrefix(path.Base(f.Name), ".") {
+		if skipZipEntry(f) {
 			continue
 		}
 		dir := path.Dir(f.Name)
@@ -352,7 +347,6 @@ func importTemplateFromZipDir(zr *zip.Reader, prefix string, installName string,
 		Description: manifest.Description,
 		Version:     manifest.Version,
 		Author:      manifest.Author,
-		Builtin:     false,
 		Keywords:    manifest.Keywords,
 		Verified:    string(verified),
 	}, nil

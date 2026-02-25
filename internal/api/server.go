@@ -114,11 +114,10 @@ func apiKeyInjectionHandler(staticDir, apiKey string, fallback http.Handler) htt
 			fallback.ServeHTTP(w, r)
 			return
 		}
-		fileName := p
 		if p == "/" {
-			fileName = "/index.html"
+			p = "/index.html"
 		}
-		filePath := filepath.Join(staticDir, filepath.Clean(fileName))
+		filePath := filepath.Join(staticDir, filepath.Clean(p))
 		data, err := os.ReadFile(filePath)
 		if err != nil {
 			http.NotFound(w, r)
