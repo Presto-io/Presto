@@ -159,7 +159,7 @@ func (s *Server) handleRenameTemplate(w http.ResponseWriter, r *http.Request) {
 
 	if err := s.manager.UpdateDisplayName(id, req.DisplayName); err != nil {
 		log.Printf("[templates] update displayName %s → %q failed: %v", id, req.DisplayName, err)
-		writeJSONError(w, err.Error(), http.StatusBadRequest)
+		writeJSONError(w, "rename failed", http.StatusBadRequest) // SEC-35
 		return
 	}
 

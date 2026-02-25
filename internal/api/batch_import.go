@@ -236,7 +236,7 @@ func (s *Server) handleBatchImportZip(w http.ResponseWriter, r *http.Request) {
 	result, err := ProcessBatchZip(data, s.manager, s.registry)
 	if err != nil {
 		log.Printf("[batch] import: %v", err)
-		writeJSONError(w, err.Error(), http.StatusBadRequest)
+		writeJSONError(w, "batch import failed", http.StatusBadRequest) // SEC-35
 		return
 	}
 
