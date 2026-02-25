@@ -4,6 +4,7 @@
   import { goto } from '$app/navigation';
   import type { RegistryItem, Registry, RegistryCategory } from '$lib/api/types';
   import { marked } from 'marked';
+  import DOMPurify from 'dompurify';
   import Fuse from 'fuse.js';
 
   interface Props {
@@ -435,7 +436,8 @@
             {:else if readmeContent}
               <div class="detail-readme">
                 <h4>README</h4>
-                <div class="readme-body">{@html renderMarkdown(readmeContent)}</div>
+                <!-- SEC-34: Sanitize rendered markdown to prevent XSS -->
+                <div class="readme-body">{@html DOMPurify.sanitize(renderMarkdown(readmeContent))}</div>
               </div>
             {/if}
           {/if}
