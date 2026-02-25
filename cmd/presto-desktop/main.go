@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/menu"
@@ -278,7 +279,9 @@ func (a *App) CheckForUpdate() (*UpdateInfo, error) {
 	current := a.GetVersion()
 	info := &UpdateInfo{CurrentVersion: current}
 
-	resp, err := http.Get("https://api.github.com/repos/Presto-io/Presto-Homepage/releases/latest")
+	// NEW-02: Use HTTP client with timeout for update checks
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Get("https://api.github.com/repos/Presto-io/Presto-Homepage/releases/latest")
 	if err != nil {
 		return nil, fmt.Errorf("failed to check update: %w", err)
 	}
@@ -477,10 +480,16 @@ func findTypstBinary() string {
 }
 
 func main() {
-	home, _ := os.UserHomeDir()
+	// SEC-44: Check os.UserHomeDir error
+	home, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatal("failed to get home directory: ", err)
+	}
 	prestoDir := filepath.Join(home, ".presto")
 	templatesDir := filepath.Join(prestoDir, "templates")
-	os.MkdirAll(templatesDir, 0755)
+	if err := os.MkdirAll(templatesDir, 0755); err != nil {
+		log.Fatal("failed to create templates directory: ", err)
+	}
 
 	manager := template.NewManager(templatesDir)
 	typstBin := findTypstBinary()
@@ -490,8 +499,8 @@ func main() {
 	registry := template.NewRegistryCache(prestoDir)
 	registry.RefreshAsync()
 
-	// SEC-02: Use $HOME instead of "/" to restrict file access to user's home
-	compiler := typst.NewCompilerWithRoot(home)
+	// SEC-40: Use os temp dir instead of $HOME to restrict file access
+	compiler := typst.NewCompilerWithRoot(os.TempDir())
 	compiler.BinPath = typstBin
 
 	// Reuse existing API server as HTTP handler for /api/* routes
@@ -513,7 +522,7 @@ func main() {
 	app := NewApp(manager, compiler, registry)
 	appMenu := buildMenu(app)
 
-	err := wails.Run(&options.App{
+	err = wails.Run(&options.App{
 		Title:     "Presto",
 		Width:     1280,
 		Height:    800,
