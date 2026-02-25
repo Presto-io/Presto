@@ -81,11 +81,12 @@ func NewServer(opts ServerOptions) http.Handler {
 		s.mux.Handle("/", dotfileFilterHandler(static))
 	}
 
-	// Middleware chain: logging → CORS → auth → rateLimit → handler
+	// Middleware chain: logging → CORS → securityHeaders → auth → rateLimit → handler
 	rl := newRateLimiter(10, 30) // 10 req/s, burst 30 (SEC-19)
 	var handler http.Handler = s.mux
 	handler = rateLimitMiddleware(rl)(handler)
 	handler = authMiddleware(opts.APIKey)(handler)
+	handler = securityHeadersMiddleware(handler) // SEC-36
 	handler = corsMiddleware(handler)
 	handler = loggingMiddleware(handler)
 	return handler

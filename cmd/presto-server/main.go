@@ -26,10 +26,16 @@ func main() {
 		host = "127.0.0.1"
 	}
 
-	home, _ := os.UserHomeDir()
+	// SEC-44: Check os.UserHomeDir error
+	home, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatal("failed to get home directory: ", err)
+	}
 	prestoDir := filepath.Join(home, ".presto")
 	templatesDir := filepath.Join(prestoDir, "templates")
-	os.MkdirAll(templatesDir, 0755)
+	if err := os.MkdirAll(templatesDir, 0755); err != nil {
+		log.Fatal("failed to create templates directory: ", err)
+	}
 
 	staticDir := os.Getenv("STATIC_DIR")
 	if staticDir == "" {
@@ -47,8 +53,11 @@ func main() {
 	}
 
 	// Font paths: default to ~/.presto/fonts, can override with FONT_PATHS (colon-separated)
+	// SEC-44: Check MkdirAll error
 	fontsDir := filepath.Join(prestoDir, "fonts")
-	os.MkdirAll(fontsDir, 0755)
+	if err := os.MkdirAll(fontsDir, 0755); err != nil {
+		log.Fatal("failed to create fonts directory: ", err)
+	}
 	var fontPaths []string
 	if fp := os.Getenv("FONT_PATHS"); fp != "" {
 		fontPaths = strings.Split(fp, ":")
@@ -71,6 +80,7 @@ func main() {
 
 	addr := fmt.Sprintf("%s:%s", host, port)
 	fmt.Printf("Presto server listening on %s\n", addr)
-	fmt.Printf("API Key: %s\n", apiKey)
+	// SEC-43: Only show truncated API key to avoid full key in logs
+	fmt.Printf("API Key: %s...%s\n", apiKey[:8], apiKey[len(apiKey)-4:])
 	log.Fatal(http.ListenAndServe(addr, srv))
 }

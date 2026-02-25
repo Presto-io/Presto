@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto/subtle"
 	"log"
 	"net/http"
 	"strings"
@@ -23,7 +24,8 @@ func corsMiddleware(next http.Handler) http.Handler {
 		origin := r.Header.Get("Origin")
 		if origin != "" && allowedOrigins[origin] {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+			// SEC-37: Include PATCH for handleRenameTemplate
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Work-Dir")
 			w.Header().Set("Vary", "Origin")
 		}
@@ -31,6 +33,16 @@ func corsMiddleware(next http.Handler) http.Handler {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// SEC-36: Security response headers middleware
+func securityHeadersMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		next.ServeHTTP(w, r)
 	})
 }
@@ -50,7 +62,8 @@ func authMiddleware(apiKey string) func(http.Handler) http.Handler {
 			}
 
 			auth := r.Header.Get("Authorization")
-			if !strings.HasPrefix(auth, "Bearer ") || auth[7:] != apiKey {
+			// NEW-04: Constant-time comparison to prevent timing attacks
+		if !strings.HasPrefix(auth, "Bearer ") || subtle.ConstantTimeCompare([]byte(auth[7:]), []byte(apiKey)) != 1 {
 				writeJSONError(w, "unauthorized", http.StatusUnauthorized)
 				return
 			}
