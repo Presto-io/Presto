@@ -269,7 +269,8 @@ func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
 	}
 
 	// Write manifest.json
-	if err := os.WriteFile(filepath.Join(tplDir, "manifest.json"), manifestBytes, 0644); err != nil {
+	// SEC-45: Restrictive file permissions
+	if err := os.WriteFile(filepath.Join(tplDir, "manifest.json"), manifestBytes, 0600); err != nil {
 		return fmt.Errorf("write manifest: %w", err)
 	}
 
@@ -287,12 +288,13 @@ func lookupChecksumFromRelease(assets []GitHubAsset, assetName string) string {
 		if err != nil {
 			return ""
 		}
-		defer resp.Body.Close()
-
+		// SEC-47: Close body immediately instead of defer in loop
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			resp.Body.Close()
 			return ""
 		}
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+		resp.Body.Close()
 		for _, line := range strings.Split(string(body), "\n") {
 			fields := strings.Fields(line)
 			if len(fields) >= 2 && strings.TrimPrefix(fields[1], "*") == assetName {
@@ -320,10 +322,14 @@ func (m *Manager) Uninstall(name string) error {
 		return fmt.Errorf("path escapes templates directory")
 	}
 
-	// Verify target exists and is a directory
-	info, err := os.Stat(tplDir)
+	// SEC-38: Use Lstat to detect symlinks (not follow them)
+	info, err := os.Lstat(tplDir)
 	if err != nil {
 		return fmt.Errorf("template not found: %w", err)
+	}
+	// SEC-38: Reject symlinks to prevent TOCTOU attacks
+	if info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("refusing to remove symlink: %s", name)
 	}
 	if !info.IsDir() {
 		return fmt.Errorf("not a directory: %s", name)

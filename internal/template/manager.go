@@ -147,7 +147,7 @@ func (m *Manager) UpdateDisplayName(name, newDisplayName string) error {
 	if err != nil {
 		return fmt.Errorf("marshal manifest: %w", err)
 	}
-	return os.WriteFile(manifestPath, out, 0644)
+	return os.WriteFile(manifestPath, out, 0600) // SEC-45
 }
 
 // Rename renames a user-installed template (directory, manifest, binary).
@@ -206,7 +206,7 @@ func renameDiskTemplate(templatesDir string, t *InstalledTemplate, newName strin
 	if err != nil {
 		return fmt.Errorf("marshal manifest: %w", err)
 	}
-	if err := os.WriteFile(filepath.Join(t.Dir, "manifest.json"), data, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(t.Dir, "manifest.json"), data, 0600); err != nil { // SEC-45
 		return fmt.Errorf("write manifest: %w", err)
 	}
 
