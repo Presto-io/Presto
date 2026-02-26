@@ -20,8 +20,6 @@
     overflow-y: auto !important;
   }
   :global(.app), :global(#main-content) {
-    overflow: visible !important;
     height: auto !important;
-    max-width: 100vw !important;
   }
 </style>
