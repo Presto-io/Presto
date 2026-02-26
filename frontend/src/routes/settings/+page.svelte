@@ -56,10 +56,10 @@
     { id: 'licenses', label: '开源协议', icon: Scale },
   ];
 
-  let panelTabs = $derived(communityEnabled ? [
+  let panelTabs = [
     { id: 'tpl-manage' as const, label: '模板管理', icon: Package },
     { id: 'tpl-store' as const, label: '模板商店', icon: ShoppingBag },
-  ] : []);
+  ];
 
   declare global {
     interface Window {
@@ -182,7 +182,6 @@
       showWarning = true;
     } else {
       communityEnabled = false;
-      activePanel = null;
       tplSearch = '';
       localStorage.setItem('communityTemplates', 'false');
     }
@@ -514,7 +513,7 @@
             <div class="setting-row">
               <div class="setting-info">
                 <span class="setting-label">启用社区模板</span>
-                <span class="setting-desc">允许浏览和安装第三方社区模板</span>
+                <span class="setting-desc">社区模板未经 Presto 验证，二进制由第三方开发者直接发布。官方和已验证模板始终可用。</span>
               </div>
               <button
                 class="toggle"

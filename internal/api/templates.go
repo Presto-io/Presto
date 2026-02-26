@@ -90,6 +90,7 @@ func (s *Server) handleInstallTemplate(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Owner     string `json:"owner"`
 		Repo      string `json:"repo"`
+		Trust     string `json:"trust"`
 		Platforms map[string]struct {
 			URL    string `json:"url"`
 			SHA256 string `json:"sha256"`
@@ -120,6 +121,7 @@ func (s *Server) handleInstallTemplate(w http.ResponseWriter, r *http.Request) {
 			opts = &template.InstallOpts{
 				DownloadURL:    info.URL,
 				ExpectedSHA256: info.SHA256,
+				Trust:          req.Trust,
 			}
 		}
 	}

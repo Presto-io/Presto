@@ -17,6 +17,7 @@
     previewUrl?: (name: string) => string;
     readmeUrl?: (name: string) => string;
     backRoute?: string;
+    communityEnabled?: boolean;
   }
 
   let {
@@ -29,6 +30,7 @@
     previewUrl,
     readmeUrl,
     backRoute,
+    communityEnabled = true,
   }: Props = $props();
 
   // --- Internal registry state ---
@@ -169,7 +171,10 @@
     return results.filter(tpl => {
       const matchesCategory = !activeCategory || tpl.category === activeCategory;
       const matchesTrust = !activeTrust || tpl.trust === activeTrust;
-      return matchesCategory && matchesTrust;
+      // 社区模板开关关闭时，只显示 official + verified
+      const matchesCommunity = communityEnabled ||
+        tpl.trust === 'official' || tpl.trust === 'verified';
+      return matchesCategory && matchesTrust && matchesCommunity;
     });
   });
 
@@ -410,19 +415,26 @@
           </div>
 
           <!-- Preview iframe -->
-          {#if previewUrl}
-            <div
-              class="detail-preview"
-              bind:clientWidth={previewWidth}
-              style="height:{previewWidth * 800 / 1200}px"
-            >
-              <iframe
-                src={previewUrl(selectedTemplate.name)}
-                sandbox="allow-scripts allow-same-origin"
-                loading="lazy"
-                title="预览"
-                style="transform:scale({previewWidth / 1200})"
-              ></iframe>
+          {#if selectedTemplate.trust === 'official' || selectedTemplate.trust === 'verified'}
+            {#if previewUrl}
+              <div
+                class="detail-preview"
+                bind:clientWidth={previewWidth}
+                style="height:{previewWidth * 800 / 1200}px"
+              >
+                <iframe
+                  src={previewUrl(selectedTemplate.name)}
+                  sandbox="allow-scripts allow-same-origin"
+                  loading="lazy"
+                  title="预览"
+                  style="transform:scale({previewWidth / 1200})"
+                ></iframe>
+              </div>
+            {/if}
+          {:else}
+            <div class="detail-preview-placeholder">
+              <Shield size={24} />
+              <span>社区模板暂不提供预览</span>
             </div>
           {/if}
 
@@ -1054,6 +1066,17 @@
     height: 800px;
     transform-origin: 0 0;
     border: none;
+  }
+  .detail-preview-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 48px 16px;
+    color: var(--color-muted);
+    background: var(--color-surface);
+    border-radius: var(--radius-md);
+    font-size: 14px;
   }
 
   /* README */
