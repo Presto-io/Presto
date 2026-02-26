@@ -84,7 +84,18 @@
       "WebFetch(domain:stackoverflow.com)",
       "Bash(git fetch:*)",
       "Bash(# Hero frame 2: frontmatter + ~15 content lines \\(through first major section\\) cd /tmp && head -22 /Users/mrered/Developer/Code/Gopst/cmd/gongwen/example.md && cat hero-partial-2.md)",
-      "Bash(/tmp/presto-template-gongwen)"
+      "Bash(/tmp/presto-template-gongwen)",
+      "Bash(brew info:*)",
+      "Bash(/tmp/.venv-playwright/bin/python:*)",
+      "WebFetch(domain:presto.c-1o.top)",
+      "Bash(gh repo list:*)",
+      "Bash(gofmt -d internal/typst/compiler.go cmd/presto-server/main.go cmd/presto-desktop/main.go)",
+      "Bash(gofmt -w internal/api/convert.go internal/api/middleware.go internal/api/templates.go internal/api/server.go internal/api/import.go internal/api/batch_import.go)",
+      "Bash(gofmt -d internal/api/)",
+      "Bash(shasum -a 256)",
+      "Bash(hdiutil info)",
+      "Bash(diskutil list)",
+      "Bash(create-dmg --version)"
     ]
   }
 }
