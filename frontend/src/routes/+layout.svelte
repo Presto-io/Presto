@@ -89,15 +89,7 @@
 		window.addEventListener('dragleave', handleDragLeave, true);
 		window.addEventListener('drop', handleDrop, true);
 
-		// Forward Wails edit menu events to native document commands
 		if (window.runtime?.EventsOn) {
-			window.runtime.EventsOn('menu:undo', () => document.execCommand('undo'));
-			window.runtime.EventsOn('menu:redo', () => document.execCommand('redo'));
-			window.runtime.EventsOn('menu:cut', () => document.execCommand('cut'));
-			window.runtime.EventsOn('menu:copy', () => document.execCommand('copy'));
-			window.runtime.EventsOn('menu:paste', () => document.execCommand('paste'));
-			window.runtime.EventsOn('menu:selectAll', () => document.execCommand('selectAll'));
-
 			// Native file drop: Wails provides absolute paths → we get dir info for images
 			window.runtime.EventsOn('native-file-drop', async (...args: any[]) => {
 				const items: any[] = Array.isArray(args[0]) ? args[0] : args;
