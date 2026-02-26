@@ -8,6 +8,7 @@
   title="模板商店"
   previewUrl={(name) => `/showcase/editor?registry=${name}`}
   readmeUrl={(name) => `https://presto.c-1o.top/templates/${name}/README.md`}
+  statsUrl="https://registry.presto.app/api/stats"
 />
 
 <style>

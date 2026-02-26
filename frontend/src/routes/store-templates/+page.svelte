@@ -30,4 +30,10 @@
   readmeUrl={(name) => `https://presto.c-1o.top/templates/${name}/README.md`}
   backRoute="/settings"
   {communityEnabled}
+  statsUrl="https://registry.presto.app/api/stats"
+  onInstallSuccess={async (name) => {
+    try {
+      await fetch(`https://registry.presto.app/api/stats/${encodeURIComponent(name)}/download`, { method: 'POST' });
+    } catch {}
+  }}
 />
