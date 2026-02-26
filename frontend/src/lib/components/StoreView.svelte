@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { ArrowLeft, Search, X, Loader, ExternalLink, Download, Check, RefreshCw, ShieldCheck, Shield, Users, ShieldOff } from 'lucide-svelte';
   import { goto } from '$app/navigation';
-  import type { RegistryItem, Registry, RegistryCategory } from '$lib/api/types';
+  import type { RegistryItem, Registry, RegistryCategory, StatsMap } from '$lib/api/types';
   import { marked } from 'marked';
   import DOMPurify from 'dompurify';
   import Fuse from 'fuse.js';
@@ -18,6 +18,8 @@
     readmeUrl?: (name: string) => string;
     backRoute?: string;
     communityEnabled?: boolean;
+    statsUrl?: string;
+    onInstallSuccess?: (name: string) => void;
   }
 
   let {
@@ -31,6 +33,8 @@
     readmeUrl,
     backRoute,
     communityEnabled = true,
+    statsUrl,
+    onInstallSuccess,
   }: Props = $props();
 
   // --- Internal registry state ---
@@ -74,6 +78,22 @@
   let previewWidth = $state(0);
   let currentPage = $state(1);
   let pageSize = $state(24);
+
+  let statsMap = $state<StatsMap>({});
+
+  async function loadStats() {
+    if (!statsUrl) return;
+    try {
+      const res = await fetch(statsUrl);
+      if (res.ok) statsMap = await res.json();
+    } catch { /* silent */ }
+  }
+
+  function formatCount(n: number | undefined): string {
+    if (n == null) return '';
+    if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+    return String(n);
+  }
 
   // Category scroll state
   let categoryScrollEl = $state<HTMLElement | null>(null);
@@ -208,6 +228,7 @@
     installing = tpl.name;
     try {
       await installFn(tpl);
+      onInstallSuccess?.(tpl.name);
     } catch (e) {
       console.error('Install failed:', e);
     } finally {
@@ -268,6 +289,7 @@
 
   onMount(() => {
     loadRegistry();
+    loadStats();
   });
 </script>
 
