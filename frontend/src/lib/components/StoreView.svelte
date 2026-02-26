@@ -1306,8 +1306,6 @@
     color: var(--color-muted);
     line-height: 1.7;
     word-break: break-word;
-    overflow-y: auto;
-    max-height: 400px;
   }
   .readme-body :global(h3),
   .readme-body :global(h4),
