@@ -84,6 +84,18 @@
 
   let statsMap = $state<StatsMap>({});
 
+  let detailEl = $state<HTMLElement | null>(null);
+  let showScrollTop = $state(false);
+
+  function onDetailScroll() {
+    if (!detailEl) return;
+    showScrollTop = detailEl.scrollTop > 300;
+  }
+
+  function scrollToTop() {
+    detailEl?.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
   async function loadStats() {
     if (!statsUrl) return;
     try {
@@ -436,7 +448,7 @@
           {/each}
         </nav>
 
-        <div class="store-detail">
+        <div class="store-detail" bind:this={detailEl} onscroll={onDetailScroll}>
           <!-- Header -->
           <div class="detail-header">
             <div class="detail-title-row">
@@ -549,27 +561,44 @@
             {/if}
           </div>
 
-          <!-- Install button (desktop only, when installFn provided) -->
-          {#if mode === 'desktop' && installFn}
-            <div class="detail-install">
-              {#if isInstalled(selectedTemplate.name)}
-                <button class="btn-installed" disabled>
-                  <Check size={14} />
-                  <span>已安装</span>
-                </button>
-              {:else if installing === selectedTemplate.name}
-                <button class="btn-installing" disabled>
-                  <Loader size={14} class="spin" />
-                  <span>安装中…</span>
-                </button>
-              {:else}
-                <button class="btn-install" onclick={() => handleInstall(selectedTemplate!)}>
-                  <Download size={14} />
-                  <span>安装</span>
+          <!-- Bottom actions -->
+          <div class="detail-actions">
+            <div class="actions-left">
+              {#if mode === 'desktop' && installFn}
+                {#if isInstalled(selectedTemplate.name)}
+                  <button class="btn-installed" disabled>
+                    <Check size={14} /><span>已安装</span>
+                  </button>
+                {:else if installing === selectedTemplate.name}
+                  <button class="btn-installing" disabled>
+                    <Loader size={14} class="spin" /><span>安装中…</span>
+                  </button>
+                {:else}
+                  <button class="btn-install" onclick={() => handleInstall(selectedTemplate!)}>
+                    <Download size={14} /><span>安装</span>
+                  </button>
+                {/if}
+              {:else if mode === 'web'}
+                <a class="btn-install" href="presto://install/{selectedTemplate.name}" target="_blank" rel="noopener">
+                  <Download size={14} /><span>在 Presto 中打开</span>
+                </a>
+              {/if}
+              {#if mode === 'desktop' && isInstalled(selectedTemplate.name)}
+                <button
+                  class="btn-manage"
+                  onclick={() => goto(`/settings?panel=tpl-manage&focus=${selectedTemplate.name}`)}
+                >
+                  <Settings size={13} /><span>管理</span>
                 </button>
               {/if}
             </div>
-          {/if}
+            {#if mode === 'desktop' && showScrollTop}
+              <button class="btn-scroll-top" onclick={scrollToTop} aria-label="回到顶部">
+                <ArrowLeft size={14} style="transform:rotate(90deg)" />
+                <span>回到顶部</span>
+              </button>
+            {/if}
+          </div>
         </div>
       </div>
     {:else}
@@ -1402,9 +1431,35 @@
   }
   .repo-link:hover { opacity: 0.8; }
 
-  /* Install button */
-  .detail-install {
+  /* Bottom actions */
+  .detail-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     margin-bottom: var(--space-xl);
+    gap: var(--space-md);
+  }
+  .actions-left {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+  }
+  .btn-scroll-top {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-muted);
+    font-size: 0.8125rem;
+    cursor: pointer;
+    transition: all var(--transition);
+  }
+  .btn-scroll-top:hover {
+    color: var(--color-text);
+    border-color: var(--color-accent-border);
   }
   .btn-install, .btn-installed, .btn-installing {
     display: inline-flex;
