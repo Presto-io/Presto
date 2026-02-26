@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { ArrowLeft, Search, X, Loader, ExternalLink, Download, Check, RefreshCw, ShieldCheck, Shield, Users, ShieldOff } from 'lucide-svelte';
+  import { ArrowLeft, Search, X, Loader, ExternalLink, Download, Check, RefreshCw, ShieldCheck, Shield, Users, ShieldOff, Star, Settings } from 'lucide-svelte';
   import { goto } from '$app/navigation';
   import type { RegistryItem, Registry, RegistryCategory, StatsMap } from '$lib/api/types';
   import { marked } from 'marked';
@@ -94,6 +94,8 @@
     if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
     return String(n);
   }
+
+  let showExactStats = $state(false);
 
   // Category scroll state
   let categoryScrollEl = $state<HTMLElement | null>(null);
@@ -410,14 +412,39 @@
         <div class="store-detail">
           <!-- Header -->
           <div class="detail-header">
-            <h3>{selectedTemplate.displayName}</h3>
-            {#if selectedBadge}
-              {@const BadgeIcon = selectedBadge.icon}
-              <span class="trust-badge {selectedBadge.cls}" style={selectedBadge.color ? `color:${selectedBadge.color}` : ''}>
-                <BadgeIcon size={14} />
-                {selectedBadge.label}
-              </span>
-            {/if}
+            <div class="detail-title-row">
+              <h3>{selectedTemplate.displayName}</h3>
+              {#if selectedBadge}
+                {@const BadgeIcon = selectedBadge.icon}
+                <span class="trust-badge {selectedBadge.cls}" style={selectedBadge.color ? `color:${selectedBadge.color}` : ''}>
+                  <BadgeIcon size={14} />
+                  {selectedBadge.label}
+                </span>
+              {/if}
+              <div class="detail-stats-actions">
+                {#if mode === 'desktop' && isInstalled(selectedTemplate.name)}
+                  <button
+                    class="btn-manage"
+                    onclick={() => goto(`/settings?panel=tpl-manage&focus=${selectedTemplate.name}`)}
+                  >
+                    <Settings size={13} />
+                    <span>管理</span>
+                  </button>
+                {/if}
+                {#if statsMap[selectedTemplate.name]?.stars != null}
+                  <button class="stat-item" onclick={() => showExactStats = !showExactStats} title="Stars">
+                    <Star size={13} />
+                    <span>{showExactStats ? statsMap[selectedTemplate.name].stars : formatCount(statsMap[selectedTemplate.name].stars)}</span>
+                  </button>
+                {/if}
+                {#if statsMap[selectedTemplate.name]?.downloads != null}
+                  <button class="stat-item" onclick={() => showExactStats = !showExactStats} title="下载量">
+                    <Download size={13} />
+                    <span>{showExactStats ? statsMap[selectedTemplate.name].downloads : formatCount(statsMap[selectedTemplate.name].downloads)}</span>
+                  </button>
+                {/if}
+              </div>
+            </div>
           </div>
 
           <!-- Description -->
@@ -1065,6 +1092,54 @@
     margin: 0;
     font-size: 1.125rem;
     color: var(--color-text-bright);
+  }
+  .detail-title-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    flex-wrap: wrap;
+  }
+  .detail-stats-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-left: auto;
+  }
+  .stat-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: none;
+    border: none;
+    color: var(--color-muted);
+    font-size: 0.8125rem;
+    font-family: var(--font-mono);
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    transition: color var(--transition), background var(--transition);
+  }
+  .stat-item:hover {
+    color: var(--color-text);
+    background: var(--color-surface);
+  }
+  .btn-manage {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: 4px 10px;
+    background: none;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    color: var(--color-muted);
+    font-size: 0.75rem;
+    font-family: var(--font-ui);
+    cursor: pointer;
+    transition: all var(--transition);
+  }
+  .btn-manage:hover {
+    color: var(--color-text);
+    border-color: var(--color-accent-border);
   }
   .trust-badge {
     display: inline-flex;
