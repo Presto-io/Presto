@@ -179,13 +179,8 @@ define CREATE_DMG
 	@echo "==> Creating DMG..."
 	@command -v create-dmg >/dev/null 2>&1 || \
 		{ echo "Error: create-dmg not found. Install with: brew install create-dmg"; exit 1; }
-	@# Detach any volume named "$(APP_NAME)" to avoid "resource busy"
-	@if [ -d "/Volumes/$(APP_NAME)" ]; then \
-		echo "    Detaching /Volumes/$(APP_NAME)..."; \
-		hdiutil detach "/Volumes/$(APP_NAME)" -force 2>/dev/null || true; \
-	fi
-	@rm -f "$(DIST)/$(APP_NAME)-$(VERSION)-macOS-$(1).dmg"
-	LANG=C create-dmg \
+	@rm -f "$(DIST)/$(APP_NAME)-$(VERSION)-macOS-$(1).dmg" "$(DIST)"/rw.*.dmg
+	create-dmg \
 		--volname "$(APP_NAME)" \
 		--volicon "$(DMG_VOLICON)" \
 		--background "$(DMG_BG)" \
@@ -196,6 +191,7 @@ define CREATE_DMG
 		--hide-extension "$(APP_NAME).app" \
 		--app-drop-link $(DMG_LNK_X) $(DMG_LNK_Y) \
 		--no-internet-enable \
+		--sandbox-safe \
 		"$(DIST)/$(APP_NAME)-$(VERSION)-macOS-$(1).dmg" \
 		"$(DIST)/$(APP_NAME).app"
 	@echo "==> $(DIST)/$(APP_NAME)-$(VERSION)-macOS-$(1).dmg"
