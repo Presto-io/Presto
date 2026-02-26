@@ -303,7 +303,15 @@
         <ArrowLeft size={16} />
       </button>
     {/if}
-    <h2>{title}</h2>
+    <nav class="breadcrumb">
+      {#if selectedId && selectedTemplate}
+        <button class="breadcrumb-link" onclick={() => selectedId = null}>{title}</button>
+        <span class="breadcrumb-sep">›</span>
+        <span class="breadcrumb-current">{selectedTemplate.displayName}</span>
+      {:else}
+        <h2>{title}</h2>
+      {/if}
+    </nav>
     {#if mode === 'desktop'}
       <button
         class="btn-refresh"
@@ -402,9 +410,6 @@
         <div class="store-detail">
           <!-- Header -->
           <div class="detail-header">
-            <button class="btn-back-grid" onclick={() => selectedId = null} aria-label="返回列表">
-              <ArrowLeft size={14} />
-            </button>
             <h3>{selectedTemplate.displayName}</h3>
             {#if selectedBadge}
               {@const BadgeIcon = selectedBadge.icon}
@@ -587,6 +592,44 @@
     font-size: 1.125rem;
     font-family: var(--font-ui);
     color: var(--color-text-bright);
+  }
+  .breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    min-width: 0;
+  }
+  .breadcrumb h2 {
+    margin: 0;
+    font-size: 1.125rem;
+    font-family: var(--font-ui);
+    color: var(--color-text-bright);
+  }
+  .breadcrumb-link {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 1.125rem;
+    font-family: var(--font-ui);
+    color: var(--color-accent);
+    cursor: pointer;
+    transition: opacity var(--transition);
+    white-space: nowrap;
+  }
+  .breadcrumb-link:hover { opacity: 0.8; }
+  .breadcrumb-sep {
+    color: var(--color-muted);
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+  .breadcrumb-current {
+    font-size: 1.125rem;
+    font-family: var(--font-ui);
+    color: var(--color-text-bright);
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .page-header {
     display: flex;
@@ -1018,21 +1061,6 @@
     gap: var(--space-md);
     margin-bottom: var(--space-md);
   }
-  .btn-back-grid {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    background: none;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    color: var(--color-muted);
-    cursor: pointer;
-    transition: all var(--transition);
-    flex-shrink: 0;
-  }
-  .btn-back-grid:hover { color: var(--color-accent); border-color: var(--color-accent); }
   .detail-header h3 {
     margin: 0;
     font-size: 1.125rem;
@@ -1293,12 +1321,6 @@
     }
     .store-detail {
       padding-right: 0;
-    }
-
-    /* Back button: larger touch target on mobile */
-    .btn-back-grid {
-      width: 32px;
-      height: 32px;
     }
 
     /* Category bar: tighter spacing */
