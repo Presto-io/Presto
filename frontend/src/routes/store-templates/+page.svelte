@@ -5,6 +5,7 @@
   import { installFromRegistry } from '$lib/api/client';
   import type { RegistryItem } from '$lib/api/types';
 
+  const isDev = import.meta.env.DEV || import.meta.env.VITE_MOCK === '1';
   let installedNames = $derived(new Set(templateStore.templates.map(t => t.name)));
   let communityEnabled = $state(false);
 
@@ -30,10 +31,12 @@
   readmeUrl={(name) => `https://presto.c-1o.top/templates/${name}/README.md`}
   backRoute="/settings"
   {communityEnabled}
-  statsUrl="https://registry.presto.app/api/stats"
+  statsUrl={isDev ? '/mock/stats.json' : 'https://registry.presto.app/api/stats'}
   onInstallSuccess={async (name) => {
-    try {
-      await fetch(`https://registry.presto.app/api/stats/${encodeURIComponent(name)}/download`, { method: 'POST' });
-    } catch {}
+    if (!isDev) {
+      try {
+        await fetch(`https://registry.presto.app/api/stats/${encodeURIComponent(name)}/download`, { method: 'POST' });
+      } catch {}
+    }
   }}
 />
