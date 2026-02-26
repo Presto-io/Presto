@@ -6,6 +6,8 @@
 *.so
 *.dylib
 presto-template-*
+/presto-desktop
+/presto-server
 
 # Go
 /vendor/
