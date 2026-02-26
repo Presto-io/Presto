@@ -100,3 +100,10 @@ export interface Registry {
   categories?: RegistryCategory[];               // v1 only; v2 derives from template.category
   templates: RegistryTemplate[];
 }
+
+export interface TemplateStats {
+  stars?: number;
+  downloads?: number;
+}
+
+export type StatsMap = Record<string, TemplateStats>;
