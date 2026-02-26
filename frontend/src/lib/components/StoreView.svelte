@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { ArrowLeft, Search, X, Loader, ExternalLink, Download, Check, RefreshCw, ShieldCheck, Shield, Users, ShieldOff, Star, Settings } from 'lucide-svelte';
+  import { fly } from 'svelte/transition';
+  import { cubicOut } from 'svelte/easing';
+  import { ArrowLeft, Search, X, Loader, ExternalLink, Download, Check, RefreshCw, ShieldCheck, Shield, Users, ShieldOff, Star, Settings, ChevronDown } from 'lucide-svelte';
   import { goto } from '$app/navigation';
   import type { RegistryItem, Registry, RegistryCategory, StatsMap } from '$lib/api/types';
   import { marked } from 'marked';
@@ -81,6 +83,9 @@
 
   type SortOption = 'latest' | 'stars' | 'downloads';
   let sortBy = $state<SortOption>('latest');
+  let sortOpen = $state(false);
+  let sortWrapperEl: HTMLDivElement;
+  const sortLabels: Record<SortOption, string> = { latest: '最新发布', stars: '最多星标', downloads: '最多下载' };
 
   let statsMap = $state<StatsMap>({});
 
@@ -328,9 +333,17 @@
     return marked.parse(src, { async: false }) as string;
   }
 
+  function handleSortOutsideClick(e: PointerEvent) {
+    if (sortOpen && sortWrapperEl && !sortWrapperEl.contains(e.target as Node)) {
+      sortOpen = false;
+    }
+  }
+
   onMount(() => {
     loadRegistry();
     loadStats();
+    document.addEventListener('pointerdown', handleSortOutsideClick, true);
+    return () => document.removeEventListener('pointerdown', handleSortOutsideClick, true);
   });
 </script>
 
@@ -394,11 +407,33 @@
             </button>
           {/if}
         </div>
-        <select class="sort-select" bind:value={sortBy}>
-          <option value="latest">最新发布</option>
-          <option value="stars">最多星标</option>
-          <option value="downloads">最多下载</option>
-        </select>
+        <div class="sort-wrapper" bind:this={sortWrapperEl}>
+          <button
+            class="sort-trigger"
+            class:open={sortOpen}
+            onclick={() => sortOpen = !sortOpen}
+            aria-haspopup="listbox"
+            aria-expanded={sortOpen}
+          >
+            <span class="sort-label">{sortLabels[sortBy]}</span>
+            <ChevronDown size={12} />
+          </button>
+          {#if sortOpen}
+            <div class="sort-dropdown" role="listbox" transition:fly={{ y: -4, duration: 150, easing: cubicOut }}>
+              {#each (['latest', 'stars', 'downloads'] as const) as opt (opt)}
+                <button
+                  class="sort-option"
+                  class:selected={sortBy === opt}
+                  role="option"
+                  aria-selected={sortBy === opt}
+                  onclick={() => { sortBy = opt; sortOpen = false; }}
+                >
+                  {sortLabels[opt]}
+                </button>
+              {/each}
+            </div>
+          {/if}
+        </div>
       </div>
       <!-- Row 2: Trust Toggles (left) + Categories (right, scrollable) -->
       <div class="controls-row">
@@ -1116,24 +1151,81 @@
   .search-sort-row .search-box {
     flex: 1;
   }
-  .sort-select {
+  .sort-wrapper {
+    position: relative;
     flex-shrink: 0;
+    align-self: stretch;
+  }
+  .sort-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 100%;
     padding: 9px var(--space-md);
-    padding-right: var(--space-lg);
+    background: var(--color-surface);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    font-family: var(--font-ui);
+    cursor: pointer;
+    transition: border-color var(--transition);
+    box-sizing: border-box;
+    white-space: nowrap;
+  }
+  .sort-trigger:hover {
+    border-color: var(--color-muted);
+  }
+  .sort-trigger.open {
+    border-color: var(--color-accent);
+  }
+  .sort-trigger :global(svg) {
+    transition: transform 150ms ease;
+    flex-shrink: 0;
+  }
+  .sort-trigger.open :global(svg) {
+    transform: rotate(180deg);
+  }
+  .sort-label {
+    flex: 1;
+    text-align: left;
+  }
+  .sort-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    min-width: 100%;
     background: var(--color-surface);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
-    color: var(--color-text);
-    font-family: var(--font-ui);
-    font-size: 13px;
-    cursor: pointer;
-    transition: border-color var(--transition);
-    outline: none;
-    box-sizing: border-box;
-    align-self: stretch;
+    box-shadow: var(--shadow-md);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: var(--space-xs) 0;
   }
-  .sort-select:focus {
-    border-color: var(--color-accent-border);
+  .sort-option {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    text-align: left;
+    padding: 6px 12px;
+    background: none;
+    border: none;
+    color: var(--color-text);
+    font-size: 12px;
+    font-family: var(--font-ui);
+    cursor: pointer;
+    transition: background var(--transition);
+    white-space: nowrap;
+  }
+  .sort-option:hover {
+    background: var(--color-surface-hover);
+  }
+  .sort-option.selected {
+    color: var(--color-accent);
+    font-weight: 500;
   }
   .card-stats {
     display: flex;
