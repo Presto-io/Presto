@@ -1,4 +1,4 @@
-import type { Template, Manifest, GitHubRepo, BatchImportResult, ImportResult, RegistryTemplate, PlatformInfo } from './types';
+import type { Template, Manifest, GitHubRepo, BatchImportResult, ImportResult, RegistryTemplate, PlatformInfo, StatsMap } from './types';
 
 const BASE = import.meta.env.VITE_API_URL || '';
 
@@ -207,4 +207,26 @@ export async function importBatchZip(file: File): Promise<BatchImportResult> {
     throw new Error(body.error || `Batch import failed: ${res.status}`);
   }
   return res.json();
+}
+
+const STATS_BASE = 'https://registry.presto.app';
+
+export async function fetchStats(): Promise<StatsMap> {
+  try {
+    const res = await fetch(`${STATS_BASE}/api/stats`);
+    if (!res.ok) return {};
+    return res.json();
+  } catch {
+    return {};
+  }
+}
+
+export async function reportDownload(name: string): Promise<void> {
+  try {
+    await fetch(`${STATS_BASE}/api/stats/${encodeURIComponent(name)}/download`, {
+      method: 'POST',
+    });
+  } catch {
+    // silent - stats are best-effort
+  }
 }
