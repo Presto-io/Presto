@@ -123,6 +123,8 @@ type InstallOpts struct {
 	// ExpectedSHA256 is the hex-encoded SHA256 hash from registry.
 	// If set, verification is mandatory.
 	ExpectedSHA256 string
+	// Trust is the trust level: "official", "verified", "community", or "".
+	Trust string
 }
 
 func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
@@ -204,6 +206,14 @@ func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
 	data, err := io.ReadAll(io.LimitReader(binResp.Body, 100<<20))
 	if err != nil {
 		return fmt.Errorf("read binary: %w", err)
+	}
+
+	// SEC-01: official 和 verified 模板必须有 SHA256
+	if expectedHash == "" {
+		if opts != nil && (opts.Trust == "official" || opts.Trust == "verified") {
+			return fmt.Errorf("SHA256 required for %s templates", opts.Trust)
+		}
+		// community/unrecorded: 保持现有行为（可选校验）
 	}
 
 	// SEC-01: Verify checksum if available
