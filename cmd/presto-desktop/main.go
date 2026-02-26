@@ -201,27 +201,7 @@ func buildMenu(app *App) *menu.Menu {
 		wailsRuntime.EventsEmit(app.ctx, "menu:templates")
 	})
 
-	editMenu := appMenu.AddSubmenu("编辑")
-	editMenu.AddText("撤销", keys.CmdOrCtrl("z"), func(_ *menu.CallbackData) {
-		wailsRuntime.EventsEmit(app.ctx, "menu:undo")
-	})
-	editMenu.AddText("重做", keys.Combo("z", keys.CmdOrCtrlKey, keys.ShiftKey), func(_ *menu.CallbackData) {
-		wailsRuntime.EventsEmit(app.ctx, "menu:redo")
-	})
-	editMenu.AddSeparator()
-	editMenu.AddText("剪切", keys.CmdOrCtrl("x"), func(_ *menu.CallbackData) {
-		wailsRuntime.EventsEmit(app.ctx, "menu:cut")
-	})
-	editMenu.AddText("复制", keys.CmdOrCtrl("c"), func(_ *menu.CallbackData) {
-		wailsRuntime.EventsEmit(app.ctx, "menu:copy")
-	})
-	editMenu.AddText("粘贴", keys.CmdOrCtrl("v"), func(_ *menu.CallbackData) {
-		wailsRuntime.EventsEmit(app.ctx, "menu:paste")
-	})
-	editMenu.AddSeparator()
-	editMenu.AddText("全选", keys.CmdOrCtrl("a"), func(_ *menu.CallbackData) {
-		wailsRuntime.EventsEmit(app.ctx, "menu:selectAll")
-	})
+	appMenu.Append(menu.EditMenu())
 
 	windowMenu := appMenu.AddSubmenu("窗口")
 	windowMenu.AddText("最小化", keys.CmdOrCtrl("m"), func(_ *menu.CallbackData) {
