@@ -32,6 +32,7 @@ server: frontend
 	go build -o bin/presto-server ./cmd/presto-server/
 
 desktop: frontend
+	rm -rf $(DESKTOP_EMBED)/_app
 	cp -r frontend/build/* $(DESKTOP_EMBED)/
 	MACOSX_DEPLOYMENT_TARGET=$(MACOSX_DEPLOYMENT_TARGET) \
 		CGO_LDFLAGS="-framework UniformTypeIdentifiers" \
@@ -44,6 +45,7 @@ dev:
 
 run-desktop:
 	cd frontend && VITE_MOCK=1 npm run build
+	rm -rf $(DESKTOP_EMBED)/_app
 	cp -r frontend/build/* $(DESKTOP_EMBED)/
 	rm -rf $(DESKTOP_EMBED)/mock && cp -r frontend/mock $(DESKTOP_EMBED)/mock
 	MACOSX_DEPLOYMENT_TARGET=$(MACOSX_DEPLOYMENT_TARGET) \
@@ -59,6 +61,7 @@ _frontend-embed:
 	@echo "==> Frontend pre-built (SKIP_FRONTEND=1), skipping..."
 else
 _frontend-embed: frontend
+	rm -rf $(DESKTOP_EMBED)/_app
 	cp -r frontend/build/* $(DESKTOP_EMBED)/
 endif
 
@@ -243,6 +246,7 @@ dist-linux-amd64: frontend
 		bash -c '\
 			apt-get update -qq && \
 			apt-get install -y -qq libgtk-3-dev libwebkit2gtk-4.0-dev pkg-config > /dev/null 2>&1 && \
+			rm -rf cmd/presto-desktop/build/_app && \
 			cp -r frontend/build/* cmd/presto-desktop/build/ && \
 			go build -tags "$(WAILS_TAGS)" -ldflags "$(LDFLAGS)" \
 				-o dist/$(APP_NAME)-$(VERSION)-linux $(DESKTOP_SRC)/'
