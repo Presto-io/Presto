@@ -241,9 +241,16 @@
   let totalPages = $derived(Math.max(1, Math.ceil(sortedTemplates.length / pageSize)));
   let pagedTemplates = $derived(sortedTemplates.slice((currentPage - 1) * pageSize, currentPage * pageSize));
 
-  let hasUnverified = $derived(
-    registry?.templates.some(t => t.trust === 'unverified') ?? false
-  );
+  // Which trust levels have visible templates (respecting communityEnabled)
+  let visibleTrustLevels = $derived.by(() => {
+    if (!registry) return new Set<string>();
+    const levels = new Set<string>();
+    for (const tpl of registry.templates) {
+      if (!communityEnabled && tpl.trust !== 'official' && tpl.trust !== 'verified') continue;
+      levels.add(tpl.trust);
+    }
+    return levels;
+  });
 
   let selectedTemplate = $derived(
     registry?.templates.find(t => t.name === selectedId) ?? null
@@ -395,9 +402,10 @@
       </div>
       <!-- Row 2: Trust Toggles (left) + Categories (right, scrollable) -->
       <div class="controls-row">
+        {#if visibleTrustLevels.size > 1}
         <div class="trust-toggles">
           {#each Object.entries(trustBadge) as [key, badge] (key)}
-            {#if key !== 'unverified' || hasUnverified}
+            {#if visibleTrustLevels.has(key)}
               {@const BadgeIcon = badge.icon}
               <button
                 class="trust-toggle"
@@ -414,6 +422,7 @@
           {/each}
         </div>
         <div class="controls-sep"></div>
+        {/if}
         <div class="category-bar">
           {#if canScrollLeft}
             <button class="scroll-arrow scroll-arrow-left" onclick={() => scrollCategories('left')} aria-label="向左滚动">‹</button>
@@ -585,10 +594,10 @@
               {/if}
               {#if mode === 'desktop' && isInstalled(selectedTemplate.name)}
                 <button
-                  class="btn-manage"
+                  class="btn-manage-lg"
                   onclick={() => goto(`/settings?panel=tpl-manage&focus=${selectedTemplate.name}`)}
                 >
-                  <Settings size={13} /><span>管理</span>
+                  <Settings size={14} /><span>管理</span>
                 </button>
               {/if}
             </div>
@@ -1109,7 +1118,8 @@
   }
   .sort-select {
     flex-shrink: 0;
-    padding: 7px var(--space-md);
+    padding: 9px var(--space-md);
+    padding-right: var(--space-lg);
     background: var(--color-surface);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
@@ -1119,7 +1129,8 @@
     cursor: pointer;
     transition: border-color var(--transition);
     outline: none;
-    padding-right: var(--space-lg);
+    box-sizing: border-box;
+    align-self: stretch;
   }
   .sort-select:focus {
     border-color: var(--color-accent-border);
@@ -1466,6 +1477,24 @@
     transition: all var(--transition);
   }
   .btn-scroll-top:hover {
+    color: var(--color-text);
+    border-color: var(--color-accent-border);
+  }
+  .btn-manage-lg {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-sm) var(--space-lg);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-muted);
+  }
+  .btn-manage-lg:hover {
     color: var(--color-text);
     border-color: var(--color-accent-border);
   }
