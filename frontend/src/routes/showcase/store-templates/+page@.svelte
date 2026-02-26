@@ -13,6 +13,7 @@
 
 <style>
   :global(.app), :global(#main-content) {
-    overflow: auto !important;
+    overflow: visible !important;
+    height: auto !important;
   }
 </style>
