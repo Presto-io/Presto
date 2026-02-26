@@ -1294,6 +1294,7 @@
   /* Detail panel */
   .store-detail {
     flex: 1;
+    min-width: 0;
     overflow-y: auto;
     padding-right: var(--space-md);
   }
@@ -1395,6 +1396,7 @@
 
   /* Preview iframe */
   .detail-preview {
+    max-width: 100%;
     border-radius: var(--radius-md);
     overflow: hidden;
     border: 1px solid var(--color-border);
