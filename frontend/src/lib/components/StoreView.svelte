@@ -79,6 +79,9 @@
   let currentPage = $state(1);
   let pageSize = $state(24);
 
+  type SortOption = 'latest' | 'stars' | 'downloads';
+  let sortBy = $state<SortOption>('latest');
+
   let statsMap = $state<StatsMap>({});
 
   async function loadStats() {
@@ -200,14 +203,31 @@
     });
   });
 
+  let sortedTemplates = $derived.by(() => {
+    const list = [...filteredTemplates];
+    switch (sortBy) {
+      case 'stars':
+        return list.sort((a, b) => (statsMap[b.name]?.stars ?? 0) - (statsMap[a.name]?.stars ?? 0));
+      case 'downloads':
+        return list.sort((a, b) => (statsMap[b.name]?.downloads ?? 0) - (statsMap[a.name]?.downloads ?? 0));
+      case 'latest':
+      default:
+        return list.sort((a, b) => {
+          const da = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
+          const db = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
+          return db - da;
+        });
+    }
+  });
+
   // Reset page when filters or page size change
   $effect(() => {
-    searchQuery; activeCategory; activeTrust; pageSize;
+    searchQuery; activeCategory; activeTrust; pageSize; sortBy;
     currentPage = 1;
   });
 
-  let totalPages = $derived(Math.max(1, Math.ceil(filteredTemplates.length / pageSize)));
-  let pagedTemplates = $derived(filteredTemplates.slice((currentPage - 1) * pageSize, currentPage * pageSize));
+  let totalPages = $derived(Math.max(1, Math.ceil(sortedTemplates.length / pageSize)));
+  let pagedTemplates = $derived(sortedTemplates.slice((currentPage - 1) * pageSize, currentPage * pageSize));
 
   let hasUnverified = $derived(
     registry?.templates.some(t => t.trust === 'unverified') ?? false
@@ -339,20 +359,27 @@
   {:else if registry}
     <!-- Filter Toolbar -->
     <div class="filter-toolbar">
-      <!-- Row 1: Search -->
-      <div class="search-box">
-        <span class="search-icon"><Search size={14} /></span>
-        <input
-          type="text"
-          class="search-input"
-          placeholder="搜索名称、描述或标签…"
-          bind:value={searchQuery}
-        />
-        {#if searchQuery}
-          <button class="search-clear" onclick={() => searchQuery = ''}>
-            <X size={12} />
-          </button>
-        {/if}
+      <!-- Row 1: Search + Sort -->
+      <div class="search-sort-row">
+        <div class="search-box">
+          <span class="search-icon"><Search size={14} /></span>
+          <input
+            type="text"
+            class="search-input"
+            placeholder="搜索名称、描述或标签…"
+            bind:value={searchQuery}
+          />
+          {#if searchQuery}
+            <button class="search-clear" onclick={() => searchQuery = ''}>
+              <X size={12} />
+            </button>
+          {/if}
+        </div>
+        <select class="sort-select" bind:value={sortBy}>
+          <option value="latest">最新发布</option>
+          <option value="stars">最多星标</option>
+          <option value="downloads">最多下载</option>
+        </select>
       </div>
       <!-- Row 2: Trust Toggles (left) + Categories (right, scrollable) -->
       <div class="controls-row">
@@ -396,7 +423,7 @@
       <!-- Master-Detail View -->
       <div class="master-detail">
         <nav class="store-nav">
-          {#each filteredTemplates as tpl (tpl.name)}
+          {#each sortedTemplates as tpl (tpl.name)}
             {@const badge = trustBadge[tpl.trust]}
             <button
               class="nav-tpl-item"
@@ -547,7 +574,7 @@
       </div>
     {:else}
       <!-- Card Grid View -->
-      {#if filteredTemplates.length === 0}
+      {#if sortedTemplates.length === 0}
         <div class="store-empty">
           <p>{searchQuery ? '没有匹配的结果' : '暂无可用内容'}</p>
         </div>
@@ -568,13 +595,23 @@
               <div class="card-footer">
                 <span class="card-version">v{tpl.version}</span>
                 <span class="card-author">{tpl.author}</span>
+                {#if statsMap[tpl.name]?.stars != null || statsMap[tpl.name]?.downloads != null}
+                  <span class="card-stats">
+                    {#if statsMap[tpl.name]?.stars != null}
+                      <span class="card-stat"><Star size={10} /> {formatCount(statsMap[tpl.name].stars)}</span>
+                    {/if}
+                    {#if statsMap[tpl.name]?.downloads != null}
+                      <span class="card-stat"><Download size={10} /> {formatCount(statsMap[tpl.name].downloads)}</span>
+                    {/if}
+                  </span>
+                {/if}
               </div>
             </button>
           {/each}
         </div>
         <!-- Pagination -->
         <div class="pagination">
-          <span class="page-info">{filteredTemplates.length} 项，第 {currentPage}/{totalPages} 页</span>
+          <span class="page-info">{sortedTemplates.length} 项，第 {currentPage}/{totalPages} 页</span>
           {#if totalPages > 1}
             <div class="page-controls">
               <button class="page-btn" disabled={currentPage <= 1} onclick={() => currentPage--}>&lsaquo;</button>
@@ -1025,6 +1062,44 @@
     color: var(--color-muted);
   }
   .card-version { font-family: var(--font-mono); }
+  .search-sort-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+  }
+  .search-sort-row .search-box {
+    flex: 1;
+  }
+  .sort-select {
+    flex-shrink: 0;
+    padding: 7px var(--space-md);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    font-family: var(--font-ui);
+    font-size: 13px;
+    cursor: pointer;
+    transition: border-color var(--transition);
+    outline: none;
+    padding-right: var(--space-lg);
+  }
+  .sort-select:focus {
+    border-color: var(--color-accent-border);
+  }
+  .card-stats {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-left: auto;
+  }
+  .card-stat {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    font-size: 0.6875rem;
+    color: var(--color-muted);
+  }
 
   /* Master-Detail */
   .master-detail {
