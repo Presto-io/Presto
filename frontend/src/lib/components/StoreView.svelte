@@ -671,6 +671,14 @@
   }
   .page.web-mode {
     padding-top: var(--space-xl);
+    height: auto;
+    overflow: visible;
+  }
+  .page.web-mode .store-detail {
+    overflow: visible;
+  }
+  .page.web-mode .card-grid {
+    overflow: visible;
   }
   .drag-region {
     position: absolute;
@@ -1508,6 +1516,8 @@
     }
     .page.web-mode {
       padding-top: var(--space-md);
+      height: auto;
+      overflow: visible;
     }
 
     /* Card grid: single column */
