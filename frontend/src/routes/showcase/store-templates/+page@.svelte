@@ -12,6 +12,10 @@
 />
 
 <style>
+  :global(body) {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+  }
   :global(.app), :global(#main-content) {
     overflow: visible !important;
     height: auto !important;
