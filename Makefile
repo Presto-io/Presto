@@ -180,8 +180,11 @@ define CREATE_DMG
 	@command -v create-dmg >/dev/null 2>&1 || \
 		{ echo "Error: create-dmg not found. Install with: brew install create-dmg"; exit 1; }
 	@rm -f "$(DIST)/$(APP_NAME)-$(VERSION)-macOS-$(1).dmg" "$(DIST)"/rw.*.dmg
-	create-dmg \
+	@rm -rf "$(DIST)/_dmg_stage" && mkdir -p "$(DIST)/_dmg_stage"
+	@cp -a "$(DIST)/$(APP_NAME).app" "$(DIST)/_dmg_stage/"
+	LC_ALL=C create-dmg \
 		--volname "$(APP_NAME)" \
+		--hdiutil-retries 15 \
 		--volicon "$(DMG_VOLICON)" \
 		--background "$(DMG_BG)" \
 		--window-pos 200 120 \
@@ -191,9 +194,9 @@ define CREATE_DMG
 		--hide-extension "$(APP_NAME).app" \
 		--app-drop-link $(DMG_LNK_X) $(DMG_LNK_Y) \
 		--no-internet-enable \
-		--sandbox-safe \
 		"$(DIST)/$(APP_NAME)-$(VERSION)-macOS-$(1).dmg" \
-		"$(DIST)/$(APP_NAME).app"
+		"$(DIST)/_dmg_stage"
+	@rm -rf "$(DIST)/_dmg_stage"
 	@echo "==> $(DIST)/$(APP_NAME)-$(VERSION)-macOS-$(1).dmg"
 endef
 
