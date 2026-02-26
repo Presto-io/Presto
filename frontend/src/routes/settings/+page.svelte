@@ -118,6 +118,19 @@
       content.addEventListener('scroll', handleScroll);
     }
     window.addEventListener('templates-changed', onTemplatesChanged);
+
+    // Handle URL params: ?panel=tpl-manage&focus=templateName
+    const params = new URLSearchParams(window.location.search);
+    const panel = params.get('panel');
+    if (panel === 'tpl-manage') {
+      activePanel = 'tpl-manage';
+      activeSection = '';
+      if (!installedLoaded) loadInstalled();
+      const focus = params.get('focus');
+      if (focus) {
+        tplSearch = focus;
+      }
+    }
   });
 
   onDestroy(() => {
