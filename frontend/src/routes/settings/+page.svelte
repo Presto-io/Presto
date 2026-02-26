@@ -19,6 +19,9 @@
   let updateInfo = $state<{ hasUpdate: boolean; latestVersion: string; downloadURL: string; releaseURL: string } | null>(null);
   let checking = $state(false);
   let updateError = $state('');
+  let updating = $state(false);
+  let updateProgress = $state(0);
+  let updateStatus = $state('');
   let activeSection = $state('general');
   let activePanel = $state<'tpl-manage' | null>(null);
 
@@ -66,6 +69,7 @@
       go?: { main: { App: {
         GetVersion: () => Promise<string>;
         CheckForUpdate: () => Promise<{ hasUpdate: boolean; currentVersion: string; latestVersion: string; downloadURL: string; releaseURL: string }>;
+        DownloadAndInstallUpdate: (downloadURL: string) => Promise<void>;
         DeleteTemplate: (name: string) => Promise<void>;
       } } };
     }
@@ -106,6 +110,20 @@
     }
   }
 
+  async function startUpdate() {
+    if (!updateInfo?.downloadURL || !window.go?.main?.App?.DownloadAndInstallUpdate) return;
+    updating = true;
+    updateError = '';
+    updateProgress = 0;
+    updateStatus = '正在下载更新…';
+    try {
+      await window.go.main.App.DownloadAndInstallUpdate(updateInfo.downloadURL);
+    } catch (e) {
+      updating = false;
+      updateError = e instanceof Error ? e.message : String(e);
+    }
+  }
+
   onMount(async () => {
     communityEnabled = localStorage.getItem('communityTemplates') === 'true';
     if (window.go?.main?.App?.GetVersion) {
@@ -118,6 +136,13 @@
       content.addEventListener('scroll', handleScroll);
     }
     window.addEventListener('templates-changed', onTemplatesChanged);
+
+    // Listen for update progress events from Wails
+    const rt = (window as any).runtime;
+    if (rt?.EventsOn) {
+      rt.EventsOn('update:progress', (pct: number) => { updateProgress = pct; });
+      rt.EventsOn('update:status', (msg: string) => { updateStatus = msg; });
+    }
 
     // Handle URL params: ?panel=tpl-manage&focus=templateName
     const params = new URLSearchParams(window.location.search);
@@ -643,14 +668,28 @@
               <div class="about-row">
                 <span class="about-label">更新</span>
                 <span class="about-value">
-                  {#if checking}
+                  {#if updating}
+                    <span class="update-progress-wrap">
+                      <span class="update-status-text">{updateStatus}</span>
+                      <span class="update-progress-bar">
+                        <span class="update-progress-fill" style="width: {updateProgress}%"></span>
+                      </span>
+                      <span class="update-pct">{updateProgress}%</span>
+                    </span>
+                  {:else if checking}
                     <RefreshCw size={12} class="spin" />
                     检查中…
                   {:else if updateInfo?.hasUpdate}
-                    <a href={updateInfo.downloadURL || updateInfo.releaseURL} onclick={(e: MouseEvent) => { e.preventDefault(); openExternal(updateInfo!.downloadURL || updateInfo!.releaseURL); }} class="update-link">
-                      v{updateInfo.latestVersion} 可用
-                      <ExternalLink size={12} />
-                    </a>
+                    {#if window.go?.main?.App?.DownloadAndInstallUpdate}
+                      <button class="btn-check-update btn-download-update" onclick={startUpdate}>
+                        下载并安装 v{updateInfo.latestVersion}
+                      </button>
+                    {:else}
+                      <a href={updateInfo.downloadURL || updateInfo.releaseURL} onclick={(e: MouseEvent) => { e.preventDefault(); openExternal(updateInfo!.downloadURL || updateInfo!.releaseURL); }} class="update-link">
+                        v{updateInfo.latestVersion} 可用
+                        <ExternalLink size={12} />
+                      </a>
+                    {/if}
                   {:else if updateInfo && !updateInfo.hasUpdate}
                     已是最新版本
                   {:else if updateError}
@@ -1008,6 +1047,44 @@
     transition: all var(--transition);
   }
   .btn-check-update:hover { background: var(--color-surface-hover); }
+  .btn-download-update {
+    background: var(--color-accent);
+    color: #fff;
+    border-color: var(--color-accent);
+  }
+  .btn-download-update:hover { opacity: 0.9; background: var(--color-accent); }
+  .update-progress-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    min-width: 180px;
+  }
+  .update-status-text {
+    white-space: nowrap;
+    color: var(--color-muted);
+  }
+  .update-progress-bar {
+    flex: 1;
+    height: 4px;
+    background: var(--color-border);
+    border-radius: 2px;
+    overflow: hidden;
+    min-width: 60px;
+  }
+  .update-progress-fill {
+    display: block;
+    height: 100%;
+    background: var(--color-accent);
+    border-radius: 2px;
+    transition: width 0.2s ease;
+  }
+  .update-pct {
+    color: var(--color-muted);
+    font-variant-numeric: tabular-nums;
+    min-width: 2.5em;
+    text-align: right;
+  }
   .btn-reset-wizard {
     background: none;
     border: 1px solid var(--color-border);
