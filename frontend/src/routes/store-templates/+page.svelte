@@ -6,13 +6,17 @@
   import type { RegistryItem } from '$lib/api/types';
 
   let installedNames = $derived(new Set(templateStore.templates.map(t => t.name)));
+  let communityEnabled = $state(false);
 
   async function handleInstall(tpl: RegistryItem) {
     await installFromRegistry(tpl);
     await templateStore.refresh();
   }
 
-  onMount(() => { templateStore.load(); });
+  onMount(() => {
+    templateStore.load();
+    communityEnabled = localStorage.getItem('communityTemplates') === 'true';
+  });
 </script>
 
 <StoreView
@@ -25,4 +29,5 @@
   previewUrl={(name) => `/showcase/editor?registry=${name}`}
   readmeUrl={(name) => `https://presto.c-1o.top/templates/${name}/README.md`}
   backRoute="/settings"
+  {communityEnabled}
 />
