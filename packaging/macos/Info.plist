@@ -34,5 +34,16 @@
 	</array>
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright © 2026 mrered. All rights reserved.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.mrered.presto</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>presto</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

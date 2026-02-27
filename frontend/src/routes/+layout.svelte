@@ -5,6 +5,7 @@
 	import WizardOverlay from '$lib/components/wizard/WizardOverlay.svelte';
 	import { fileRouter } from '$lib/stores/file-router.svelte';
 	import { page } from '$app/stores';
+	import { goto } from '$app/navigation';
 
 	let { children } = $props();
 
@@ -78,7 +79,7 @@
 		}
 	});
 
-	onMount(() => {
+	onMount(async () => {
 		// Skip all event registration in showcase mode
 		if (isShowcase) return;
 
@@ -90,7 +91,29 @@
 		window.addEventListener('drop', handleDrop, true);
 
 		if (window.runtime?.EventsOn) {
-			// Native file drop: Wails provides absolute paths → we get dir info for images
+			// URL scheme: presto://install/{name} → navigate to template detail page
+			// Hot start: event pushed from Go via SingleInstanceLock
+			window.runtime.EventsOn('url-scheme-open-template', (name: string) => {
+				console.log('[url-scheme] hot start event received:', name);
+				goto(`/store-templates?template=${encodeURIComponent(name)}`);
+			});
+
+			// Cold start: pull pending URL from Go (event timing unreliable at startup)
+			try {
+				console.log('[url-scheme] checking for startup URL...');
+				const pendingURL = await (window as any).go.main.App.GetStartupURL();
+				console.log('[url-scheme] startup URL:', pendingURL);
+				if (pendingURL) {
+					const match = pendingURL.match(/^presto:\/\/install\/(.+)/);
+					if (match) {
+						console.log('[url-scheme] navigating to template:', match[1]);
+						goto(`/store-templates?template=${encodeURIComponent(match[1])}`);
+					}
+				}
+			} catch (e) {
+				console.error('[url-scheme] GetStartupURL failed:', e);
+			}
+
 			window.runtime.EventsOn('native-file-drop', async (...args: any[]) => {
 				const items: any[] = Array.isArray(args[0]) ? args[0] : args;
 				dragCounter = 0;

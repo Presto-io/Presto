@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -32,6 +33,9 @@ import (
 
 // version is set at build time via -ldflags "-X main.version=..."
 var version string
+
+// startupURL holds a presto:// URL passed via os.Args on cold start.
+var startupURL string
 
 //go:embed all:build
 var assets embed.FS
@@ -109,6 +113,43 @@ func (a *App) startup(ctx context.Context) {
 			wailsRuntime.EventsEmit(ctx, "native-file-drop", items)
 		}
 	})
+}
+
+// GetStartupURL returns and clears the pending presto:// URL from cold start.
+// Called by the frontend on mount to check if the app was launched via URL scheme.
+func (a *App) GetStartupURL() string {
+	u := startupURL
+	startupURL = ""
+	log.Printf("[url-scheme] GetStartupURL called, returning: %q", u)
+	return u
+}
+
+// handlePrestoURL parses a presto:// URL and routes to the appropriate action.
+// Currently supports: presto://install/{template-name}
+func (a *App) handlePrestoURL(rawURL string) {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		log.Printf("[url-scheme] failed to parse URL: %s", rawURL)
+		return
+	}
+
+	// presto://install/{name} → Host="install", Path="/{name}"
+	action := u.Host
+	if action != "install" {
+		log.Printf("[url-scheme] unsupported action: %s", action)
+		return
+	}
+
+	templateName := strings.TrimPrefix(u.Path, "/")
+	if templateName == "" {
+		log.Printf("[url-scheme] missing template name in URL: %s", rawURL)
+		return
+	}
+
+	log.Printf("[url-scheme] opening template: %s", templateName)
+
+	// Emit event to navigate frontend to the template detail page
+	wailsRuntime.EventsEmit(a.ctx, "url-scheme-open-template", templateName)
 }
 
 // OpenFile opens a native file dialog and returns the file content and directory.
@@ -502,6 +543,16 @@ func main() {
 	app := NewApp(manager, compiler, registry)
 	appMenu := buildMenu(app)
 
+	// Check os.Args for a presto:// URL (cold start via URL scheme)
+	log.Printf("[url-scheme] os.Args: %v", os.Args)
+	for _, arg := range os.Args[1:] {
+		if strings.HasPrefix(arg, "presto://") {
+			startupURL = arg
+			log.Printf("[url-scheme] captured startup URL: %s", arg)
+			break
+		}
+	}
+
 	err = wails.Run(&options.App{
 		Title:     "Presto",
 		Width:     1280,
@@ -520,11 +571,27 @@ func main() {
 		Bind: []interface{}{
 			app,
 		},
+		SingleInstanceLock: &options.SingleInstanceLock{
+			UniqueId: "com.mrered.presto",
+			OnSecondInstanceLaunch: func(data options.SecondInstanceData) {
+				log.Printf("[url-scheme] second instance args: %v", data.Args)
+			},
+		},
 		Mac: &macOptions.Options{
 			TitleBar: macOptions.TitleBarHiddenInset(),
 			About: &macOptions.AboutInfo{
 				Title:   "Presto",
 				Message: "Markdown → Typst → PDF",
+			},
+			OnUrlOpen: func(url string) {
+				log.Printf("[url-scheme] OnUrlOpen: %s", url)
+				if app.ctx != nil {
+					// Hot start: frontend is ready, emit event directly
+					go app.handlePrestoURL(url)
+				} else {
+					// Cold start: frontend not ready yet, store for later pull
+					startupURL = url
+				}
 			},
 		},
 	})
