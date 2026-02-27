@@ -242,8 +242,13 @@ jobs:
             runner: ubuntu-24.04-arm
             typst_sha256: 491b101aa40a3a7ea82a3f8a6232cabb4e6a7e233810082e5ac812d43fdcd47a
     runs-on: ${{ matrix.runner }}
+    env:
+      REGISTRY_IMAGE: ghcr.io/${{ github.repository_owner }}/presto
     steps:
       - uses: actions/checkout@v4
+
+      - name: Lowercase registry image
+        run: echo "REGISTRY_IMAGE=${REGISTRY_IMAGE,,}" >> "$GITHUB_ENV"
 
       - uses: docker/setup-buildx-action@v3
 
@@ -256,7 +261,7 @@ jobs:
       - uses: docker/metadata-action@v5
         id: meta
         with:
-          images: ghcr.io/${{ github.repository_owner }}/presto
+          images: ${{ env.REGISTRY_IMAGE }}
 
       - name: Build and push by digest
         id: build
@@ -271,7 +276,7 @@ jobs:
           build-args: |
             TYPST_SHA256_AMD64=${{ matrix.typst_sha256 }}
             TYPST_SHA256_ARM64=${{ matrix.typst_sha256 }}
-          outputs: type=image,name=ghcr.io/${{ github.repository_owner }}/presto,push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
 
       - name: Export digest
         run: |
@@ -289,7 +294,12 @@ jobs:
   merge-docker:
     needs: build-docker
     runs-on: ubuntu-latest
+    env:
+      REGISTRY_IMAGE: ghcr.io/${{ github.repository_owner }}/presto
     steps:
+      - name: Lowercase registry image
+        run: echo "REGISTRY_IMAGE=${REGISTRY_IMAGE,,}" >> "$GITHUB_ENV"
+
       - uses: actions/download-artifact@v4
         with:
           path: /tmp/digests
@@ -307,7 +317,7 @@ jobs:
       - uses: docker/metadata-action@v5
         id: meta
         with:
-          images: ghcr.io/${{ github.repository_owner }}/presto
+          images: ${{ env.REGISTRY_IMAGE }}
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -318,7 +328,7 @@ jobs:
         run: |
           docker buildx imagetools create \
             $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf 'ghcr.io/${{ github.repository_owner }}/presto@sha256:%s ' *)
+            $(printf '${{ env.REGISTRY_IMAGE }}@sha256:%s ' *)
 
   # ── GitHub Release ──────────────────────────────────────────
   release:
