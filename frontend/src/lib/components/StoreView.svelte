@@ -22,6 +22,7 @@
     communityEnabled?: boolean;
     statsUrl?: string;
     onInstallSuccess?: (name: string) => void;
+    initialSelectedId?: string | null;
   }
 
   let {
@@ -37,6 +38,7 @@
     communityEnabled = true,
     statsUrl,
     onInstallSuccess,
+    initialSelectedId = null,
   }: Props = $props();
 
   // --- Internal registry state ---
@@ -73,7 +75,7 @@
   let searchQuery = $state('');
   let activeCategory = $state<string | null>(null);
   let activeTrust = $state<string | null>(null);
-  let selectedId = $state<string | null>(null);
+  let selectedId = $state<string | null>(initialSelectedId);
   let installing = $state('');
   let readmeContent = $state('');
   let readmeLoading = $state(false);
@@ -623,9 +625,16 @@
                   </button>
                 {/if}
               {:else if mode === 'web'}
-                <a class="btn-install" href="presto://install/{selectedTemplate.name}" target="_blank" rel="noopener">
+                <button class="btn-install" onclick={() => {
+                  const url = `presto://install/${selectedTemplate!.name}`;
+                  if (window.parent !== window) {
+                    window.parent.postMessage({ type: 'presto-open-template', url }, '*');
+                  } else {
+                    window.location.href = url;
+                  }
+                }}>
                   <Download size={14} /><span>在 Presto 中打开</span>
-                </a>
+                </button>
               {/if}
               {#if mode === 'desktop' && isInstalled(selectedTemplate.name)}
                 <button

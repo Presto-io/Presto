@@ -4,10 +4,14 @@
   import { templateStore } from '$lib/stores/templates.svelte';
   import { installFromRegistry } from '$lib/api/client';
   import type { RegistryItem } from '$lib/api/types';
+  import { page } from '$app/stores';
 
   const isDev = import.meta.env.DEV || import.meta.env.VITE_MOCK === '1';
   let installedNames = $derived(new Set(templateStore.templates.map(t => t.name)));
   let communityEnabled = $state(false);
+
+  // Read ?template= query param for deep linking (from presto:// URL scheme)
+  let initialTemplate = $derived($page.url.searchParams.get('template'));
 
   async function handleInstall(tpl: RegistryItem) {
     await installFromRegistry(tpl);
@@ -31,6 +35,7 @@
   readmeUrl={(name) => `https://presto.c-1o.top/templates/${name}/README.md`}
   backRoute="/settings"
   {communityEnabled}
+  initialSelectedId={initialTemplate}
   statsUrl={isDev ? '/mock/stats.json' : 'https://registry.presto.app/api/stats'}
   onInstallSuccess={async (name) => {
     if (!isDev) {
