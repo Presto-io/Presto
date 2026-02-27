@@ -90,6 +90,16 @@ brew install --cask brewforge/more/presto
 
 前往 [GitHub Releases](https://github.com/mrered/presto/releases) 下载对应平台的安装包。
 
+> **macOS 首次打开提示"无法验证开发者"？**
+>
+> 由于应用尚未签名，macOS 会阻止首次打开。请在终端运行：
+>
+> ```bash
+> xattr -cr /Applications/Presto.app
+> ```
+>
+> 或者右键点击 Presto.app → 打开 → 确认打开。
+
 ### Docker 部署（Web 端）
 
 ```bash
@@ -152,6 +162,33 @@ make dist
 ```
 
 打包产物输出到 `dist/` 目录。macOS .app 会自动捆绑 Typst 二进制和内置模板到 `Contents/Resources/`。
+
+### macOS 代码签名与公证
+
+本地构建默认使用 ad-hoc 签名。如需 Developer ID 签名，设置环境变量：
+
+```bash
+export CODESIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)"
+make dist-dmg-arm64
+```
+
+CI 自动签名需要在 GitHub 仓库配置以下 Secrets：
+
+| Secret | 说明 |
+|--------|------|
+| `APPLE_CERTIFICATE_P12_BASE64` | Developer ID Application 证书的 .p12 文件，base64 编码 |
+| `APPLE_CERTIFICATE_PASSWORD` | .p12 文件的导入密码 |
+| `APPLE_ID` | Apple 开发者账号邮箱 |
+| `APPLE_TEAM_ID` | Apple 开发者团队 ID（10 位字符串） |
+| `APPLE_APP_SPECIFIC_PASSWORD` | 用于 notarytool 的 App 专用密码（在 appleid.apple.com 生成） |
+
+生成 base64 编码证书：
+
+```bash
+base64 -i DeveloperIDApplication.p12 | pbcopy
+```
+
+未配置上述 Secrets 时，CI 构建将回退到 ad-hoc 签名并输出警告。
 
 ## 使用指南
 

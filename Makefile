@@ -2,7 +2,7 @@
        _build-macos-arm64 _build-macos-amd64 \
        dist-macos dist-macos-arm64 dist-macos-amd64 dist-macos-universal \
        dist-dmg dist-dmg-arm64 dist-dmg-amd64 dist-dmg-universal \
-       dist-windows dist-linux dist
+       dist-windows dist-linux dist notarize
 
 # ─── Config ──────────────────────────────────────────────
 APP_NAME     := Presto
@@ -142,7 +142,7 @@ dist-macos-universal: _build-macos-arm64 _build-macos-amd64
 	@if [ -f packaging/macos/icon.icns ]; then \
 		cp packaging/macos/icon.icns "$(DIST)/$(APP_NAME).app/Contents/Resources/"; \
 	fi
-	codesign --force --deep -s - "$(DIST)/$(APP_NAME).app"
+	bash packaging/macos/codesign.sh "$(DIST)/$(APP_NAME).app"
 	@echo "==> $(DIST)/$(APP_NAME).app"
 
 dist-macos: dist-macos-arm64
@@ -160,7 +160,7 @@ _bundle-app:
 	@if [ -f packaging/macos/icon.icns ]; then \
 		cp packaging/macos/icon.icns "$(DIST)/$(APP_NAME).app/Contents/Resources/"; \
 	fi
-	codesign --force --deep -s - "$(DIST)/$(APP_NAME).app"
+	bash packaging/macos/codesign.sh "$(DIST)/$(APP_NAME).app"
 
 # ─── DMG (per-arch + universal) ─────────────────────────
 
@@ -203,6 +203,22 @@ dist-dmg-universal: dist-macos-universal
 	$(call CREATE_DMG,universal)
 
 dist-dmg: dist-dmg-arm64 dist-dmg-amd64 dist-dmg-universal
+
+# ─── Notarization ───────────────────────────────────────
+# Usage: make notarize DMG_PATH=dist/Presto-0.1.0-macOS-arm64.dmg
+
+notarize:
+	@test -n "$(DMG_PATH)" || { echo "Error: DMG_PATH is required"; exit 1; }
+	@test -f "$(DMG_PATH)" || { echo "Error: $(DMG_PATH) not found"; exit 1; }
+	@echo "==> Submitting $(DMG_PATH) for notarization..."
+	xcrun notarytool submit "$(DMG_PATH)" \
+		--apple-id "$(APPLE_ID)" \
+		--team-id "$(APPLE_TEAM_ID)" \
+		--password "$(APPLE_APP_SPECIFIC_PASSWORD)" \
+		--wait --timeout 10m
+	@echo "==> Stapling notarization ticket..."
+	xcrun stapler staple "$(DMG_PATH)"
+	@echo "==> Notarization complete: $(DMG_PATH)"
 
 # ─── Windows Distribution ───────────────────────────────
 # Requires: brew install mingw-w64
