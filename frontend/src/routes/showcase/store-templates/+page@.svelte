@@ -1,5 +1,18 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import StoreView from '$lib/components/StoreView.svelte';
+
+  onMount(() => {
+    if (window.parent === window) return;
+    const ro = new ResizeObserver(() => {
+      window.parent.postMessage(
+        { type: 'presto-resize', height: document.documentElement.scrollHeight },
+        '*'
+      );
+    });
+    ro.observe(document.documentElement);
+    return () => ro.disconnect();
+  });
 </script>
 
 <StoreView

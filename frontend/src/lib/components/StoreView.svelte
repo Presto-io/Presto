@@ -147,7 +147,7 @@
   let cardGridEl = $state<HTMLElement | null>(null);
 
   function computePageSize() {
-    if (!cardGridEl) return;
+    if (mode === 'web' || !cardGridEl) return;
     const style = getComputedStyle(cardGridEl);
     const gap = parseFloat(style.gap) || 12;
     const colWidth = 200 + gap;
@@ -155,7 +155,7 @@
     const firstCard = cardGridEl.querySelector('.tpl-card') as HTMLElement | null;
     const cardH = firstCard ? firstCard.offsetHeight : 120;
     const rowHeight = cardH + gap;
-    const rows = Math.max(1, Math.floor((cardGridEl.clientHeight + gap) / rowHeight));
+    const rows = Math.max(1, Math.round((cardGridEl.clientHeight + gap) / rowHeight));
     const auto = cols * rows;
     if (auto > 0 && auto !== pageSize) pageSize = auto;
   }
@@ -170,7 +170,9 @@
 
   // Re-compute after data loads and cards render
   $effect(() => {
-    if (registry && cardGridEl) {
+    if (mode === 'web' && registry) {
+      pageSize = registry.templates.length || 100;
+    } else if (registry && cardGridEl) {
       requestAnimationFrame(() => computePageSize());
     }
   });
@@ -692,6 +694,7 @@
           {/each}
         </div>
         <!-- Pagination -->
+        {#if mode !== 'web'}
         <div class="pagination">
           <span class="page-info">{sortedTemplates.length} 项，第 {currentPage}/{totalPages} 页</span>
           {#if totalPages > 1}
@@ -708,6 +711,7 @@
             </div>
           {/if}
         </div>
+        {/if}
       {/if}
     {/if}
   {/if}
@@ -1649,7 +1653,8 @@
     .page.web-mode {
       padding-top: var(--space-md);
       height: auto;
-      overflow: visible;
+      overflow-x: hidden;
+      overflow-y: visible;
     }
 
     /* Card grid: single column */
@@ -1667,10 +1672,23 @@
     .store-detail {
       padding-right: 0;
     }
+    .detail-header {
+      flex-wrap: wrap;
+    }
+    .detail-actions {
+      flex-wrap: wrap;
+    }
 
     /* Category bar: tighter spacing */
     .filter-toolbar {
       margin-bottom: var(--space-md);
+    }
+    .controls-row {
+      flex-wrap: wrap;
+      gap: var(--space-sm);
+    }
+    .search-sort-row {
+      flex-wrap: wrap;
     }
 
     /* Pagination: compact */
