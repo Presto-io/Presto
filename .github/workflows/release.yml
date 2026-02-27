@@ -171,20 +171,20 @@ jobs:
           name: dist-windows-${{ matrix.goarch }}
           path: dist/Presto-${{ env.VERSION }}-windows-${{ matrix.goarch }}.zip
 
-  # ── Linux: amd64 + arm64 ───────────────────────────────────
+  # ── Linux: amd64 + arm64 (native runners, no cross-compilation) ──
   build-linux:
     needs: build-frontend
-    runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
       matrix:
         include:
           - goarch: amd64
-            cc: gcc
+            runner: ubuntu-22.04
             typst_archive: typst-x86_64-unknown-linux-musl.tar.xz
           - goarch: arm64
-            cc: aarch64-linux-gnu-gcc
+            runner: ubuntu-22.04-arm
             typst_archive: typst-aarch64-unknown-linux-musl.tar.xz
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
 
@@ -198,43 +198,18 @@ jobs:
           name: frontend-build
           path: cmd/presto-desktop/build/
 
-      - name: Install native dependencies (amd64)
-        if: matrix.goarch == 'amd64'
+      - name: Install native dependencies
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq libgtk-3-dev libwebkit2gtk-4.0-dev pkg-config
-
-      - name: Setup arm64 cross-compilation
-        if: matrix.goarch == 'arm64'
-        run: |
-          sudo dpkg --add-architecture arm64
-          # Replace ALL apt sources with arch-pinned versions
-          sudo rm -f /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources
-          sudo tee /etc/apt/sources.list <<'SOURCES'
-          deb [arch=amd64] http://archive.ubuntu.com/ubuntu jammy main restricted universe multiverse
-          deb [arch=amd64] http://archive.ubuntu.com/ubuntu jammy-updates main restricted universe multiverse
-          deb [arch=amd64] http://security.ubuntu.com/ubuntu jammy-security main restricted universe multiverse
-          deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy main restricted universe multiverse
-          deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-updates main restricted universe multiverse
-          deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted universe multiverse
-          SOURCES
-          sudo sed -i 's/^          //' /etc/apt/sources.list
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq gcc-aarch64-linux-gnu pkg-config \
-            libgtk-3-dev:arm64 libwebkit2gtk-4.0-dev:arm64
 
       - name: Extract version
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
 
       - name: Build Linux binary
+        env:
+          CGO_ENABLED: '1'
         run: |
-          export CGO_ENABLED=1
-          export CC=${{ matrix.cc }}
-          export GOOS=linux
-          export GOARCH=${{ matrix.goarch }}
-          if [ "${{ matrix.goarch }}" = "arm64" ]; then
-            export PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig
-          fi
           go build \
             -tags "desktop,production" \
             -ldflags "-s -w -X main.version=${{ env.VERSION }}" \
@@ -254,13 +229,72 @@ jobs:
           name: dist-linux-${{ matrix.goarch }}
           path: dist/Presto-${{ env.VERSION }}-linux-${{ matrix.goarch }}.tar.gz
 
-  # ── Docker: multi-arch server image ─────────────────────────
+  # ── Docker: per-arch native build ───────────────────────────
   build-docker:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+            typst_sha256: a6044cbad2a954deb921167e257e120ac0a16b20339ec01121194ff9d394996d
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+            typst_sha256: 491b101aa40a3a7ea82a3f8a6232cabb4e6a7e233810082e5ac812d43fdcd47a
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
 
-      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/presto
+
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.platform }}
+          # SEC-32: Pass Typst SHA256 checksums for build-time verification
+          build-args: |
+            TYPST_SHA256_AMD64=${{ matrix.typst_sha256 }}
+            TYPST_SHA256_ARM64=${{ matrix.typst_sha256 }}
+          outputs: type=image,name=ghcr.io/${{ github.repository_owner }}/presto,push-by-digest=true,name-canonical=true,push=true
+
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: docker-digest-${{ strategy.job-index }}
+          path: /tmp/digests/*
+          retention-days: 1
+
+  # ── Docker: merge multi-arch manifest ──────────────────────
+  merge-docker:
+    needs: build-docker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: docker-digest-*
+          merge-multiple: true
 
       - uses: docker/setup-buildx-action@v3
 
@@ -279,19 +313,12 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest
 
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          # SEC-32: Pass Typst SHA256 checksums for build-time verification
-          build-args: |
-            TYPST_SHA256_AMD64=a6044cbad2a954deb921167e257e120ac0a16b20339ec01121194ff9d394996d
-            TYPST_SHA256_ARM64=491b101aa40a3a7ea82a3f8a6232cabb4e6a7e233810082e5ac812d43fdcd47a
+      - name: Create manifest list and push
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf 'ghcr.io/${{ github.repository_owner }}/presto@sha256:%s ' *)
 
   # ── GitHub Release ──────────────────────────────────────────
   release:
