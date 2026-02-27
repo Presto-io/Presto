@@ -163,7 +163,6 @@ _bundle-app:
 	codesign --force --deep -s - "$(DIST)/$(APP_NAME).app"
 
 # ─── DMG (per-arch + universal) ─────────────────────────
-# Requires: brew install create-dmg
 
 DMG_BG       := packaging/macos/dmg-background.png
 DMG_VOLICON  := packaging/macos/dmg-icon.icns
@@ -177,23 +176,17 @@ DMG_LNK_Y   := 192
 
 define CREATE_DMG
 	@echo "==> Creating DMG..."
-	@command -v create-dmg >/dev/null 2>&1 || \
-		{ echo "Error: create-dmg not found. Install with: brew install create-dmg"; exit 1; }
-	@rm -f "$(DIST)/$(APP_NAME)-$(VERSION)-macOS-$(1).dmg" "$(DIST)"/rw.*.dmg
 	@rm -rf "$(DIST)/_dmg_stage" && mkdir -p "$(DIST)/_dmg_stage"
 	@cp -a "$(DIST)/$(APP_NAME).app" "$(DIST)/_dmg_stage/"
-	LC_ALL=C create-dmg \
+	bash packaging/macos/create-dmg.sh \
 		--volname "$(APP_NAME)" \
-		--hdiutil-retries 15 \
-		--volicon "$(DMG_VOLICON)" \
 		--background "$(DMG_BG)" \
-		--window-pos 200 120 \
+		--volicon "$(DMG_VOLICON)" \
 		--window-size $(DMG_WIN_W) $(DMG_WIN_H) \
 		--icon-size $(DMG_ICON_SIZE) \
 		--icon "$(APP_NAME).app" $(DMG_APP_X) $(DMG_APP_Y) \
 		--hide-extension "$(APP_NAME).app" \
 		--app-drop-link $(DMG_LNK_X) $(DMG_LNK_Y) \
-		--no-internet-enable \
 		"$(DIST)/$(APP_NAME)-$(VERSION)-macOS-$(1).dmg" \
 		"$(DIST)/_dmg_stage"
 	@rm -rf "$(DIST)/_dmg_stage"
