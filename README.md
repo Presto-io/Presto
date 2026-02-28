@@ -114,6 +114,16 @@ docker compose up -d
 docker run -d -p 8080:8080 -v presto-data:/home/presto/.presto ghcr.io/mrered/presto
 ```
 
+#### 启用 HTTPS（推荐用于公网部署）
+
+修改 `Caddyfile` 中的 `YOUR_DOMAIN` 为实际域名，然后：
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d
+```
+
+Caddy 会自动获取 Let's Encrypt 证书。
+
 ## 从源码构建
 
 ### 前置依赖

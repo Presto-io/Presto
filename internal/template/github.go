@@ -181,6 +181,9 @@ func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
 
 		// SEC-01: Try to fetch checksums from release assets (same-source, weaker)
 		expectedHash = lookupChecksumFromRelease(release.Assets, assetName)
+		if expectedHash == "" {
+			log.Printf("[security] WARNING: no checksums.txt/SHA256SUMS found in release for %s/%s", owner, repo)
+		}
 	}
 
 	// SEC-07: Validate download URL domain
@@ -189,6 +192,7 @@ func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
 		return fmt.Errorf("invalid download URL: %w", err)
 	}
 	if !isAllowedDownloadHost(parsedURL.Host) {
+		log.Printf("[security] BLOCKED: download URL host not in whitelist: %s (full URL: %s)", parsedURL.Host, downloadURL)
 		return fmt.Errorf("download URL host not allowed: %s", parsedURL.Host)
 	}
 
@@ -208,23 +212,27 @@ func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
 		return fmt.Errorf("read binary: %w", err)
 	}
 
-	// SEC-01: official 和 verified 模板必须有 SHA256
-	if expectedHash == "" {
-		if opts != nil && (opts.Trust == "official" || opts.Trust == "verified") {
-			return fmt.Errorf("SHA256 required for %s templates", opts.Trust)
-		}
-		// community/unrecorded: 保持现有行为（可选校验）
-	}
+	// SEC-30: 下载→验证→执行 三步流程
+	// Step 1: 下载已完成（data 已获取）
+	// Step 2: 验证 SHA256
+	actualHash := sha256.Sum256(data)
+	actualHex := hex.EncodeToString(actualHash[:])
 
-	// SEC-01: Verify checksum if available
-	if expectedHash != "" {
-		actualHash := sha256.Sum256(data)
-		actualHex := hex.EncodeToString(actualHash[:])
+	if expectedHash == "" {
+		// SEC-01: official 和 verified 模板必须有 SHA256，缺失则拒绝安装
+		if opts != nil && (opts.Trust == "official" || opts.Trust == "verified") {
+			return fmt.Errorf("SHA256 required for %s templates but not found", opts.Trust)
+		}
+		// SEC-30: 社区模板无校验时记录警告
+		log.Printf("[security] WARNING: installing %s/%s without SHA256 verification (hash: %s)", owner, repo, actualHex)
+	} else {
 		if actualHex != expectedHash {
 			return fmt.Errorf("SHA256 mismatch: expected %s, got %s", expectedHash, actualHex)
 		}
+		log.Printf("[security] SHA256 verified for %s/%s: %s", owner, repo, actualHex)
 	}
 
+	// Step 3: 验证通过后才执行二进制
 	tmpFile, err := os.CreateTemp("", "presto-template-*")
 	if err != nil {
 		return fmt.Errorf("create temp file: %w", err)
@@ -293,6 +301,11 @@ func lookupChecksumFromRelease(assets []GitHubAsset, assetName string) string {
 	for _, asset := range assets {
 		if asset.Name != "checksums.txt" && asset.Name != "SHA256SUMS" {
 			continue
+		}
+		// SEC-07: Validate checksum file URL domain
+		if checksumURL, err := url.Parse(asset.BrowserDownloadURL); err != nil || !isAllowedDownloadHost(checksumURL.Host) {
+			log.Printf("[security] BLOCKED: checksum URL host not in whitelist: %s", asset.BrowserDownloadURL)
+			return ""
 		}
 		resp, err := httpClient.Get(asset.BrowserDownloadURL)
 		if err != nil {

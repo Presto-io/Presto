@@ -110,18 +110,17 @@ export async function convertAndCompile(
   return res.blob();
 }
 
+// SEC-39: Only send owner/repo — server looks up download URL from registry
 export async function installTemplate(
   owner: string,
-  repo: string,
-  platforms?: Record<string, PlatformInfo>,
-  trust?: string
+  repo: string
 ): Promise<void> {
   const res = await authFetch(
     `${BASE}/api/templates/${encodeURIComponent(owner + '/' + repo)}/install`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ owner, repo, platforms, trust })
+      body: JSON.stringify({ owner, repo })
     }
   );
   if (!res.ok) throw new Error(`Install failed: ${res.status}`);
@@ -146,7 +145,8 @@ export function installFromRegistry(template: RegistryTemplate): Promise<void> {
     return Promise.reject(new Error('No repository info'));
   }
 
-  return installTemplate(owner, repo, template.platforms, template.trust);
+  // SEC-39: No longer pass platforms/trust — server queries registry directly
+  return installTemplate(owner, repo);
 }
 
 export async function deleteTemplate(id: string): Promise<void> {

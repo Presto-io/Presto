@@ -216,6 +216,21 @@ func (rc *RegistryCache) LookupTrust(templateName string) string {
 	return ""
 }
 
+// SEC-39: LookupByRepo returns the registry entry for a template by owner/repo.
+// The server uses this to get trusted download URLs instead of accepting client-provided URLs.
+func (rc *RegistryCache) LookupByRepo(ownerRepo string) *RegistryEntry {
+	reg := rc.Load()
+	if reg == nil {
+		return nil
+	}
+	for _, entry := range reg.Templates {
+		if entry.Repo == ownerRepo {
+			return &entry
+		}
+	}
+	return nil
+}
+
 func Platform() string {
 	return runtime.GOOS + "-" + runtime.GOARCH
 }

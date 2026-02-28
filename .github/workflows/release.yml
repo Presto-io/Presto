@@ -20,9 +20,9 @@ jobs:
   build-frontend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -34,7 +34,7 @@ jobs:
       - name: Embed into desktop build dir
         run: cp -r frontend/build/* cmd/presto-desktop/build/
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: frontend-build
           path: cmd/presto-desktop/build/
@@ -53,14 +53,14 @@ jobs:
           - goarch: amd64
             make_target: dist-dmg-amd64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: frontend-build
           path: cmd/presto-desktop/build/
@@ -129,7 +129,7 @@ jobs:
             security delete-keychain "$KEYCHAIN_PATH" || true
           fi
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: dist-macos-${{ matrix.goarch }}
           path: dist/Presto-${{ env.VERSION }}-macOS-${{ matrix.goarch }}.dmg
@@ -154,14 +154,14 @@ jobs:
             typst_archive: typst-aarch64-pc-windows-msvc.zip
             typst_sha256: "1c4aaa0de000ab1787dda354c34f4fa1fe3c2525d3d038e692a3d7daa333d551"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: frontend-build
           path: cmd/presto-desktop/build/
@@ -172,7 +172,7 @@ jobs:
       - name: Cache llvm-mingw toolchain
         if: matrix.goarch == 'arm64'
         id: cache-llvm-mingw
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: llvm-mingw-20250114-ucrt-x86_64
           key: llvm-mingw-20250114-ucrt-x86_64
@@ -231,7 +231,7 @@ jobs:
           cd dist
           7z a "Presto-${{ env.VERSION }}-windows-${{ matrix.goarch }}.zip" Presto.exe typst.exe
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: dist-windows-${{ matrix.goarch }}
           path: dist/Presto-${{ env.VERSION }}-windows-${{ matrix.goarch }}.zip
@@ -251,14 +251,14 @@ jobs:
             typst_archive: typst-aarch64-unknown-linux-musl.tar.xz
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: frontend-build
           path: cmd/presto-desktop/build/
@@ -289,7 +289,7 @@ jobs:
           cd dist
           tar czf "Presto-${{ env.VERSION }}-linux-${{ matrix.goarch }}.tar.gz" Presto typst
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: dist-linux-${{ matrix.goarch }}
           path: dist/Presto-${{ env.VERSION }}-linux-${{ matrix.goarch }}.tar.gz
@@ -311,9 +311,9 @@ jobs:
     env:
       REGISTRY_IMAGE: ghcr.io/${{ github.repository_owner }}/presto
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: frontend-build
           path: frontend/build/
@@ -321,22 +321,22 @@ jobs:
       - name: Lowercase registry image
         run: echo "REGISTRY_IMAGE=${REGISTRY_IMAGE,,}" >> "$GITHUB_ENV"
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: docker/metadata-action@v5
+      - uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         id: meta
         with:
           images: ${{ env.REGISTRY_IMAGE }}
 
       - name: Build and push by digest
         id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
           platforms: ${{ matrix.platform }}
@@ -356,7 +356,7 @@ jobs:
           digest="${{ steps.build.outputs.digest }}"
           touch "/tmp/digests/${digest#sha256:}"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: docker-digest-${{ strategy.job-index }}
           path: /tmp/digests/*
@@ -372,21 +372,21 @@ jobs:
       - name: Lowercase registry image
         run: echo "REGISTRY_IMAGE=${REGISTRY_IMAGE,,}" >> "$GITHUB_ENV"
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: /tmp/digests
           pattern: docker-digest-*
           merge-multiple: true
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: docker/metadata-action@v5
+      - uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         id: meta
         with:
           images: ${{ env.REGISTRY_IMAGE }}
@@ -407,9 +407,9 @@ jobs:
     needs: [build-macos, build-windows, build-linux]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: dist/
           pattern: dist-*
@@ -430,7 +430,8 @@ jobs:
             PRERELEASE_FLAG="--prerelease"
           fi
           if gh release view "${{ github.ref_name }}" &>/dev/null; then
-            gh release upload "${{ github.ref_name }}" dist/* --clobber
+            echo "::error::Release ${{ github.ref_name }} already exists. Delete existing assets manually before re-uploading."
+            exit 1
           else
             gh release create "${{ github.ref_name }}" \
               --title "Presto ${{ env.VERSION }}" \
