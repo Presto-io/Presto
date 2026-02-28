@@ -9,12 +9,14 @@ COPY internal/ internal/
 RUN CGO_ENABLED=0 GOARCH=$TARGETARCH go build -ldflags="-s -w" -o /bin/presto-server ./cmd/presto-server/
 
 # Stage 2: Build frontend (platform-independent, runs on build host)
+# Set SKIP_FRONTEND_BUILD=true and pre-place frontend/build/ in context to skip npm build
 FROM --platform=$BUILDPLATFORM node:22-alpine AS frontend-builder
+ARG SKIP_FRONTEND_BUILD=false
 WORKDIR /app
 COPY frontend/package*.json ./
-RUN npm ci
+RUN if [ "$SKIP_FRONTEND_BUILD" = "false" ]; then npm ci; fi
 COPY frontend/ ./
-RUN npm run build
+RUN if [ "$SKIP_FRONTEND_BUILD" = "false" ]; then npm run build; fi
 
 # Stage 3: Download typst for target arch
 FROM --platform=$BUILDPLATFORM alpine:3.21 AS typst-downloader
