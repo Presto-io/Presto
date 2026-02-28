@@ -3,10 +3,34 @@
 **初审日期：** 2026-02-19
 **复审日期：** 2026-02-19
 **三审日期：** 2026-02-25
-**审计范围：** 全部 Go 后端、Svelte 前端、Wails 桌面集成、Docker/CI 部署、模板供应链
+**四审日期：** 2026-02-28
+**审计范围：** 全部 Go 后端、Svelte 前端、Wails 桌面集成、Docker/CI 部署、模板供应链、跨仓库 CI/CD、Homepage 前端
 **审计方式：** 白盒代码审计
 
 ---
+
+## 四审总览（2026-02-28）— 跨仓库安全加固
+
+| 状态 | 数量 | 说明 |
+|------|------|------|
+| 已修复 | 43 | 漏洞已完全消除（含 SEC-30/39/41/NEW-01） |
+| 部分修复 | 3 | 有缓解措施但仍存在残留风险（SEC-01/10/24） |
+| 未修复 | 0 | 无 |
+
+### 四审修复内容
+
+- **SEC-30（严重→已修复）**: Install() 重构为「下载→验证→执行」三步流程，社区模板无校验时记录警告
+- **SEC-39（中→已修复）**: 安装 API 不再接受客户端 URL，服务端从 registry 查询下载地址
+- **SEC-41（中→已修复）**: 提供 docker-compose.tls.yml + Caddy 自动 HTTPS 反向代理配置
+- **NEW-01（低-中→已修复）**: release workflow 移除 --clobber，已存在 release 时报错而非覆盖
+- **域名白名单日志**: 下载/checksum URL 被白名单拦截时记录安全日志
+- **Homepage postMessage**: 添加 event.origin 同源校验
+- **Homepage CSP**: 添加 Content-Security-Policy 响应头
+- **Homepage iframe sandbox**: 移除不必要的 allow-popups-to-escape-sandbox
+- **CI/CD 权限**: 全仓库 11 个 workflow 添加 permissions 最小权限声明
+- **CI/CD Action 固定**: 全部第三方 Action 从 tag 固定到 commit SHA
+- **依赖审计**: govulncheck + npm audit 全仓库扫描，修复 Homepage rollup 高危漏洞
+- **自动化**: 添加 security-scan.yml 周期扫描 + Dependabot 自动依赖更新
 
 ## 三审总览（2026-02-25）
 

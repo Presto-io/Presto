@@ -1,0 +1,5 @@
+# Caddyfile — Presto TLS 反向代理
+# SEC-41: 将 YOUR_DOMAIN 替换为实际域名
+YOUR_DOMAIN {
+    reverse_proxy presto:8080
+}
