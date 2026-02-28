@@ -87,14 +87,10 @@ func (s *Server) handleInstallTemplate(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
 	id := r.PathValue("id")
 
+	// SEC-39: Only accept owner/repo, not client-provided URLs
 	var req struct {
-		Owner     string `json:"owner"`
-		Repo      string `json:"repo"`
-		Trust     string `json:"trust"`
-		Platforms map[string]struct {
-			URL    string `json:"url"`
-			SHA256 string `json:"sha256"`
-		} `json:"platforms"`
+		Owner string `json:"owner"`
+		Repo  string `json:"repo"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Owner == "" {
 		parts := strings.SplitN(id, "/", 2)
@@ -113,15 +109,19 @@ func (s *Server) handleInstallTemplate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// SEC-01: Extract platform-specific download info from registry data
+	// SEC-39: Server-side registry lookup — never trust client-provided URLs
 	var opts *template.InstallOpts
-	if req.Platforms != nil {
-		platform := runtime.GOOS + "-" + runtime.GOARCH
-		if info, ok := req.Platforms[platform]; ok && info.URL != "" {
-			opts = &template.InstallOpts{
-				DownloadURL:    info.URL,
-				ExpectedSHA256: info.SHA256,
-				Trust:          req.Trust,
+	if s.registry != nil {
+		ownerRepo := req.Owner + "/" + req.Repo
+		if entry := s.registry.LookupByRepo(ownerRepo); entry != nil {
+			platform := runtime.GOOS + "-" + runtime.GOARCH
+			if info, ok := entry.Platforms[platform]; ok && info.URL != "" {
+				opts = &template.InstallOpts{
+					DownloadURL:    info.URL,
+					ExpectedSHA256: info.SHA256,
+					Trust:          entry.Trust,
+				}
+				log.Printf("[templates] registry lookup for %s: trust=%s, platform=%s", ownerRepo, entry.Trust, platform)
 			}
 		}
 	}
