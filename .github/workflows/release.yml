@@ -430,8 +430,7 @@ jobs:
             PRERELEASE_FLAG="--prerelease"
           fi
           if gh release view "${{ github.ref_name }}" &>/dev/null; then
-            echo "::error::Release ${{ github.ref_name }} already exists. Delete existing assets manually before re-uploading."
-            exit 1
+            gh release upload "${{ github.ref_name }}" dist/* --clobber
           else
             gh release create "${{ github.ref_name }}" \
               --title "Presto ${{ env.VERSION }}" \
