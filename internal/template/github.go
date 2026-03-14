@@ -40,6 +40,7 @@ var allowedDownloadHosts = map[string]bool{
 	"github-releases.githubusercontent.com":   true,
 	"github.githubassets.com":                 true,
 	"codeload.github.com":                     true,
+	"presto.c-1o.top":                         true,
 }
 
 func isAllowedDownloadHost(host string) bool {
@@ -120,6 +121,9 @@ type InstallOpts struct {
 	// DownloadURL is the direct binary download URL from registry.
 	// If set, skips GitHub release API lookup.
 	DownloadURL string
+	// CdnURL is the CDN mirror URL for the binary (bypasses GitHub).
+	// If set, tried first before DownloadURL.
+	CdnURL string
 	// ExpectedSHA256 is the hex-encoded SHA256 hash from registry.
 	// If set, verification is mandatory.
 	ExpectedSHA256 string
@@ -143,7 +147,13 @@ func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
 		// SEC-01: Registry-based install — URL and SHA256 from trusted registry
 		downloadURL = opts.DownloadURL
 		expectedHash = strings.ToLower(opts.ExpectedSHA256)
-		log.Printf("[templates] registry install: %s/%s (SHA256 from registry)", owner, repo)
+		// Prefer CDN mirror if available (bypasses GitHub for better China access)
+		if opts.CdnURL != "" {
+			downloadURL = opts.CdnURL
+			log.Printf("[templates] registry install: %s/%s (CDN mirror, SHA256 from registry)", owner, repo)
+		} else {
+			log.Printf("[templates] registry install: %s/%s (SHA256 from registry)", owner, repo)
+		}
 	} else {
 		log.Printf("[templates] discovery install: %s/%s (fetching from release)", owner, repo)
 
@@ -198,12 +208,37 @@ func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
 
 	binResp, err := httpClient.Get(downloadURL)
 	if err != nil {
-		return fmt.Errorf("download binary: %w", err)
+		// Fallback to GitHub URL if CDN download failed
+		if opts != nil && opts.CdnURL != "" && downloadURL == opts.CdnURL && opts.DownloadURL != "" {
+			log.Printf("[templates] CDN download failed, falling back to GitHub: %v", err)
+			downloadURL = opts.DownloadURL
+			binResp, err = httpClient.Get(downloadURL)
+			if err != nil {
+				return fmt.Errorf("download binary (fallback): %w", err)
+			}
+		} else {
+			return fmt.Errorf("download binary: %w", err)
+		}
 	}
 	defer binResp.Body.Close()
 
 	if err := checkHTTPStatus(binResp, "download binary"); err != nil {
-		return err
+		// Fallback to GitHub URL if CDN returned error status
+		if opts != nil && opts.CdnURL != "" && downloadURL == opts.CdnURL && opts.DownloadURL != "" {
+			binResp.Body.Close()
+			log.Printf("[templates] CDN returned error, falling back to GitHub: %v", err)
+			downloadURL = opts.DownloadURL
+			binResp, err = httpClient.Get(downloadURL)
+			if err != nil {
+				return fmt.Errorf("download binary (fallback): %w", err)
+			}
+			defer binResp.Body.Close()
+			if err := checkHTTPStatus(binResp, "download binary (fallback)"); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
 	}
 
 	// SEC-13: Limit download to 100MB
