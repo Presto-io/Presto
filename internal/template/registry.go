@@ -24,6 +24,7 @@ const (
 
 type RegistryPlatformInfo struct {
 	URL    string `json:"url"`
+	CdnURL string `json:"cdn_url,omitempty"`
 	SHA256 string `json:"sha256"`
 }
 
@@ -225,6 +226,21 @@ func (rc *RegistryCache) LookupByRepo(ownerRepo string) *RegistryEntry {
 	}
 	for _, entry := range reg.Templates {
 		if entry.Repo == ownerRepo {
+			return &entry
+		}
+	}
+	return nil
+}
+
+// LookupByName returns the registry entry for a template by its name.
+// This is more reliable than LookupByRepo for monorepos that contain multiple templates.
+func (rc *RegistryCache) LookupByName(name string) *RegistryEntry {
+	reg := rc.Load()
+	if reg == nil {
+		return nil
+	}
+	for _, entry := range reg.Templates {
+		if entry.Name == name {
 			return &entry
 		}
 	}

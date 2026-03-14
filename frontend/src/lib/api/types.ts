@@ -70,6 +70,7 @@ export interface RegistryCategory {
 
 export interface PlatformInfo {
   url: string;
+  cdn_url?: string;
   sha256: string;
 }
 
