@@ -6,6 +6,14 @@
   import type { RegistryItem } from '$lib/api/types';
   import { page } from '$app/stores';
 
+  declare global {
+    interface Window {
+      go?: { main: { App: {
+        InstallTemplate: (templateName: string) => Promise<void>;
+      } } };
+    }
+  }
+
   const isDev = import.meta.env.DEV || import.meta.env.VITE_MOCK === '1';
   let installedNames = $derived(new Set(templateStore.templates.map(t => t.name)));
   let communityEnabled = $state(false);
@@ -14,7 +22,13 @@
   let initialTemplate = $derived($page.url.searchParams.get('template'));
 
   async function handleInstall(tpl: RegistryItem) {
-    await installFromRegistry(tpl);
+    // Use Wails binding to bypass WebView HTTP limitations (%2F decoding, header stripping)
+    if (window.go?.main?.App?.InstallTemplate) {
+      await window.go.main.App.InstallTemplate(tpl.name);
+    } else {
+      // Fallback for dev/web mode
+      await installFromRegistry(tpl);
+    }
     await templateStore.refresh();
   }
 

@@ -278,6 +278,42 @@ func (a *App) DeleteTemplate(name string) error {
 	return a.manager.Uninstall(name)
 }
 
+// InstallTemplate installs a template by name from the registry.
+// Bypasses the HTTP layer where Wails WebView decodes %2F in URLs,
+// breaking route matching for owner/repo path parameters.
+func (a *App) InstallTemplate(templateName string) error {
+	if a.registry == nil {
+		return fmt.Errorf("registry not available")
+	}
+
+	entry := a.registry.LookupByName(templateName)
+	if entry == nil {
+		return fmt.Errorf("template %q not found in registry", templateName)
+	}
+
+	// Extract owner/repo
+	parts := strings.SplitN(entry.Repo, "/", 2)
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid repo format: %s", entry.Repo)
+	}
+	owner, repo := parts[0], parts[1]
+
+	// Build install opts from registry entry
+	platform := runtime.GOOS + "-" + runtime.GOARCH
+	var opts *template.InstallOpts
+	if info, ok := entry.Platforms[platform]; ok && info.URL != "" {
+		opts = &template.InstallOpts{
+			DownloadURL:    info.URL,
+			CdnURL:         info.CdnURL,
+			ExpectedSHA256: info.SHA256,
+			Trust:          entry.Trust,
+		}
+		log.Printf("[templates] Wails install: %s (trust=%s, platform=%s)", templateName, entry.Trust, platform)
+	}
+
+	return a.manager.Install(owner, repo, opts)
+}
+
 // GetVersion returns the current app version.
 func (a *App) GetVersion() string {
 	if version == "" {
