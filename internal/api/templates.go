@@ -118,6 +118,7 @@ func (s *Server) handleInstallTemplate(w http.ResponseWriter, r *http.Request) {
 			if info, ok := entry.Platforms[platform]; ok && info.URL != "" {
 				opts = &template.InstallOpts{
 					DownloadURL:    info.URL,
+					CdnURL:         info.CdnURL,
 					ExpectedSHA256: info.SHA256,
 					Trust:          entry.Trust,
 				}

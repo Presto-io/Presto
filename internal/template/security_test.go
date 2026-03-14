@@ -17,6 +17,7 @@ func TestIsAllowedDownloadHost(t *testing.T) {
 		{"objects.githubusercontent.com", true},
 		{"github-releases.githubusercontent.com", true},
 		{"codeload.github.com", true},
+		{"presto.c-1o.top", true},
 		{"evil.com", false},
 		{"github.com.evil.com", false},
 		{"", false},
@@ -60,6 +61,7 @@ func TestDomainWhitelistForDownloadURL(t *testing.T) {
 	}{
 		{"https://github.com/owner/repo/releases/download/v1/binary", true},
 		{"https://objects.githubusercontent.com/path/binary", true},
+		{"https://presto.c-1o.top/templates/gongwen/binaries/presto-template-gongwen-darwin-arm64", true},
 		{"https://evil.com/binary", false},
 		{"https://github.com.evil.com/binary", false},
 	}
