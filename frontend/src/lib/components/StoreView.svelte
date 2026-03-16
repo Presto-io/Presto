@@ -8,6 +8,8 @@
   import { marked } from 'marked';
   import DOMPurify from 'dompurify';
   import Fuse from 'fuse.js';
+  import { installState } from '$lib/stores/install-state.svelte';
+  import Toast from '$lib/components/Toast.svelte';
 
   interface Props {
     mode: 'desktop' | 'web';
@@ -76,12 +78,12 @@
   let activeCategory = $state<string | null>(null);
   let activeTrust = $state<string | null>(null);
   let selectedId = $state<string | null>(initialSelectedId);
-  let installing = $state('');
   let readmeContent = $state('');
   let readmeLoading = $state(false);
   let previewWidth = $state(0);
   let currentPage = $state(1);
   let pageSize = $state(24);
+  let _toastState = $state<{ message: string; type: 'success' | 'error'; onRetry?: () => void } | null>(null);
 
   type SortOption = 'latest' | 'stars' | 'downloads';
   let sortBy = $state<SortOption>('latest');
@@ -273,16 +275,56 @@
     return installedNames.has(name);
   }
 
+  const errorMessages: Record<string, string> = {
+    network_error: '网络连接失败，请检查网络后重试',
+    not_found: '模板不存在',
+    checksum_mismatch: '文件校验失败，可能已损坏，请重试',
+    server_error: '服务器暂时不可用，请稍后重试',
+  };
+
   async function handleInstall(tpl: RegistryItem) {
-    if (!installFn || installing || isInstalled(tpl.name)) return;
-    installing = tpl.name;
+    if (!installFn || installState.isInstalling(tpl.name) || installState.isInstalled(tpl.name)) return;
+
+    installState.setInstalling(tpl.name);
+
     try {
       await installFn(tpl);
+      installState.setInstalled(tpl.name);
       onInstallSuccess?.(tpl.name);
-    } catch (e) {
-      console.error('Install failed:', e);
-    } finally {
-      installing = '';
+      // Success toast is optional - button shows "已安装" anyway
+    } catch (err) {
+      // Parse error response from API
+      let errorMessage = '安装失败，请重试';
+      let errorType = 'server_error';
+
+      if (err instanceof Error) {
+        try {
+          const errorData = JSON.parse(err.message);
+          if (errorData.error_type && errorMessages[errorData.error_type]) {
+            errorMessage = errorMessages[errorData.error_type];
+            errorType = errorData.error_type;
+          }
+        } catch {
+          // Not JSON, use default message
+        }
+      }
+
+      // Show error toast with retry
+      _toastState = {
+        message: errorMessage,
+        type: 'error',
+        onRetry: () => {
+          _toastState = null;
+          handleInstall(tpl); // Retry
+        },
+      };
+
+      // Reset state after toast (per user decision: button returns to "Install" state)
+      setTimeout(() => {
+        installState.reset(tpl.name);
+      }, 3500); // After toast duration + buffer
+
+      console.error('[StoreView] install failed:', err);
     }
   }
 
@@ -613,13 +655,13 @@
           <div class="detail-actions">
             <div class="actions-left">
               {#if mode === 'desktop' && installFn}
-                {#if isInstalled(selectedTemplate.name)}
+                {#if installState.isInstalled(selectedTemplate.name)}
                   <button class="btn-installed" disabled>
                     <Check size={14} /><span>已安装</span>
                   </button>
-                {:else if installing === selectedTemplate.name}
+                {:else if installState.isInstalling(selectedTemplate.name)}
                   <button class="btn-installing" disabled>
-                    <Loader size={14} class="spin" /><span>安装中…</span>
+                    <Loader size={14} class="spin" /><span>安装中...</span>
                   </button>
                 {:else}
                   <button class="btn-install" onclick={() => handleInstall(selectedTemplate!)}>
@@ -714,6 +756,15 @@
         {/if}
       {/if}
     {/if}
+  {/if}
+
+  {#if _toastState}
+    <Toast
+      message={_toastState.message}
+      type={_toastState.type}
+      duration={3000}
+      onRetry={_toastState.onRetry}
+    />
   {/if}
 </div>
 
