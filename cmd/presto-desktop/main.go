@@ -512,7 +512,14 @@ func (a *App) InstallTemplate(templateName string) error {
 		log.Printf("[templates] Wails install: %s (trust=%s, platform=%s)", templateName, entry.Trust, platform)
 	}
 
-	return a.manager.Install(owner, repo, opts)
+	err := a.manager.Install(owner, repo, opts)
+	if err != nil {
+		return err
+	}
+
+	// Emit templates-changed event to refresh frontend
+	wailsRuntime.EventsEmit(a.ctx, "templates-changed")
+	return nil
 }
 
 // GetInstalledTemplates returns list of installed templates for frontend refresh
