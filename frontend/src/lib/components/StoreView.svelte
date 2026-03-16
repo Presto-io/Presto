@@ -17,7 +17,7 @@
     mockRegistryUrl?: string;
     title: string;
     installFn?: (item: RegistryItem) => Promise<void>;
-    installedNames?: Set<string>;
+    installedVersions?: Map<string, string>; // Changed from installedNames
     previewUrl?: (name: string) => string;
     readmeUrl?: (name: string) => string;
     backRoute?: string;
@@ -33,7 +33,7 @@
     mockRegistryUrl,
     title,
     installFn,
-    installedNames = new Set<string>(),
+    installedVersions = new Map<string, string>(),
     previewUrl,
     readmeUrl,
     backRoute,
@@ -272,7 +272,13 @@
   );
 
   function isInstalled(name: string): boolean {
-    return installedNames.has(name);
+    return installedVersions.has(name);
+  }
+
+  function hasUpdate(name: string, latestVersion: string): boolean {
+    const installedVersion = installedVersions.get(name);
+    if (!installedVersion) return false;
+    return installedVersion !== latestVersion;
   }
 
   const errorMessages: Record<string, string> = {
@@ -283,7 +289,7 @@
   };
 
   async function handleInstall(tpl: RegistryItem) {
-    if (!installFn || installState.isInstalling(tpl.name) || installState.isInstalled(tpl.name)) return;
+    if (!installFn || installState.isInstalling(tpl.name)) return;
 
     installState.setInstalling(tpl.name);
 
@@ -291,7 +297,7 @@
       await installFn(tpl);
       installState.setInstalled(tpl.name);
       onInstallSuccess?.(tpl.name);
-      // Success toast is optional - button shows "已安装" anyway
+      // Success toast is optional - button shows state anyway
     } catch (err) {
       // Parse error response from API
       let errorMessage = '安装失败，请重试';
@@ -655,15 +661,15 @@
           <div class="detail-actions">
             <div class="actions-left">
               {#if mode === 'desktop' && installFn}
-                {#if installState.isInstalled(selectedTemplate.name)}
-                  <button class="btn-installed" disabled>
-                    <Check size={14} /><span>已安装</span>
-                  </button>
-                {:else if installState.isInstalling(selectedTemplate.name)}
+                {#if installState.isInstalling(selectedTemplate.name)}
                   <button class="btn-installing" disabled>
                     <Loader size={14} class="spin" /><span>安装中...</span>
                   </button>
-                {:else}
+                {:else if isInstalled(selectedTemplate.name) && hasUpdate(selectedTemplate.name, selectedTemplate.version)}
+                  <button class="btn-install" onclick={() => handleInstall(selectedTemplate!)}>
+                    <RefreshCw size={14} /><span>更新</span>
+                  </button>
+                {:else if !isInstalled(selectedTemplate.name)}
                   <button class="btn-install" onclick={() => handleInstall(selectedTemplate!)}>
                     <Download size={14} /><span>安装</span>
                   </button>
