@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"regexp"
@@ -16,6 +17,22 @@ var validGitHubNameRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]*$`)
 
 func isValidGitHubName(name string) bool {
 	return len(name) > 0 && len(name) <= 100 && validGitHubNameRe.MatchString(name)
+}
+
+// InstallErrorResponse provides structured error responses for install operations
+type InstallErrorResponse struct {
+	ErrorType string `json:"error_type"`
+	Message   string `json:"message"`
+}
+
+// writeInstallError writes a structured error response for template installation
+func writeInstallError(w http.ResponseWriter, errType, message string, code int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(InstallErrorResponse{
+		ErrorType: errType,
+		Message:   message,
+	})
 }
 
 func (s *Server) handleListTemplates(w http.ResponseWriter, r *http.Request) {
@@ -129,7 +146,24 @@ func (s *Server) handleInstallTemplate(w http.ResponseWriter, r *http.Request) {
 
 	if err := s.manager.Install(req.Owner, req.Repo, opts); err != nil {
 		log.Printf("[templates] install %s/%s failed: %v", req.Owner, req.Repo, err)
-		writeJSONError(w, "install failed", http.StatusInternalServerError)
+
+		// Classify error and return structured response
+		var installErr *template.InstallError
+		if errors.As(err, &installErr) {
+			switch installErr.Type {
+			case template.ErrNetwork:
+				writeInstallError(w, "network_error", "网络连接失败，请检查网络后重试", http.StatusServiceUnavailable)
+			case template.ErrNotFound:
+				writeInstallError(w, "not_found", "模板不存在", http.StatusNotFound)
+			case template.ErrChecksumMismatch:
+				writeInstallError(w, "checksum_mismatch", "文件校验失败，可能已损坏，请重试", http.StatusBadRequest)
+			default:
+				writeInstallError(w, "server_error", "服务器暂时不可用，请稍后重试", http.StatusInternalServerError)
+			}
+		} else {
+			// Unknown error type - treat as server error
+			writeInstallError(w, "server_error", "服务器暂时不可用，请稍后重试", http.StatusInternalServerError)
+		}
 		return
 	}
 
