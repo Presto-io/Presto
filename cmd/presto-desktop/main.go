@@ -455,6 +455,10 @@ func buildMenu(app *App) *menu.Menu {
 	windowMenu.AddText("缩放", nil, func(_ *menu.CallbackData) {
 		wailsRuntime.WindowToggleMaximise(app.ctx)
 	})
+	windowMenu.AddSeparator()
+	windowMenu.AddText("关闭窗口", keys.CmdOrCtrl("w"), func(_ *menu.CallbackData) {
+		wailsRuntime.Quit(app.ctx)
+	})
 
 	return appMenu
 }
