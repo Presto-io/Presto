@@ -132,7 +132,12 @@ func (a *App) checkFirstLaunch() {
 	if len(templates) == 0 {
 		log.Printf("[first-launch] first launch detected, starting default template download")
 		a.downloadDefaultTemplates()
+		return
 	}
+
+	// Templates already installed - check for updates
+	log.Printf("[first-launch] %d templates already installed, checking for updates", len(templates))
+	go a.checkTemplateUpdates(templates)
 }
 
 // downloadDefaultTemplates downloads all official templates concurrently.
@@ -226,6 +231,89 @@ func (a *App) emitFirstLaunchComplete(success int, failed int) {
 // emitFirstLaunchError emits the first-launch:error event when download process fails.
 func (a *App) emitFirstLaunchError(message string) {
 	wailsRuntime.EventsEmit(a.ctx, "first-launch:error", map[string]string{"message": message})
+}
+
+// checkTemplateUpdates checks if installed templates have updates available and installs them.
+func (a *App) checkTemplateUpdates(installed []template.InstalledTemplate) {
+	reg := a.registry.Load()
+	if reg == nil {
+		log.Printf("[template-update] registry not available, skipping update check")
+		return
+	}
+
+	var updatesAvailable []struct {
+		name    string
+		latest  template.RegistryEntry
+		current string
+	}
+
+	for _, inst := range installed {
+		entry := a.registry.LookupByName(inst.Manifest.Name)
+		if entry == nil {
+			continue
+		}
+
+		// Compare versions
+		if entry.Version != inst.Manifest.Version {
+			log.Printf("[template-update] update available for %s: installed=%s, latest=%s",
+				inst.Manifest.Name, inst.Manifest.Version, entry.Version)
+			updatesAvailable = append(updatesAvailable, struct {
+				name    string
+				latest  template.RegistryEntry
+				current string
+			}{inst.Manifest.Name, *entry, inst.Manifest.Version})
+		}
+	}
+
+	if len(updatesAvailable) == 0 {
+		log.Printf("[template-update] all templates are up to date")
+		return
+	}
+
+	log.Printf("[template-update] updating %d templates...", len(updatesAvailable))
+
+	// Update templates in parallel
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 3)
+	var successCount, failCount int
+	var mu sync.Mutex
+
+	for _, update := range updatesAvailable {
+		wg.Add(1)
+		go func(name string, entry template.RegistryEntry, oldVersion string) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			log.Printf("[template-update] updating %s from %s to %s...", name, oldVersion, entry.Version)
+
+			// Delete old version first
+			if err := a.manager.Uninstall(name); err != nil {
+				log.Printf("[template-update] failed to uninstall old version of %s: %v", name, err)
+				mu.Lock()
+				failCount++
+				mu.Unlock()
+				return
+			}
+
+			// Install new version
+			if err := a.InstallTemplate(name); err != nil {
+				log.Printf("[template-update] failed to update %s: %v", name, err)
+				mu.Lock()
+				failCount++
+				mu.Unlock()
+				return
+			}
+
+			log.Printf("[template-update] successfully updated %s to version %s", name, entry.Version)
+			mu.Lock()
+			successCount++
+			mu.Unlock()
+		}(update.name, update.latest, update.current)
+	}
+
+	wg.Wait()
+	log.Printf("[template-update] update complete: %d success, %d failed", successCount, failCount)
 }
 
 // GetStartupURL returns and clears the pending presto:// URL from cold start.
@@ -425,6 +513,20 @@ func (a *App) InstallTemplate(templateName string) error {
 	}
 
 	return a.manager.Install(owner, repo, opts)
+}
+
+// GetInstalledTemplates returns list of installed templates for frontend refresh
+func (a *App) GetInstalledTemplates() ([]string, error) {
+	templates, err := a.manager.List()
+	if err != nil {
+		return nil, err
+	}
+
+	names := make([]string, len(templates))
+	for i, t := range templates {
+		names[i] = t.Manifest.Name
+	}
+	return names, nil
 }
 
 // GetVersion returns the current app version.

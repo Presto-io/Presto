@@ -15,7 +15,7 @@
   }
 
   const isDev = import.meta.env.DEV || import.meta.env.VITE_MOCK === '1';
-  let installedNames = $derived(new Set(templateStore.templates.map(t => t.name)));
+  let installedVersions = $derived(new Map(templateStore.templates.map(t => [t.name, t.version])));
   let communityEnabled = $state(false);
 
   // Read ?template= query param for deep linking (from presto:// URL scheme)
@@ -44,7 +44,7 @@
   mockRegistryUrl="/mock/registry.json"
   title="模板商店"
   installFn={handleInstall}
-  {installedNames}
+  {installedVersions}
   previewUrl={(name) => `/showcase/editor?registry=${name}`}
   readmeUrl={(name) => `https://presto.c-1o.top/templates/${name}/README.md`}
   backRoute="/settings"
