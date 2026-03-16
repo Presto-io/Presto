@@ -4,6 +4,7 @@
  */
 
 import { templateStore } from './templates.svelte';
+import { installState } from './install-state.svelte';
 
 interface TemplateProgress {
   name: string;
@@ -58,6 +59,13 @@ export const firstLaunchStore = {
       _state.isActive = true;
       _state.errorMessage = undefined;
       console.log('[first-launch] started, total:', _state.total);
+
+      // Mark all templates as installing to show breathing animation
+      if (data.templates) {
+        data.templates.forEach((name: string) => {
+          installState.setInstalling(name);
+        });
+      }
     });
 
     Events.On('first-launch:progress', (data: any) => {
@@ -66,8 +74,10 @@ export const firstLaunchStore = {
 
       if (status === 'success') {
         _state.downloaded++;
+        installState.setInstalled(name);
       } else if (status === 'error') {
         _state.failed++;
+        installState.reset(name);
       }
       console.log('[first-launch] progress:', name, status);
     });
@@ -109,6 +119,10 @@ export const firstLaunchStore = {
 };
 
 // Auto-initialize on import (only in Wails desktop environment)
-if (typeof window !== 'undefined' && (window as any).runtime?.EventsOn) {
-  firstLaunchStore.init();
+// Check if running in Wails by trying to import the runtime
+if (typeof window !== 'undefined') {
+  firstLaunchStore.init().catch(err => {
+    // Silently fail if not in Wails environment (e.g., showcase builds)
+    console.debug('[first-launch] not initializing:', err.message);
+  });
 }
