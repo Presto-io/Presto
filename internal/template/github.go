@@ -107,6 +107,7 @@ var allowedDownloadHosts = map[string]bool{
 	"github.githubassets.com":                 true,
 	"codeload.github.com":                     true,
 	"presto.c-1o.top":                         true,
+	"cdn.presto.c-1o.top":                   true,
 }
 
 func isAllowedDownloadHost(host string) bool {
