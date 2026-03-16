@@ -165,8 +165,8 @@ func (a *App) downloadDefaultTemplates() {
 
 	log.Printf("[first-launch] downloading %d official templates", len(officialTemplates))
 
-	// Emit start event
-	a.emitFirstLaunchStart(len(officialTemplates))
+	// Emit start event with template list
+	a.emitFirstLaunchStart(officialTemplates)
 
 	// Download concurrently using a semaphore to limit parallelism
 	var wg sync.WaitGroup
@@ -207,8 +207,11 @@ func (a *App) downloadDefaultTemplates() {
 }
 
 // emitFirstLaunchStart emits the first-launch:start event to the frontend.
-func (a *App) emitFirstLaunchStart(total int) {
-	wailsRuntime.EventsEmit(a.ctx, "first-launch:start", map[string]int{"total": total})
+func (a *App) emitFirstLaunchStart(templateNames []string) {
+	wailsRuntime.EventsEmit(a.ctx, "first-launch:start", map[string]interface{}{
+		"total":     len(templateNames),
+		"templates": templateNames,
+	})
 }
 
 // emitFirstLaunchProgress emits the first-launch:progress event for individual template downloads.
