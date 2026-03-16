@@ -3,6 +3,7 @@
 	import { onMount } from 'svelte';
 	import { FileText } from 'lucide-svelte';
 	import WizardOverlay from '$lib/components/wizard/WizardOverlay.svelte';
+	import FirstLaunchBanner from '$lib/components/FirstLaunchBanner.svelte';
 	import { fileRouter } from '$lib/stores/file-router.svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
@@ -163,6 +164,7 @@
 </script>
 
 <div class="app">
+	<FirstLaunchBanner />
 	<main id="main-content">
 		{@render children()}
 	</main>
