@@ -663,7 +663,7 @@
               {#if mode === 'desktop' && installFn}
                 {#if installState.isInstalling(selectedTemplate.name)}
                   <button class="btn-installing" disabled>
-                    <Loader size={14} class="spin" /><span>安装中...</span>
+                    <span class="status-dot"></span><span>安装中...</span>
                   </button>
                 {:else if isInstalled(selectedTemplate.name) && hasUpdate(selectedTemplate.name, selectedTemplate.version)}
                   <button class="btn-install" onclick={() => handleInstall(selectedTemplate!)}>
@@ -1688,6 +1688,17 @@
     background: var(--color-surface);
     color: var(--color-muted);
     cursor: not-allowed;
+  }
+  .btn-installing .status-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--color-accent);
+    animation: pulse 1s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
   }
 
   :global(.spin) {
