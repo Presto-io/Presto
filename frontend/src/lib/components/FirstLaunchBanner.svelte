@@ -14,7 +14,7 @@
         <div class="progress-bar">
           <div
             class="progress-fill"
-            style="width: {((state.downloaded + state.failed) / state.total * 100}%"
+            style="width: {((state.downloaded + state.failed) / state.total) * 100}%"
           ></div>
         </div>
       </div>
