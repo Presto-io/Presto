@@ -164,7 +164,9 @@
 </script>
 
 <div class="app">
-	<FirstLaunchBanner />
+	{#if !isShowcase}
+		<FirstLaunchBanner />
+	{/if}
 	<main id="main-content">
 		{@render children()}
 	</main>
