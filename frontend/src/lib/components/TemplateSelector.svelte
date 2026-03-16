@@ -5,6 +5,7 @@
   import { ChevronDown, Search, AlertTriangle, ShoppingBag } from 'lucide-svelte';
   import { goto } from '$app/navigation';
   import { templateStore } from '$lib/stores/templates.svelte';
+  import { firstLaunchStore } from '$lib/stores/first-launch.svelte';
 
   let {
     selected = $bindable(''),
@@ -15,6 +16,8 @@
   } = $props();
 
   let templates = $derived(templateStore.templates);
+  let loading = $derived(templateStore.loading || firstLaunchStore.isActive);
+  let disabled = $derived(loading);
   let open = $state(false);
   let search = $state('');
   let highlightIndex = $state(0);
@@ -34,6 +37,7 @@
   );
 
   let selectedDisplay = $derived(
+    loading ? '加载中...' :
     templates.find(t => t.name === selected)?.displayName ||
     templates.find(t => t.name === selected)?.name ||
     selected ||
@@ -60,6 +64,7 @@
   });
 
   function toggle() {
+    if (disabled) return;
     open = !open;
     if (open) {
       search = '';
@@ -127,17 +132,23 @@
   <button
     bind:this={triggerEl}
     class="selector-trigger"
+    class:loading
     class:open
     onclick={toggle}
     aria-haspopup="listbox"
     aria-expanded={open}
     aria-label="选择模板"
+    {disabled}
   >
     <span class="selector-label">{selectedDisplay}</span>
-    {#if selectedHasMissing}
+    {#if loading}
+      <span class="loading-dot"></span>
+    {:else if selectedHasMissing}
       <span class="selector-warn" title="缺少字体"><AlertTriangle size={11} /></span>
     {/if}
-    <ChevronDown size={12} />
+    {#if !loading}
+      <ChevronDown size={12} />
+    {/if}
   </button>
 
   {#if open}
@@ -216,12 +227,31 @@
   .selector-trigger.open {
     border-color: var(--color-accent);
   }
+  .selector-trigger.loading {
+    opacity: 0.7;
+    cursor: wait;
+  }
   .selector-trigger :global(svg) {
     transition: transform 150ms ease;
     flex-shrink: 0;
   }
   .selector-trigger.open :global(svg) {
     transform: rotate(180deg);
+  }
+  .loading-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--color-accent);
+    animation: pulse 1s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 0.4;
+    }
+    50% {
+      opacity: 1;
+    }
   }
   .selector-label {
     flex: 1;
