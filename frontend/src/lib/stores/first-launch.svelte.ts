@@ -2,7 +2,6 @@
  * First launch state management.
  * Listens to Wails events for template download progress.
  */
-import { Events } from '@wailsio/runtime';
 
 interface TemplateProgress {
   name: string;
@@ -45,8 +44,10 @@ export const firstLaunchStore = {
     return CDN_ZIP_BASE.replace('{name}', templateName);
   },
 
-  init() {
-    // Listen to Wails events
+  async init() {
+    // Dynamic import to avoid bundling @wailsio/runtime in showcase builds
+    const { Events } = await import('@wailsio/runtime');
+
     Events.On('first-launch:start', (data: any) => {
       _state.total = data.total ?? 0;
       _state.downloaded = 0;
@@ -98,7 +99,7 @@ export const firstLaunchStore = {
   },
 };
 
-// Auto-initialize on import
-if (typeof window !== 'undefined') {
+// Auto-initialize on import (only in Wails desktop environment)
+if (typeof window !== 'undefined' && (window as any).runtime?.EventsOn) {
   firstLaunchStore.init();
 }
