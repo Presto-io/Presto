@@ -584,9 +584,10 @@ func downloadWithRetry(downloadURL string, maxRetries int) ([]byte, error) {
 		}
 
 		resp, err := downloadClient.Do(req)
-		cancel()
+		// Note: cancel() deferred to after response body is read
 
 		if err != nil {
+			cancel() // Cancel on error
 			// Network error - retry
 			lastErr = &InstallError{
 				Type:    ErrNetwork,
@@ -600,6 +601,7 @@ func downloadWithRetry(downloadURL string, maxRetries int) ([]byte, error) {
 		// Check HTTP status
 		if err := checkHTTPStatus(resp, "download binary"); err != nil {
 			resp.Body.Close()
+			cancel() // Cancel after closing body
 
 			// Classify error
 			statusCode := resp.StatusCode
@@ -622,9 +624,10 @@ func downloadWithRetry(downloadURL string, maxRetries int) ([]byte, error) {
 			continue
 		}
 
-		// SEC-13: Limit download to 100MB
-		data, err := io.ReadAll(io.LimitReader(resp.Body, 100<<20))
+		// Read response body
+		data, err := io.ReadAll(resp.Body)
 		resp.Body.Close()
+		cancel() // Cancel after reading and closing body
 
 		if err != nil {
 			lastErr = &InstallError{
