@@ -3,6 +3,8 @@
  * Listens to Wails events for template download progress.
  */
 
+import { templateStore } from './templates.svelte';
+
 interface TemplateProgress {
   name: string;
   status: 'pending' | 'downloading' | 'success' | 'error';
@@ -74,6 +76,13 @@ export const firstLaunchStore = {
       const { success, failed } = data;
       _state.isActive = false;
       console.log('[first-launch] complete:', success, 'success,', failed, 'failed');
+
+      // Refresh template list after download completes
+      if (success > 0) {
+        templateStore.refresh().catch(err => {
+          console.error('[first-launch] failed to refresh templates:', err);
+        });
+      }
 
       // If all failed, show manual download option
       if (success === 0 && failed > 0) {
