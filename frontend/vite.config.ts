@@ -45,6 +45,13 @@ export default defineConfig({
 	define: {
 		__APP_VERSION__: JSON.stringify(process.env.VERSION || getGitVersion())
 	},
+	resolve: {
+		alias: {
+			// Mock @wailsio/runtime for static builds (showcase)
+			// The actual runtime is only needed for desktop app
+			'@wailsio/runtime': join(process.cwd(), 'src/lib/wails-runtime-stub.ts')
+		}
+	},
 	build: {
 		rollupOptions: {
 			output: {
