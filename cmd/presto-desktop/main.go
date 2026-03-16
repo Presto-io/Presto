@@ -16,6 +16,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/wailsapp/wails/v2"
@@ -113,6 +114,118 @@ func (a *App) startup(ctx context.Context) {
 			wailsRuntime.EventsEmit(ctx, "native-file-drop", items)
 		}
 	})
+
+	// Check if this is first launch (no templates installed)
+	go a.checkFirstLaunch()
+}
+
+// checkFirstLaunch detects if this is the first launch (no templates installed)
+// and triggers automatic download of official templates.
+func (a *App) checkFirstLaunch() {
+	templates, err := a.manager.List()
+	if err != nil {
+		log.Printf("[first-launch] failed to list templates: %v", err)
+		return
+	}
+
+	// First launch if no templates installed
+	if len(templates) == 0 {
+		log.Printf("[first-launch] first launch detected, starting default template download")
+		a.downloadDefaultTemplates()
+	}
+}
+
+// downloadDefaultTemplates downloads all official templates concurrently.
+// Emits events for frontend to track progress.
+func (a *App) downloadDefaultTemplates() {
+	reg := a.registry.Load()
+	if reg == nil {
+		log.Printf("[first-launch] registry not available, skipping default download")
+		a.emitFirstLaunchError("无法获取模板列表")
+		return
+	}
+
+	// Filter official templates
+	var officialTemplates []string
+	for _, entry := range reg.Templates {
+		if entry.Trust == "official" {
+			officialTemplates = append(officialTemplates, entry.Name)
+		}
+	}
+
+	if len(officialTemplates) == 0 {
+		log.Printf("[first-launch] no official templates found")
+		return
+	}
+
+	log.Printf("[first-launch] downloading %d official templates", len(officialTemplates))
+
+	// Emit start event
+	a.emitFirstLaunchStart(len(officialTemplates))
+
+	// Download concurrently using a semaphore to limit parallelism
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 3) // Max 3 concurrent downloads
+	var successCount int
+	var failureCount int
+	var mu sync.Mutex
+
+	for _, name := range officialTemplates {
+		wg.Add(1)
+		go func(templateName string) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			log.Printf("[first-launch] downloading: %s", templateName)
+			err := a.InstallTemplate(templateName)
+
+			mu.Lock()
+			if err != nil {
+				failureCount++
+				log.Printf("[first-launch] failed to download %s: %v", templateName, err)
+				a.emitFirstLaunchProgress(templateName, "error", err.Error())
+			} else {
+				successCount++
+				log.Printf("[first-launch] successfully downloaded: %s", templateName)
+				a.emitFirstLaunchProgress(templateName, "success", "")
+			}
+			mu.Unlock()
+		}(name)
+	}
+
+	wg.Wait()
+
+	// Emit completion event
+	a.emitFirstLaunchComplete(successCount, failureCount)
+	log.Printf("[first-launch] download complete: %d success, %d failed", successCount, failureCount)
+}
+
+// emitFirstLaunchStart emits the first-launch:start event to the frontend.
+func (a *App) emitFirstLaunchStart(total int) {
+	wailsRuntime.EventsEmit(a.ctx, "first-launch:start", map[string]int{"total": total})
+}
+
+// emitFirstLaunchProgress emits the first-launch:progress event for individual template downloads.
+func (a *App) emitFirstLaunchProgress(name string, status string, errorMsg string) {
+	wailsRuntime.EventsEmit(a.ctx, "first-launch:progress", map[string]interface{}{
+		"name":   name,
+		"status": status,
+		"error":  errorMsg,
+	})
+}
+
+// emitFirstLaunchComplete emits the first-launch:complete event when all downloads finish.
+func (a *App) emitFirstLaunchComplete(success int, failed int) {
+	wailsRuntime.EventsEmit(a.ctx, "first-launch:complete", map[string]int{
+		"success": success,
+		"failed":  failed,
+	})
+}
+
+// emitFirstLaunchError emits the first-launch:error event when download process fails.
+func (a *App) emitFirstLaunchError(message string) {
+	wailsRuntime.EventsEmit(a.ctx, "first-launch:error", map[string]string{"message": message})
 }
 
 // GetStartupURL returns and clears the pending presto:// URL from cold start.
