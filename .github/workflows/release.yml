@@ -11,7 +11,7 @@ permissions:
   packages: write
 
 env:
-  GO_VERSION: '1.25'
+  GO_VERSION: '1.25.8'
   NODE_VERSION: '22'
   TYPST_VERSION: '0.14.2'
 
