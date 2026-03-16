@@ -6,6 +6,7 @@
 import { templateStore } from './templates.svelte';
 import { installState } from './install-state.svelte';
 import { editor } from './editor.svelte';
+import { getExample, convertAndCompile } from '$lib/api/client';
 
 interface TemplateProgress {
   name: string;
@@ -91,11 +92,11 @@ export const firstLaunchStore = {
         installState.setInstalled(name);
         console.log('[first-launch] template installed:', name);
 
-        // Auto-select the first successfully downloaded template
+        // Auto-select and load example for first successfully downloaded template
         // Prefer 'gongwen' if it's among the downloads
         if (!editor.selectedTemplate) {
           const templates = Array.from(_state.templates.keys());
-          const successTemplates = templates.filter(t =>
+          const successTemplates = templates.filter((t: string) =>
             _state.templates.get(t)?.status === 'success'
           );
 
@@ -107,6 +108,20 @@ export const firstLaunchStore = {
           if (templateToSelect) {
             editor.selectedTemplate = templateToSelect;
             console.log('[first-launch] auto-selected template:', templateToSelect);
+
+            // Load example document into editor
+            getExample(templateToSelect).then(example => {
+              if (example) {
+                editor.markdown = example;
+                console.log('[first-launch] loaded example document for:', templateToSelect);
+                // Trigger conversion to show preview
+                convertAndCompile(example, templateToSelect).catch(err => {
+                  console.error('[first-launch] failed to compile example:', err);
+                });
+              }
+            }).catch(err => {
+              console.error('[first-launch] failed to load example:', err);
+            });
           }
         }
       } else if (status === 'error') {
