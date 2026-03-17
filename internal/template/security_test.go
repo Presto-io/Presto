@@ -59,11 +59,21 @@ func TestDomainWhitelistForDownloadURL(t *testing.T) {
 		rawURL  string
 		allowed bool
 	}{
+		// Existing test cases
 		{"https://github.com/owner/repo/releases/download/v1/binary", true},
 		{"https://objects.githubusercontent.com/path/binary", true},
 		{"https://presto.c-1o.top/templates/gongwen/binaries/presto-template-gongwen-darwin-arm64", true},
+
+		// New test cases - additional whitelisted domains
+		{"https://cdn.presto.c-1o.top/templates/binaries/v1.0.0/gongwen/darwin-arm64", true},
+		{"https://api.github.com/repos/owner/repo", true},
+		{"https://github-releases.githubusercontent.com/path", true},
+		{"https://codeload.github.com/owner/repo/zip/main", true},
+
+		// Edge cases - blocked domains
 		{"https://evil.com/binary", false},
 		{"https://github.com.evil.com/binary", false},
+		{"https://presto.c-1o.top.evil.com/binary", false},
 	}
 
 	for _, tt := range tests {
