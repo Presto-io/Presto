@@ -74,6 +74,10 @@ func TestDomainWhitelistForDownloadURL(t *testing.T) {
 		{"https://evil.com/binary", false},
 		{"https://github.com.evil.com/binary", false},
 		{"https://presto.c-1o.top.evil.com/binary", false},
+
+		// HTTP protocol - also validated (security doesn't depend on protocol)
+		{"http://github.com/binary", true},
+		{"http://evil.com/binary", false},
 	}
 
 	for _, tt := range tests {
