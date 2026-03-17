@@ -34,3 +34,4 @@ _fonts/
 # AI 工具
 .claude/*
 !.claude/settings.local.json
+coverage.out
