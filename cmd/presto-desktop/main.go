@@ -239,8 +239,14 @@ func (a *App) emitFirstLaunchError(message string) {
 	wailsRuntime.EventsEmit(a.ctx, "first-launch:error", map[string]string{"message": message})
 }
 
-// checkTemplateUpdates checks if installed templates have updates available and installs them.
+// checkTemplateUpdates checks if installed templates have updates available and installs them silently.
+// This is completely silent - no notifications, no badges, just background updates.
+// NOTE: Current implementation deletes old version before installing new version.
+// If installation fails, the template will be missing and user needs to manually re-install.
+// This is acceptable for v1 - future versions can implement atomic swap.
 func (a *App) checkTemplateUpdates(installed []template.InstalledTemplate) {
+	log.Printf("[template-update] starting silent update check for %d templates", len(installed))
+
 	reg := a.registry.Load()
 	if reg == nil {
 		log.Printf("[template-update] registry not available, skipping update check")
@@ -276,7 +282,7 @@ func (a *App) checkTemplateUpdates(installed []template.InstalledTemplate) {
 		return
 	}
 
-	log.Printf("[template-update] updating %d templates...", len(updatesAvailable))
+	log.Printf("[template-update] silently updating %d templates in background...", len(updatesAvailable))
 
 	// Update templates in parallel
 	var wg sync.WaitGroup
@@ -302,12 +308,14 @@ func (a *App) checkTemplateUpdates(installed []template.InstalledTemplate) {
 				return
 			}
 
-			// Install new version
+			// Install new version (silent - no events, no notifications)
 			if err := a.InstallTemplate(name); err != nil {
 				log.Printf("[template-update] failed to update %s: %v", name, err)
 				mu.Lock()
 				failCount++
 				mu.Unlock()
+				// NOTE: Old version already deleted, template is now missing
+				// User will need to manually re-install (known limitation for v1)
 				return
 			}
 
@@ -319,7 +327,15 @@ func (a *App) checkTemplateUpdates(installed []template.InstalledTemplate) {
 	}
 
 	wg.Wait()
-	log.Printf("[template-update] update complete: %d success, %d failed", successCount, failCount)
+
+	// Log summary (for debugging)
+	log.Printf("[template-update] silent update complete: %d success, %d failed", successCount, failCount)
+
+	// IMPORTANT: No UI notifications, no badges, completely silent
+	// Only emit templates-changed event to refresh UI if at least one update succeeded
+	if successCount > 0 {
+		wailsRuntime.EventsEmit(a.ctx, "templates-changed")
+	}
 }
 
 // GetStartupURL returns and clears the pending presto:// URL from cold start.
