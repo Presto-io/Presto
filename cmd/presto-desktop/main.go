@@ -107,6 +107,9 @@ func NewApp(manager *template.Manager, compiler *typst.Compiler, registry *templ
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 
+	// Clean up temporary download files from previous session
+	template.CleanupTmpDownloadFiles()
+
 	// Native file drop: receive absolute paths and forward to frontend
 	wailsRuntime.OnFileDrop(ctx, func(x, y int, paths []string) {
 		items := a.readFilePaths(paths)
