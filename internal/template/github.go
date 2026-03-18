@@ -236,13 +236,13 @@ func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
 			log.Printf("[templates] downloading %s/%s from GitHub: %s", owner, repo, opts.DownloadURL)
 			downloadURL = opts.DownloadURL
 
-			data, err := downloadWithRetry(downloadURL, 3, opts.OnProgress)
+			data, err := downloadWithResume(downloadURL, 3, opts.OnProgress)
 			if err != nil {
 				// GitHub failed, try CDN fallback
 				if opts.CdnURL != "" {
 					log.Printf("[templates] GitHub failed: %v, falling back to CDN: %s", err, opts.CdnURL)
 					downloadURL = opts.CdnURL
-					data, err = downloadWithRetry(downloadURL, 3, opts.OnProgress)
+					data, err = downloadWithResume(downloadURL, 3, opts.OnProgress)
 					if err != nil {
 						return err
 					}
@@ -263,7 +263,7 @@ func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
 				downloadURL = opts.DownloadURL
 			}
 
-			data, err := downloadWithRetry(downloadURL, 3, opts.OnProgress)
+			data, err := downloadWithResume(downloadURL, 3, opts.OnProgress)
 			if err != nil {
 				return err
 			}
@@ -331,7 +331,7 @@ func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
 
 		// Download with retry
 		log.Printf("[templates] downloading %s/%s from %s", owner, repo, downloadURL)
-		data, err := downloadWithRetry(downloadURL, 3, nil)
+		data, err := downloadWithResume(downloadURL, 3, nil)
 		if err != nil {
 			return err
 		}
