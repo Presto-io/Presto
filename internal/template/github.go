@@ -197,6 +197,9 @@ type InstallOpts struct {
 	ExpectedSHA256 string
 	// Trust is the trust level: "official", "verified", "community", or "".
 	Trust string
+	// OnProgress is an optional callback for download progress updates.
+	// If set, called periodically with bytes downloaded and total bytes.
+	OnProgress ProgressCallback
 }
 
 func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
@@ -233,13 +236,13 @@ func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
 			log.Printf("[templates] downloading %s/%s from GitHub: %s", owner, repo, opts.DownloadURL)
 			downloadURL = opts.DownloadURL
 
-			data, err := downloadWithRetry(downloadURL, 3)
+			data, err := downloadWithRetry(downloadURL, 3, opts.OnProgress)
 			if err != nil {
 				// GitHub failed, try CDN fallback
 				if opts.CdnURL != "" {
 					log.Printf("[templates] GitHub failed: %v, falling back to CDN: %s", err, opts.CdnURL)
 					downloadURL = opts.CdnURL
-					data, err = downloadWithRetry(downloadURL, 3)
+					data, err = downloadWithRetry(downloadURL, 3, opts.OnProgress)
 					if err != nil {
 						return err
 					}
@@ -260,7 +263,7 @@ func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
 				downloadURL = opts.DownloadURL
 			}
 
-			data, err := downloadWithRetry(downloadURL, 3)
+			data, err := downloadWithRetry(downloadURL, 3, opts.OnProgress)
 			if err != nil {
 				return err
 			}
@@ -328,7 +331,7 @@ func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
 
 		// Download with retry
 		log.Printf("[templates] downloading %s/%s from %s", owner, repo, downloadURL)
-		data, err := downloadWithRetry(downloadURL, 3)
+		data, err := downloadWithRetry(downloadURL, 3, nil)
 		if err != nil {
 			return err
 		}
@@ -540,8 +543,9 @@ func isGitHubReachable() bool {
 
 // downloadWithRetry downloads a URL with retry logic and exponential backoff
 // maxRetries: maximum number of retry attempts (total attempts = maxRetries + 1)
+// onProgress: optional callback for download progress updates (can be nil)
 // Returns downloaded data or error
-func downloadWithRetry(downloadURL string, maxRetries int) ([]byte, error) {
+func downloadWithRetry(downloadURL string, maxRetries int, onProgress ProgressCallback) ([]byte, error) {
 	// SEC-07: Validate URL domain
 	parsedURL, err := url.Parse(downloadURL)
 	if err != nil {
@@ -624,8 +628,16 @@ func downloadWithRetry(downloadURL string, maxRetries int) ([]byte, error) {
 			continue
 		}
 
-		// Read response body
-		data, err := io.ReadAll(resp.Body)
+		// Read response body with progress tracking
+		var data []byte
+		if onProgress != nil && resp.ContentLength > 0 {
+			// Use ProgressReader to track download progress
+			pr := NewProgressReader(resp.Body, resp.ContentLength, onProgress)
+			data, err = io.ReadAll(pr)
+		} else {
+			// No progress callback or unknown content length, read directly
+			data, err = io.ReadAll(resp.Body)
+		}
 		resp.Body.Close()
 		cancel() // Cancel after reading and closing body
 
