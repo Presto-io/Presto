@@ -4,6 +4,7 @@
 	import { FileText } from 'lucide-svelte';
 	import WizardOverlay from '$lib/components/wizard/WizardOverlay.svelte';
 	import FirstLaunchBanner from '$lib/components/FirstLaunchBanner.svelte';
+	import DownloadProgressBar from '$lib/components/DownloadProgressBar.svelte';
 	import { fileRouter } from '$lib/stores/file-router.svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
@@ -165,6 +166,7 @@
 
 <div class="app">
 	{#if !isShowcase}
+		<DownloadProgressBar />
 		<FirstLaunchBanner />
 	{/if}
 	<main id="main-content">
