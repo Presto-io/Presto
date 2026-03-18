@@ -9,7 +9,9 @@
   import DOMPurify from 'dompurify';
   import Fuse from 'fuse.js';
   import { installState } from '$lib/stores/install-state.svelte';
+  import { networkStore } from '$lib/stores/network.svelte';
   import Toast from '$lib/components/Toast.svelte';
+  import OfflineMode from '$lib/components/OfflineMode.svelte';
 
   interface Props {
     mode: 'desktop' | 'web';
@@ -399,6 +401,24 @@
   });
 </script>
 
+{#if !networkStore.isOnline}
+  <div class="page" class:web-mode={mode === 'web'}>
+    {#if mode === 'desktop'}
+      <div class="drag-region" style="--wails-draggable:drag"></div>
+    {/if}
+    <div class="page-header">
+      {#if mode === 'desktop' && backRoute}
+        <button class="btn-back" onclick={() => goto(backRoute!)} aria-label="返回设置">
+          <ArrowLeft size={16} />
+        </button>
+      {/if}
+      <nav class="breadcrumb">
+        <h2>{title}</h2>
+      </nav>
+    </div>
+    <OfflineMode />
+  </div>
+{:else}
 <div class="page" class:web-mode={mode === 'web'}>
   {#if mode === 'desktop'}
     <div class="drag-region" style="--wails-draggable:drag"></div>
@@ -1766,3 +1786,4 @@
     }
   }
 </style>
+{/if}
