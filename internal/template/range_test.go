@@ -3,6 +3,8 @@ package template
 import (
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -18,10 +20,15 @@ func TestRangeRequest_FirstRequest(t *testing.T) {
 			}
 			firstRequest = false
 		}
-		w.Header().Set("Content-Length", string(len(data)))
+		w.Header().Set("Content-Length", strconv.Itoa(len(data)))
 		w.Write(data)
 	}))
 	defer server.Close()
+
+	// Add test server to allowed hosts
+	serverHost := strings.TrimPrefix(server.URL, "http://")
+	allowedDownloadHosts[serverHost] = true
+	defer func() { delete(allowedDownloadHosts, serverHost) }()
 
 	// Test downloadWithResume (will be implemented in Task 3)
 	// For now, this test will fail because downloadWithResume doesn't exist
@@ -50,11 +57,16 @@ func TestRangeRequest_Resume(t *testing.T) {
 			w.WriteHeader(http.StatusPartialContent)
 			w.Write(data[5:])
 		} else {
-			w.Header().Set("Content-Length", string(len(data)))
+			w.Header().Set("Content-Length", strconv.Itoa(len(data)))
 			w.Write(data)
 		}
 	}))
 	defer server.Close()
+
+	// Add test server to allowed hosts
+	serverHost := strings.TrimPrefix(server.URL, "http://")
+	allowedDownloadHosts[serverHost] = true
+	defer func() { delete(allowedDownloadHosts, serverHost) }()
 
 	// First download should succeed without Range header
 	_, err := downloadWithResume(server.URL, 0, nil)
@@ -77,10 +89,15 @@ func TestRangeRequest_ServerNotSupport(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestCount++
 		// Always return 200, ignore Range header
-		w.Header().Set("Content-Length", string(len(data)))
+		w.Header().Set("Content-Length", strconv.Itoa(len(data)))
 		w.Write(data)
 	}))
 	defer server.Close()
+
+	// Add test server to allowed hosts
+	serverHost := strings.TrimPrefix(server.URL, "http://")
+	allowedDownloadHosts[serverHost] = true
+	defer func() { delete(allowedDownloadHosts, serverHost) }()
 
 	_, err := downloadWithResume(server.URL, 0, nil)
 	if err != nil {
@@ -98,10 +115,15 @@ func TestRangeRequest_CleanupOnSuccess(t *testing.T) {
 	data := []byte("test cleanup on success")
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Length", string(len(data)))
+		w.Header().Set("Content-Length", strconv.Itoa(len(data)))
 		w.Write(data)
 	}))
 	defer server.Close()
+
+	// Add test server to allowed hosts
+	serverHost := strings.TrimPrefix(server.URL, "http://")
+	allowedDownloadHosts[serverHost] = true
+	defer func() { delete(allowedDownloadHosts, serverHost) }()
 
 	_, err := downloadWithResume(server.URL, 0, nil)
 	if err != nil {
