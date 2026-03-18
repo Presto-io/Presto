@@ -515,6 +515,18 @@ func (a *App) InstallTemplate(templateName string) error {
 			CdnURL:         info.CdnURL,
 			ExpectedSHA256: info.SHA256,
 			Trust:          entry.Trust,
+			OnProgress: func(downloaded, total int64) {
+				// Emit progress event to frontend
+				if total > 0 {
+					percent := float64(downloaded) / float64(total) * 100
+					wailsRuntime.EventsEmit(a.ctx, "template-download:progress", map[string]interface{}{
+						"template":   templateName,
+						"downloaded": downloaded,
+						"total":      total,
+						"percent":    percent,
+					})
+				}
+			},
 		}
 		log.Printf("[templates] Wails install: %s (trust=%s, platform=%s)", templateName, entry.Trust, platform)
 	}
