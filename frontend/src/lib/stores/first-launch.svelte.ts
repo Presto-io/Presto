@@ -158,6 +158,12 @@ export const firstLaunchStore = {
       console.error('[first-launch] error:', data.message);
     });
 
+    // Listen for template download progress events
+    rt.EventsOn('template-download:progress', (data: any) => {
+      const { template, downloaded, total, percent } = data;
+      installState.updateProgress(template, { downloaded, total, percent });
+    });
+
     console.log('[first-launch] all event listeners registered successfully');
   },
 
