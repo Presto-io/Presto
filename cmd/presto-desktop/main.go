@@ -125,6 +125,8 @@ func (a *App) startup(ctx context.Context) {
 // checkFirstLaunch detects if this is the first launch (no templates installed)
 // and triggers automatic download of official templates.
 func (a *App) checkFirstLaunch() {
+	log.Printf("[first-launch] starting check, registry available: %v", a.registry.Load() != nil)
+
 	templates, err := a.manager.List()
 	if err != nil {
 		log.Printf("[first-launch] failed to list templates: %v", err)
