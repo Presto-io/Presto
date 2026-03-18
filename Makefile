@@ -2,7 +2,7 @@
        _build-macos-arm64 _build-macos-amd64 \
        dist-macos dist-macos-arm64 dist-macos-amd64 dist-macos-universal \
        dist-dmg dist-dmg-arm64 dist-dmg-amd64 dist-dmg-universal \
-       dist-windows dist-linux dist notarize
+       dist-windows dist-linux dist notarize nsis
 
 # ─── Config ──────────────────────────────────────────────
 APP_NAME     := Presto
@@ -276,3 +276,12 @@ clean:
 	rm -rf bin/ dist/ cmd/presto-desktop/build frontend/build
 	mkdir -p $(DESKTOP_EMBED)
 	echo '<!doctype html>' > $(DESKTOP_EMBED)/index.html
+
+# ─── NSIS Windows Installer ──────────────────────────────
+# Note: Requires NSIS 3.08+ installed on Windows
+
+.PHONY: nsis
+nsis: dist-windows-amd64
+	@echo "==> Building NSIS installer..."
+	wails build -platform windows/amd64 -nsis
+	@echo "==> Installer created: build/bin/Presto-$(VERSION)-installer.exe"
