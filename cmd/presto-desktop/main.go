@@ -798,7 +798,103 @@ func findTypstBinary() string {
 	return "typst" // will fail at runtime with a clear error
 }
 
+// downloadTemplatesAndExit downloads all official templates and exits.
+// Exit code 0 = success, 1 = failure.
+// Used by NSIS installer for template pre-download during installation.
+func downloadTemplatesAndExit() {
+	log.Printf("[Installer] Starting template download...")
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		log.Printf("[Installer] ERROR: Failed to get user home directory: %v", err)
+		os.Exit(1)
+	}
+
+	prestoDir := filepath.Join(home, ".presto")
+	templatesDir := filepath.Join(prestoDir, "templates")
+	if err := os.MkdirAll(templatesDir, 0755); err != nil {
+		log.Printf("[Installer] ERROR: Failed to create templates directory: %v", err)
+		os.Exit(1)
+	}
+
+	manager := template.NewManager(templatesDir)
+	registry := template.NewRegistryCache(prestoDir)
+
+	// Load registry (fetches from CDN if cache is missing/expired)
+	reg := registry.Load()
+	if reg == nil {
+		log.Printf("[Installer] ERROR: Failed to load template registry")
+		os.Exit(1)
+	}
+
+	// Filter official templates
+	var officialTemplates []template.RegistryEntry
+	for _, entry := range reg.Templates {
+		if entry.Trust == "official" {
+			officialTemplates = append(officialTemplates, entry)
+		}
+	}
+
+	if len(officialTemplates) == 0 {
+		log.Printf("[Installer] No official templates found in registry")
+		os.Exit(0)
+	}
+
+	log.Printf("[Installer] Found %d official templates to download", len(officialTemplates))
+
+	platform := runtime.GOOS + "-" + runtime.GOARCH
+	var failCount int
+
+	for _, entry := range officialTemplates {
+		// Skip if already installed
+		if manager.Exists(entry.Name) {
+			log.Printf("[Installer] Template %s already installed, skipping", entry.Name)
+			continue
+		}
+
+		parts := strings.SplitN(entry.Repo, "/", 2)
+		if len(parts) != 2 {
+			log.Printf("[Installer] ERROR: Invalid repo format for %s: %s", entry.Name, entry.Repo)
+			failCount++
+			continue
+		}
+		owner, repo := parts[0], parts[1]
+
+		var opts *template.InstallOpts
+		if info, ok := entry.Platforms[platform]; ok && info.URL != "" {
+			opts = &template.InstallOpts{
+				DownloadURL:    info.URL,
+				CdnURL:         info.CdnURL,
+				ExpectedSHA256: info.SHA256,
+				Trust:          entry.Trust,
+			}
+		}
+
+		log.Printf("[Installer] Downloading template: %s", entry.Name)
+		if err := manager.Install(owner, repo, opts); err != nil {
+			log.Printf("[Installer] ERROR: Failed to download %s: %v", entry.Name, err)
+			failCount++
+			continue
+		}
+		log.Printf("[Installer] Successfully downloaded: %s", entry.Name)
+	}
+
+	if failCount > 0 {
+		log.Printf("[Installer] Template download completed with %d failures", failCount)
+		os.Exit(1)
+	}
+
+	log.Printf("[Installer] Template download completed successfully")
+	os.Exit(0)
+}
+
 func main() {
+	// Check for --download-templates flag (used by NSIS installer)
+	if len(os.Args) > 1 && os.Args[1] == "--download-templates" {
+		downloadTemplatesAndExit()
+		return
+	}
+
 	// SEC-44: Check os.UserHomeDir error
 	home, err := os.UserHomeDir()
 	if err != nil {
