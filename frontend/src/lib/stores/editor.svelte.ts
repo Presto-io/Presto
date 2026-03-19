@@ -9,4 +9,6 @@ export const editor = $state({
   selectedTemplate: '',
   documentDir: '',
   pendingExternalLoad: false,
+  currentFilePath: '',
+  isDirty: false,
 });
