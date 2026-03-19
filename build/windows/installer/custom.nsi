@@ -14,6 +14,7 @@
 ; ========================================
 Var CreateDesktopShortcut
 Var CreateStartMenuShortcut
+Var DownloadTemplates
 Var LaunchAfterInstall
 
 ; ========================================
@@ -41,8 +42,13 @@ Function OptionsPage
   Pop $CreateStartMenuShortcut
   ${NSD_SetState} $CreateStartMenuShortcut ${BST_CHECKED}
 
+  ; Download Templates (default: checked)
+  ${NSD_CreateCheckbox} 0 40u 100% 12u "Download official templates (recommended)"
+  Pop $DownloadTemplates
+  ${NSD_SetState} $DownloadTemplates ${BST_CHECKED}
+
   ; Launch after install (default: checked)
-  ${NSD_CreateCheckbox} 0 40u 100% 12u "Launch Presto after installation"
+  ${NSD_CreateCheckbox} 0 60u 100% 12u "Launch Presto after installation"
   Pop $LaunchAfterInstall
   ${NSD_SetState} $LaunchAfterInstall ${BST_CHECKED}
 
@@ -53,6 +59,7 @@ Function OptionsLeave
   ; Save checkbox states
   ${NSD_GetState} $CreateDesktopShortcut $CreateDesktopShortcut
   ${NSD_GetState} $CreateStartMenuShortcut $CreateStartMenuShortcut
+  ${NSD_GetState} $DownloadTemplates $DownloadTemplates
   ${NSD_GetState} $LaunchAfterInstall $LaunchAfterInstall
 FunctionEnd
 
@@ -70,6 +77,33 @@ Section "Shortcuts" SEC_SHORTCUTS
     CreateDirectory "$SMPROGRAMS\Presto"
     CreateShortCut "$SMPROGRAMS\Presto\Presto.lnk" "$INSTDIR\Presto.exe" "" "$INSTDIR\Presto.exe" 0
     CreateShortCut "$SMPROGRAMS\Presto\Uninstall Presto.lnk" "$INSTDIR\uninstall.exe" "" "$INSTDIR\uninstall.exe" 0
+  ${EndIf}
+SectionEnd
+
+; ========================================
+; Template Download Section
+; ========================================
+Section "Download Templates" SEC_TEMPLATES
+  ${If} $DownloadTemplates == ${BST_CHECKED}
+    ; Show progress banner
+    Banner::show /set 76 "Downloading Templates" "Please wait while templates are downloaded..."
+
+    ; Execute Presto.exe --download-templates and capture return code
+    ExecWait '"$INSTDIR\Presto.exe" --download-templates' $0
+
+    ; Hide banner
+    Banner::destroy
+
+    ; Check return code (0 = success, non-zero = failure)
+    ${If} $0 != 0
+      ; Download failed - ask user whether to continue
+      MessageBox MB_YESNO|MB_ICONWARNING \
+        "Template download failed. You can download templates later from within the application.$\n$\nContinue installation?" \
+        IDYES continue_install
+      Abort
+
+      continue_install:
+    ${EndIf}
   ${EndIf}
 SectionEnd
 
