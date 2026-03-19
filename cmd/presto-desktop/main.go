@@ -42,10 +42,12 @@ var startupURL string
 var assets embed.FS
 
 type App struct {
-	ctx      context.Context
-	manager  *template.Manager
-	compiler *typst.Compiler
-	registry *template.RegistryCache
+	ctx            context.Context
+	manager        *template.Manager
+	compiler       *typst.Compiler
+	registry       *template.RegistryCache
+	saveMenuItem   *menu.MenuItem
+	exportMenuItem *menu.MenuItem
 }
 
 // spaFallbackHandler wraps the API handler to support prerendered SvelteKit routes.
@@ -450,38 +452,137 @@ func buildMenu(app *App) *menu.Menu {
 	appMenu := menu.NewMenu()
 	appMenu.Append(menu.AppMenu())
 
+	// 文件菜单
 	fileMenu := appMenu.AddSubmenu("文件")
+	fileMenu.AddText("新建", keys.CmdOrCtrl("n"), func(_ *menu.CallbackData) {
+		wailsRuntime.EventsEmit(app.ctx, "menu:new")
+	})
 	fileMenu.AddText("打开文件…", keys.CmdOrCtrl("o"), func(_ *menu.CallbackData) {
 		wailsRuntime.EventsEmit(app.ctx, "menu:open")
 	})
-	fileMenu.AddSeparator()
-	fileMenu.AddText("导出 PDF…", keys.CmdOrCtrl("e"), func(_ *menu.CallbackData) {
+	app.saveMenuItem = fileMenu.AddText("保存", keys.CmdOrCtrl("s"), func(_ *menu.CallbackData) {
+		wailsRuntime.EventsEmit(app.ctx, "menu:save")
+	})
+	app.saveMenuItem.Disabled = true // MENU-12: disabled when editor is empty
+	fileMenu.AddText("另存为…", keys.Combo("s", keys.CmdOrCtrlKey, keys.ShiftKey), func(_ *menu.CallbackData) {
+		wailsRuntime.EventsEmit(app.ctx, "menu:saveas")
+	})
+	app.exportMenuItem = fileMenu.AddText("导出 PDF…", keys.CmdOrCtrl("e"), func(_ *menu.CallbackData) {
 		wailsRuntime.EventsEmit(app.ctx, "menu:export")
 	})
-	fileMenu.AddSeparator()
+	app.exportMenuItem.Disabled = true // MENU-12: disabled when editor is empty
 	fileMenu.AddText("设置…", keys.CmdOrCtrl(","), func(_ *menu.CallbackData) {
 		wailsRuntime.EventsEmit(app.ctx, "menu:settings")
 	})
 	fileMenu.AddSeparator()
-	fileMenu.AddText("模板管理…", keys.Combo("t", keys.CmdOrCtrlKey, keys.ShiftKey), func(_ *menu.CallbackData) {
-		wailsRuntime.EventsEmit(app.ctx, "menu:templates")
-	})
-
-	appMenu.Append(menu.EditMenu())
-
-	windowMenu := appMenu.AddSubmenu("窗口")
-	windowMenu.AddText("最小化", keys.CmdOrCtrl("m"), func(_ *menu.CallbackData) {
+	fileMenu.AddText("最小化", keys.CmdOrCtrl("m"), func(_ *menu.CallbackData) {
 		wailsRuntime.WindowMinimise(app.ctx)
 	})
-	windowMenu.AddText("缩放", nil, func(_ *menu.CallbackData) {
+	fileMenu.AddText("缩放", nil, func(_ *menu.CallbackData) {
 		wailsRuntime.WindowToggleMaximise(app.ctx)
 	})
-	windowMenu.AddSeparator()
-	windowMenu.AddText("关闭窗口", keys.CmdOrCtrl("w"), func(_ *menu.CallbackData) {
+	fileMenu.AddSeparator()
+	fileMenu.AddText("退出", keys.CmdOrCtrl("w"), func(_ *menu.CallbackData) {
 		wailsRuntime.Quit(app.ctx)
 	})
 
+	// 编辑菜单（Wails 内置）
+	appMenu.Append(menu.EditMenu())
+
+	// 模板菜单
+	templateMenu := appMenu.AddSubmenu("模板")
+	templateMenu.AddText("模板商店", nil, func(_ *menu.CallbackData) {
+		wailsRuntime.EventsEmit(app.ctx, "menu:store")
+	})
+	templateMenu.AddText("模板管理…", keys.Combo("t", keys.CmdOrCtrlKey, keys.ShiftKey), func(_ *menu.CallbackData) {
+		wailsRuntime.EventsEmit(app.ctx, "menu:templates")
+	})
+
+	// 帮助菜单
+	helpMenu := appMenu.AddSubmenu("帮助")
+	helpMenu.AddText("文档", nil, func(_ *menu.CallbackData) {
+		wailsRuntime.BrowserOpenURL(app.ctx, "https://presto.io/docs")
+	})
+	helpMenu.AddText("关于 Presto", nil, func(_ *menu.CallbackData) {
+		app.ShowAboutDialog()
+	})
+	helpMenu.AddText("检查更新", nil, func(_ *menu.CallbackData) {
+		go app.CheckAndNotifyUpdate()
+	})
+
 	return appMenu
+}
+
+// SaveMarkdown writes markdown content to the given file path.
+func (a *App) SaveMarkdown(content string, filePath string) error {
+	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+		return fmt.Errorf("save failed: %w", err)
+	}
+	log.Printf("[desktop] saved markdown to %s (%d bytes)", filePath, len(content))
+	return nil
+}
+
+// SaveMarkdownAs opens a native save dialog and writes markdown content to the chosen path.
+// Returns the selected path, or ("", nil) if the user cancelled.
+func (a *App) SaveMarkdownAs(content string) (string, error) {
+	savePath, err := wailsRuntime.SaveFileDialog(a.ctx, wailsRuntime.SaveDialogOptions{
+		DefaultFilename: "untitled.md",
+		Filters: []wailsRuntime.FileFilter{
+			{DisplayName: "Markdown", Pattern: "*.md"},
+			{DisplayName: "所有文件", Pattern: "*.*"},
+		},
+	})
+	if err != nil {
+		return "", fmt.Errorf("save dialog failed: %w", err)
+	}
+	if savePath == "" {
+		return "", nil // user cancelled
+	}
+	if err := os.WriteFile(savePath, []byte(content), 0644); err != nil {
+		return "", fmt.Errorf("write failed: %w", err)
+	}
+	log.Printf("[desktop] saved markdown as %s (%d bytes)", savePath, len(content))
+	return savePath, nil
+}
+
+// ShowAboutDialog displays a native info dialog with app version and copyright.
+func (a *App) ShowAboutDialog() {
+	ver := a.GetVersion()
+	wailsRuntime.MessageDialog(a.ctx, wailsRuntime.MessageDialogOptions{
+		Type:    wailsRuntime.InfoDialog,
+		Title:   "关于 Presto",
+		Message: fmt.Sprintf("Presto %s\nMarkdown → Typst → PDF\n\n© 2024-2026 Presto", ver),
+	})
+}
+
+// CheckAndNotifyUpdate checks for updates and notifies the frontend or shows a dialog.
+func (a *App) CheckAndNotifyUpdate() {
+	info, err := a.CheckForUpdate()
+	if err != nil {
+		log.Printf("[desktop] update check failed: %v", err)
+		return
+	}
+	if info.HasUpdate {
+		wailsRuntime.EventsEmit(a.ctx, "menu:update-available", info)
+	} else {
+		wailsRuntime.MessageDialog(a.ctx, wailsRuntime.MessageDialogOptions{
+			Type:    wailsRuntime.InfoDialog,
+			Title:   "检查更新",
+			Message: "已是最新版本",
+		})
+	}
+}
+
+// UpdateMenuState enables or disables save/export menu items based on editor content.
+// Called by the frontend when editor content changes.
+func (a *App) UpdateMenuState(hasContent bool) {
+	if a.saveMenuItem != nil {
+		a.saveMenuItem.Disabled = !hasContent
+	}
+	if a.exportMenuItem != nil {
+		a.exportMenuItem.Disabled = !hasContent
+	}
+	wailsRuntime.MenuUpdateApplicationMenu(a.ctx)
 }
 
 // CompileSVG compiles typst source to SVG pages via Wails binding,
