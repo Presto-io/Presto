@@ -156,3 +156,45 @@ Function .onInit
       ExecWait '"$0" /S _?=$INSTDIR'
   ${EndIf}
 FunctionEnd
+
+; ========================================
+; Uninstall Section
+; ========================================
+Section "Uninstall"
+  ; Ask for confirmation
+  MessageBox MB_YESNO "Are you sure you want to uninstall Presto?" IDYES confirm
+  Abort
+
+  confirm:
+
+  ; Ask whether to keep user data
+  MessageBox MB_YESNO "Keep user data directory?$\n$\nIf you select Yes, your documents, templates, and settings will be preserved.$\n$\nLocation: $PROFILE\.presto" IDYES keep_data
+
+  ; Delete user data
+  RMDir /r "$PROFILE\.presto"
+
+  keep_data:
+
+  ; Delete installation files
+  Delete "$INSTDIR\Presto.exe"
+  Delete "$INSTDIR\typst.exe"
+  Delete "$INSTDIR\uninstall.exe"
+  Delete "$INSTDIR\*.dll"
+  Delete "$INSTDIR\resources\*.*"
+  RMDir "$INSTDIR\resources"
+  RMDir "$INSTDIR"
+
+  ; Delete desktop shortcut
+  Delete "$DESKTOP\Presto.lnk"
+
+  ; Delete start menu shortcuts
+  Delete "$SMPROGRAMS\Presto\Presto.lnk"
+  Delete "$SMPROGRAMS\Presto\Uninstall Presto.lnk"
+  RMDir "$SMPROGRAMS\Presto"
+
+  ; Delete registry key
+  DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Presto"
+
+  ; Display completion message
+  MessageBox MB_OK "Presto has been successfully uninstalled."
+SectionEnd
