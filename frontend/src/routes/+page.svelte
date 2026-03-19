@@ -21,8 +21,14 @@
         OpenFiles: () => Promise<{ name: string; content: string; dir: string; isZip: boolean; path?: string }[] | null>;
         CompileSVG: (typstSource: string, workDir: string) => Promise<string[]>;
         ImportBatchZip: (filePath: string) => Promise<any>;
+        SaveMarkdown: (content: string, filePath: string) => Promise<void>;
+        SaveMarkdownAs: (content: string) => Promise<string>;
+        UpdateMenuState: (hasContent: boolean) => Promise<void>;
       } } };
-      runtime?: { EventsOn: (event: string, cb: (...args: any[]) => void) => void };
+      runtime?: {
+        EventsOn: (event: string, cb: (...args: any[]) => void) => void;
+        EventsOff: (event: string) => void;
+      };
     }
   }
 
@@ -202,6 +208,57 @@
     return 'output';
   }
 
+  function handleNew() {
+    if (editor.isDirty && editor.markdown.trim()) {
+      if (!confirm('当前文档未保存，是否继续？')) return;
+    }
+    editor.markdown = '';
+    editor.typstSource = '';
+    editor.svgPages = [];
+    editor.currentFilePath = '';
+    editor.documentDir = '';
+    editor.isDirty = false;
+    window.go?.main?.App?.UpdateMenuState?.(false);
+  }
+
+  async function handleSave() {
+    if (!editor.markdown.trim()) return;
+    if (!window.go?.main?.App?.SaveMarkdown) return;
+    try {
+      if (editor.currentFilePath) {
+        await window.go.main.App.SaveMarkdown(editor.markdown, editor.currentFilePath);
+        editor.isDirty = false;
+      } else {
+        await handleSaveAs();
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      errorMsg = msg;
+    }
+  }
+
+  async function handleSaveAs() {
+    if (!editor.markdown.trim()) return;
+    if (!window.go?.main?.App?.SaveMarkdownAs) return;
+    try {
+      const savedPath = await window.go.main.App.SaveMarkdownAs(editor.markdown);
+      if (savedPath) {
+        editor.currentFilePath = savedPath;
+        editor.isDirty = false;
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      errorMsg = msg;
+    }
+  }
+
+  /** Wrapper: track dirty state + update menu before converting. */
+  function handleEditorChange(md: string) {
+    editor.isDirty = true;
+    window.go?.main?.App?.UpdateMenuState?.(md.trim().length > 0);
+    handleConvert(md);
+  }
+
   async function handleConvert(md: string) {
     if (!editor.selectedTemplate || !md.trim()) return;
     errorMsg = '';
@@ -284,6 +341,11 @@
           }
         }
         if (files.length === 0 && zipResults.length === 0) return;
+        // Track file path for single non-ZIP file (enables direct save)
+        if (results.length === 1 && !results[0].isZip && results[0].path) {
+          editor.currentFilePath = results[0].path;
+          editor.isDirty = false;
+        }
         await fileRouter.processFiles(
           files, '/', documentDirs,
           zipResults.length > 0 ? zipResults : undefined,
@@ -316,6 +378,10 @@
       window.runtime.EventsOn('menu:export', handleDownload);
       window.runtime.EventsOn('menu:settings', () => goto('/settings'));
       window.runtime.EventsOn('menu:templates', () => goto('/settings'));
+      window.runtime.EventsOn('menu:new', handleNew);
+      window.runtime.EventsOn('menu:save', handleSave);
+      window.runtime.EventsOn('menu:saveas', handleSaveAs);
+      window.runtime.EventsOn('menu:store', () => goto('/store-templates'));
     }
     // Keyboard shortcut for web: Cmd+, opens settings
     function handleKeydown(e: KeyboardEvent) {
@@ -329,7 +395,19 @@
       }
     }
     document.addEventListener('keydown', handleKeydown);
-    return () => document.removeEventListener('keydown', handleKeydown);
+    return () => {
+      document.removeEventListener('keydown', handleKeydown);
+      if (window.runtime?.EventsOff) {
+        window.runtime.EventsOff('menu:open');
+        window.runtime.EventsOff('menu:export');
+        window.runtime.EventsOff('menu:settings');
+        window.runtime.EventsOff('menu:templates');
+        window.runtime.EventsOff('menu:new');
+        window.runtime.EventsOff('menu:save');
+        window.runtime.EventsOff('menu:saveas');
+        window.runtime.EventsOff('menu:store');
+      }
+    };
   });
 </script>
 
@@ -383,7 +461,7 @@
 
 <div class="editor-layout" bind:this={layoutEl} class:dragging={isDragging}>
   <div class="pane" style="flex: {splitRatio}">
-    <Editor bind:value={editor.markdown} onchange={handleConvert} scrollRatio={editorScrollRatio} onscroll={(ratio: number) => {
+    <Editor bind:value={editor.markdown} onchange={handleEditorChange} scrollRatio={editorScrollRatio} onscroll={(ratio: number) => {
       if (scrollSource !== 'preview') {
         scrollSource = 'editor';
         previewScrollRatio = ratio;
