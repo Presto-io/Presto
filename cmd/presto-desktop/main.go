@@ -5,9 +5,12 @@ import (
 	"embed"
 	"encoding/base64"
 	"encoding/json"
+	"flag"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -37,6 +40,19 @@ var version string
 
 // startupURL holds a presto:// URL passed via os.Args on cold start.
 var startupURL string
+
+// Logging configuration
+var (
+	logger      *slog.Logger
+	verbose     bool
+	logFilePath string
+)
+
+func init() {
+	flag.BoolVar(&verbose, "verbose", false, "Enable verbose (debug) logging")
+	flag.BoolVar(&verbose, "v", false, "Enable verbose (debug) logging (shorthand)")
+	flag.StringVar(&logFilePath, "log-file", "", "Write logs to file path")
+}
 
 //go:embed all:build
 var assets embed.FS
@@ -902,19 +918,97 @@ func findTypstBinary() string {
 // downloadTemplatesAndExit downloads all official templates and exits.
 // Exit code 0 = success, 1 = failure.
 // Used by NSIS installer for template pre-download during installation.
+func initLogger() {
+	// Determine log level
+	level := slog.LevelInfo
+	if verbose {
+		level = slog.LevelDebug
+	}
+
+	// Create multi-writer if log file is specified
+	var writer io.Writer = os.Stderr
+
+	if logFilePath != "" {
+		// Open log file (create if not exists, append if exists)
+		logFile, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			// Fallback to stderr if file open fails
+			log.Printf("[logger] failed to open log file %s: %v", logFilePath, err)
+		} else {
+			// Write to both stderr and file
+			writer = io.MultiWriter(os.Stderr, logFile)
+		}
+	}
+
+	// Create text handler (human-readable)
+	opts := &slog.HandlerOptions{
+		Level:       level,
+		ReplaceAttr: sanitizeLogAttributes,
+	}
+	handler := slog.NewTextHandler(writer, opts)
+
+	// Set global logger
+	logger = slog.New(handler)
+	slog.SetDefault(logger)
+
+	logger.Info("[presto] logger initialized",
+		"verbose", verbose,
+		"log_file", logFilePath,
+		"level", level.String())
+}
+
+// closeLogger closes the log file if opened
+func closeLogger() {
+	if logFilePath != "" {
+		logger.Info("[presto] shutting down logger")
+	}
+}
+
+// sanitizeLogAttributes removes sensitive information from log attributes
+func sanitizeLogAttributes(groups []string, a slog.Attr) slog.Attr {
+	// Sanitize file paths (replace home directory)
+	if a.Value.Kind() == slog.KindString {
+		value := a.Value.String()
+		home := homeDir()
+		if home != "" && strings.Contains(value, home) {
+			value = strings.ReplaceAll(value, home, "~")
+			a.Value = slog.StringValue(value)
+		}
+	}
+	return a
+}
+
+// homeDir returns the user's home directory for sanitization
+func homeDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "" // Fallback: no sanitization
+	}
+	return home
+}
+
 func downloadTemplatesAndExit() {
-	log.Printf("[Installer] Starting template download...")
+	// Initialize logger for CLI mode (output to stdout for NSIS installer)
+	level := slog.LevelInfo
+	if verbose {
+		level = slog.LevelDebug
+	}
+	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: level})
+	logger = slog.New(handler)
+	slog.SetDefault(logger)
+
+	logger.Info("[Installer] Starting template download...")
 
 	home, err := os.UserHomeDir()
 	if err != nil {
-		log.Printf("[Installer] ERROR: Failed to get user home directory: %v", err)
+		logger.Error("[Installer] Failed to get user home directory", "error", err)
 		os.Exit(1)
 	}
 
 	prestoDir := filepath.Join(home, ".presto")
 	templatesDir := filepath.Join(prestoDir, "templates")
 	if err := os.MkdirAll(templatesDir, 0755); err != nil {
-		log.Printf("[Installer] ERROR: Failed to create templates directory: %v", err)
+		logger.Error("[Installer] Failed to create templates directory", "error", err)
 		os.Exit(1)
 	}
 
@@ -924,7 +1018,7 @@ func downloadTemplatesAndExit() {
 	// Load registry (fetches from CDN if cache is missing/expired)
 	reg := registry.Load()
 	if reg == nil {
-		log.Printf("[Installer] ERROR: Failed to load template registry")
+		logger.Error("[Installer] Failed to load template registry")
 		os.Exit(1)
 	}
 
@@ -937,25 +1031,24 @@ func downloadTemplatesAndExit() {
 	}
 
 	if len(officialTemplates) == 0 {
-		log.Printf("[Installer] No official templates found in registry")
+		logger.Info("[Installer] No official templates found in registry")
 		os.Exit(0)
 	}
 
-	log.Printf("[Installer] Found %d official templates to download", len(officialTemplates))
+	logger.Info("[Installer] Found official templates to download", "count", len(officialTemplates))
 
 	platform := runtime.GOOS + "-" + runtime.GOARCH
 	var failCount int
-
 	for _, entry := range officialTemplates {
 		// Skip if already installed
 		if manager.Exists(entry.Name) {
-			log.Printf("[Installer] Template %s already installed, skipping", entry.Name)
+			logger.Info("[Installer] Template already installed, skipping", "name", entry.Name)
 			continue
 		}
 
 		parts := strings.SplitN(entry.Repo, "/", 2)
 		if len(parts) != 2 {
-			log.Printf("[Installer] ERROR: Invalid repo format for %s: %s", entry.Name, entry.Repo)
+			logger.Error("[Installer] Invalid repo format", "name", entry.Name, "repo", entry.Repo)
 			failCount++
 			continue
 		}
@@ -971,25 +1064,31 @@ func downloadTemplatesAndExit() {
 			}
 		}
 
-		log.Printf("[Installer] Downloading template: %s", entry.Name)
+		logger.Info("[Installer] Downloading template", "name", entry.Name)
 		if err := manager.Install(owner, repo, opts); err != nil {
-			log.Printf("[Installer] ERROR: Failed to download %s: %v", entry.Name, err)
+			logger.Error("[Installer] Failed to download template", "name", entry.Name, "error", err)
 			failCount++
 			continue
 		}
-		log.Printf("[Installer] Successfully downloaded: %s", entry.Name)
+		logger.Info("[Installer] Successfully downloaded template", "name", entry.Name)
 	}
 
 	if failCount > 0 {
-		log.Printf("[Installer] Template download completed with %d failures", failCount)
+		logger.Error("[Installer] Template download completed with failures", "fail_count", failCount)
 		os.Exit(1)
 	}
 
-	log.Printf("[Installer] Template download completed successfully")
+	logger.Info("[Installer] Template download completed successfully")
 	os.Exit(0)
 }
 
 func main() {
+	// Parse command-line flags
+	flag.Parse()
+
+	// Initialize logger
+	initLogger()
+
 	// Check for --download-templates flag (used by NSIS installer)
 	if len(os.Args) > 1 && os.Args[1] == "--download-templates" {
 		downloadTemplatesAndExit()
@@ -1009,7 +1108,7 @@ func main() {
 
 	manager := template.NewManager(templatesDir)
 	typstBin := findTypstBinary()
-	log.Printf("[presto] using typst: %s", typstBin)
+	logger.Info("[presto] using typst", "path", typstBin)
 
 	// Registry cache for SHA256 verification of imported templates
 	registry := template.NewRegistryCache(prestoDir)
@@ -1039,11 +1138,11 @@ func main() {
 	appMenu := buildMenu(app)
 
 	// Check os.Args for a presto:// URL (cold start via URL scheme)
-	log.Printf("[url-scheme] os.Args: %v", os.Args)
+	logger.Debug("[url-scheme] os.Args", "args", os.Args)
 	for _, arg := range os.Args[1:] {
 		if strings.HasPrefix(arg, "presto://") {
 			startupURL = arg
-			log.Printf("[url-scheme] captured startup URL: %s", arg)
+			logger.Debug("[url-scheme] captured startup URL", "url", arg)
 			break
 		}
 	}
@@ -1069,7 +1168,7 @@ func main() {
 		SingleInstanceLock: &options.SingleInstanceLock{
 			UniqueId: "com.mrered.presto",
 			OnSecondInstanceLaunch: func(data options.SecondInstanceData) {
-				log.Printf("[url-scheme] second instance args: %v", data.Args)
+				logger.Debug("[url-scheme] second instance args", "args", data.Args)
 			},
 		},
 		Mac: &macOptions.Options{
@@ -1079,7 +1178,7 @@ func main() {
 				Message: "Markdown → Typst → PDF",
 			},
 			OnUrlOpen: func(url string) {
-				log.Printf("[url-scheme] OnUrlOpen: %s", url)
+				logger.Debug("[url-scheme] OnUrlOpen", "url", url)
 				if app.ctx != nil {
 					// Hot start: frontend is ready, emit event directly
 					go app.handlePrestoURL(url)
