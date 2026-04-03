@@ -143,23 +143,23 @@ func (a *App) startup(ctx context.Context) {
 // checkFirstLaunch detects if this is the first launch (no templates installed)
 // and triggers automatic download of official templates.
 func (a *App) checkFirstLaunch() {
-	log.Printf("[first-launch] starting check, registry available: %v", a.registry.Load() != nil)
+	logger.Debug("[first-launch] starting check", "registry_available", a.registry.Load() != nil)
 
 	templates, err := a.manager.List()
 	if err != nil {
-		log.Printf("[first-launch] failed to list templates: %v", err)
+		logger.Error("[first-launch] failed to list templates", "error", err)
 		return
 	}
 
 	// First launch if no templates installed
 	if len(templates) == 0 {
-		log.Printf("[first-launch] first launch detected, starting default template download")
+		logger.Info("[first-launch] first launch detected, starting default template download")
 		a.downloadDefaultTemplates()
 		return
 	}
 
 	// Templates already installed - check for updates
-	log.Printf("[first-launch] %d templates already installed, checking for updates", len(templates))
+	logger.Info("[first-launch] templates already installed, checking for updates", "count", len(templates))
 	go a.checkTemplateUpdates(templates)
 }
 
@@ -168,7 +168,7 @@ func (a *App) checkFirstLaunch() {
 func (a *App) downloadDefaultTemplates() {
 	reg := a.registry.Load()
 	if reg == nil {
-		log.Printf("[first-launch] registry not available, skipping default download")
+		logger.Warn("[first-launch] registry not available, skipping default download")
 		a.emitFirstLaunchError("无法获取模板列表")
 		return
 	}
@@ -182,11 +182,11 @@ func (a *App) downloadDefaultTemplates() {
 	}
 
 	if len(officialTemplates) == 0 {
-		log.Printf("[first-launch] no official templates found")
+		logger.Warn("[first-launch] no official templates found")
 		return
 	}
 
-	log.Printf("[first-launch] downloading %d official templates", len(officialTemplates))
+	logger.Info("[first-launch] downloading official templates", "count", len(officialTemplates))
 
 	// Emit start event with template list
 	a.emitFirstLaunchStart(officialTemplates)
@@ -205,17 +205,17 @@ func (a *App) downloadDefaultTemplates() {
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			log.Printf("[first-launch] downloading: %s", templateName)
+			logger.Debug("[first-launch] downloading template", "name", templateName)
 			err := a.InstallTemplate(templateName)
 
 			mu.Lock()
 			if err != nil {
 				failureCount++
-				log.Printf("[first-launch] failed to download %s: %v", templateName, err)
+				logger.Error("[first-launch] failed to download template", "name", templateName, "error", err)
 				a.emitFirstLaunchProgress(templateName, "error", err.Error())
 			} else {
 				successCount++
-				log.Printf("[first-launch] successfully downloaded: %s", templateName)
+				logger.Info("[first-launch] successfully downloaded template", "name", templateName)
 				a.emitFirstLaunchProgress(templateName, "success", "")
 			}
 			mu.Unlock()
@@ -226,7 +226,7 @@ func (a *App) downloadDefaultTemplates() {
 
 	// Emit completion event
 	a.emitFirstLaunchComplete(successCount, failureCount)
-	log.Printf("[first-launch] download complete: %d success, %d failed", successCount, failureCount)
+	logger.Info("[first-launch] download complete", "success", successCount, "failed", failureCount)
 }
 
 // emitFirstLaunchStart emits the first-launch:start event to the frontend.
@@ -265,11 +265,11 @@ func (a *App) emitFirstLaunchError(message string) {
 // If installation fails, the template will be missing and user needs to manually re-install.
 // This is acceptable for v1 - future versions can implement atomic swap.
 func (a *App) checkTemplateUpdates(installed []template.InstalledTemplate) {
-	log.Printf("[template-update] starting silent update check for %d templates", len(installed))
+	logger.Debug("[template-update] starting silent update check", "count", len(installed))
 
 	reg := a.registry.Load()
 	if reg == nil {
-		log.Printf("[template-update] registry not available, skipping update check")
+		logger.Warn("[template-update] registry not available, skipping update check")
 		return
 	}
 
@@ -287,8 +287,10 @@ func (a *App) checkTemplateUpdates(installed []template.InstalledTemplate) {
 
 		// Compare versions
 		if entry.Version != inst.Manifest.Version {
-			log.Printf("[template-update] update available for %s: installed=%s, latest=%s",
-				inst.Manifest.Name, inst.Manifest.Version, entry.Version)
+			logger.Info("[template-update] update available",
+				"name", inst.Manifest.Name,
+				"installed", inst.Manifest.Version,
+				"latest", entry.Version)
 			updatesAvailable = append(updatesAvailable, struct {
 				name    string
 				latest  template.RegistryEntry
@@ -298,11 +300,11 @@ func (a *App) checkTemplateUpdates(installed []template.InstalledTemplate) {
 	}
 
 	if len(updatesAvailable) == 0 {
-		log.Printf("[template-update] all templates are up to date")
+		logger.Info("[template-update] all templates are up to date")
 		return
 	}
 
-	log.Printf("[template-update] silently updating %d templates in background...", len(updatesAvailable))
+	logger.Info("[template-update] silently updating templates in background", "count", len(updatesAvailable))
 
 	// Update templates in parallel
 	var wg sync.WaitGroup
@@ -317,11 +319,16 @@ func (a *App) checkTemplateUpdates(installed []template.InstalledTemplate) {
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			log.Printf("[template-update] updating %s from %s to %s...", name, oldVersion, entry.Version)
+			logger.Info("[template-update] updating template",
+				"name", name,
+				"old_version", oldVersion,
+				"new_version", entry.Version)
 
 			// Delete old version first
 			if err := a.manager.Uninstall(name); err != nil {
-				log.Printf("[template-update] failed to uninstall old version of %s: %v", name, err)
+				logger.Error("[template-update] failed to uninstall old version",
+					"name", name,
+					"error", err)
 				mu.Lock()
 				failCount++
 				mu.Unlock()
@@ -330,7 +337,9 @@ func (a *App) checkTemplateUpdates(installed []template.InstalledTemplate) {
 
 			// Install new version (silent - no events, no notifications)
 			if err := a.InstallTemplate(name); err != nil {
-				log.Printf("[template-update] failed to update %s: %v", name, err)
+				logger.Error("[template-update] failed to update template",
+					"name", name,
+					"error", err)
 				mu.Lock()
 				failCount++
 				mu.Unlock()
@@ -339,7 +348,9 @@ func (a *App) checkTemplateUpdates(installed []template.InstalledTemplate) {
 				return
 			}
 
-			log.Printf("[template-update] successfully updated %s to version %s", name, entry.Version)
+			logger.Info("[template-update] successfully updated template",
+				"name", name,
+				"version", entry.Version)
 			mu.Lock()
 			successCount++
 			mu.Unlock()
@@ -349,7 +360,7 @@ func (a *App) checkTemplateUpdates(installed []template.InstalledTemplate) {
 	wg.Wait()
 
 	// Log summary (for debugging)
-	log.Printf("[template-update] silent update complete: %d success, %d failed", successCount, failCount)
+	logger.Info("[template-update] silent update complete", "success", successCount, "failed", failCount)
 
 	// IMPORTANT: No UI notifications, no badges, completely silent
 	// Only emit templates-changed event to refresh UI if at least one update succeeded
@@ -363,7 +374,7 @@ func (a *App) checkTemplateUpdates(installed []template.InstalledTemplate) {
 func (a *App) GetStartupURL() string {
 	u := startupURL
 	startupURL = ""
-	log.Printf("[url-scheme] GetStartupURL called, returning: %q", u)
+	logger.Debug("[url-scheme] GetStartupURL called", "url", u)
 	return u
 }
 
@@ -534,8 +545,8 @@ func (a *App) SaveMarkdown(content string, filePath string) error {
 	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
 		return fmt.Errorf("save failed: %w", err)
 	}
-	log.Printf("[desktop] saved markdown to %s (%d bytes)", filePath, len(content))
-	return nil
+	logger.Info("[desktop] saved markdown", "path", filePath, "bytes", len(content))
+ return nil
 }
 
 // SaveMarkdownAs opens a native save dialog and writes markdown content to the chosen path.
@@ -557,7 +568,7 @@ func (a *App) SaveMarkdownAs(content string) (string, error) {
 	if err := os.WriteFile(savePath, []byte(content), 0644); err != nil {
 		return "", fmt.Errorf("write failed: %w", err)
 	}
-	log.Printf("[desktop] saved markdown as %s (%d bytes)", savePath, len(content))
+	logger.Info("[desktop] saved markdown as", "path", savePath, "bytes", len(content))
 	return savePath, nil
 }
 
@@ -666,7 +677,7 @@ func (a *App) InstallTemplate(templateName string) error {
 				}
 			},
 		}
-		log.Printf("[templates] Wails install: %s (trust=%s, platform=%s)", templateName, entry.Trust, platform)
+		logger.Info("[templates] Wails install", "name", templateName, "trust", entry.Trust, "platform", platform)
 	}
 
 	err := a.manager.Install(owner, repo, opts)
@@ -821,8 +832,8 @@ func (a *App) SavePDF(markdown string, templateId string, workDir string) error 
 		return fmt.Errorf("write failed: %w", err)
 	}
 
-	log.Printf("[desktop] saved PDF to %s (%d bytes)", savePath, len(pdf))
-	return nil
+	logger.Info("[desktop] saved PDF", "path", savePath, "bytes", len(pdf))
+ return nil
 }
 
 // extractTypstTitle finds the first heading from typst source.
