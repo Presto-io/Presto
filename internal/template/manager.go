@@ -3,7 +3,7 @@ package template
 import (
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -82,9 +82,12 @@ func (m *Manager) List() ([]InstalledTemplate, error) {
 			continue
 		}
 		newName := uniqueNameInSet(name, seen)
-		log.Printf("[templates] auto-renaming duplicate %q → %q", name, newName)
+		slog.Info("[templates] auto-renaming duplicate",
+			"old_name", name,
+			"new_name", newName)
 		if err := renameDiskTemplate(m.TemplatesDir, &templates[i], newName); err != nil {
-			log.Printf("[templates] auto-rename failed: %v", err)
+			slog.Warn("[templates] auto-rename failed",
+				"error", err.Error())
 			continue
 		}
 		seen[newName] = true

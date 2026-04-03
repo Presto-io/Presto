@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -138,25 +138,29 @@ func (rc *RegistryCache) fetchFromCDN() *Registry {
 	}
 	resp, err := client.Get(rc.cdnURL)
 	if err != nil {
-		log.Printf("[registry] fetch failed: %v", err)
+		slog.Warn("[registry] fetch failed",
+			"error", err.Error())
 		return nil
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		log.Printf("[registry] fetch returned status %d", resp.StatusCode)
+		slog.Warn("[registry] fetch returned non-OK status",
+			"status_code", resp.StatusCode)
 		return nil
 	}
 
 	data, err := io.ReadAll(io.LimitReader(resp.Body, maxRegistrySize))
 	if err != nil {
-		log.Printf("[registry] read body failed: %v", err)
+		slog.Warn("[registry] read body failed",
+			"error", err.Error())
 		return nil
 	}
 
 	var reg Registry
 	if err := json.Unmarshal(data, &reg); err != nil {
-		log.Printf("[registry] parse failed: %v", err)
+		slog.Warn("[registry] parse failed",
+			"error", err.Error())
 		return nil
 	}
 
@@ -171,11 +175,13 @@ func (rc *RegistryCache) fetchFromCDN() *Registry {
 
 	if cacheData, err := json.Marshal(cached); err == nil {
 		if err := os.WriteFile(rc.cachePath(), cacheData, 0600); err != nil { // SEC-45
-			log.Printf("[registry] cache write failed: %v", err)
+			slog.Warn("[registry] cache write failed",
+				"error", err.Error())
 		}
 	}
 
-	log.Printf("[registry] refreshed, %d templates", len(reg.Templates))
+	slog.Info("[registry] refreshed",
+		"template_count", len(reg.Templates))
 	return &reg
 }
 

@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -32,7 +32,9 @@ func downloadWithResume(downloadURL string, maxRetries int, onProgress ProgressC
 		}
 	}
 	if !isAllowedDownloadHost(parsedURL.Host) {
-		log.Printf("[security] BLOCKED: download URL host not in whitelist: %s (full URL: %s)", parsedURL.Host, downloadURL)
+		slog.Warn("[security] blocked download URL host not in whitelist",
+			"host", parsedURL.Host,
+			"url", SanitizeURL(downloadURL))
 		return nil, &InstallError{
 			Type:    ErrNotFound,
 			Message: fmt.Sprintf("download URL host not allowed: %s", parsedURL.Host),
@@ -43,7 +45,8 @@ func downloadWithResume(downloadURL string, maxRetries int, onProgress ProgressC
 	// Create temp directory for partial downloads
 	tmpDir := filepath.Join(os.TempDir(), tmpDownloadDir)
 	if err := os.MkdirAll(tmpDir, 0700); err != nil {
-		log.Printf("[download] failed to create tmp dir: %v", err)
+		slog.Warn("[download] failed to create tmp dir, falling back to non-resumable download",
+			"error", err.Error())
 		// Fallback to non-resumable download
 		return downloadWithRetry(downloadURL, maxRetries, onProgress)
 	}
@@ -54,14 +57,18 @@ func downloadWithResume(downloadURL string, maxRetries int, onProgress ProgressC
 	var offset int64 = 0
 	if info, err := os.Stat(tmpFile); err == nil {
 		offset = info.Size()
-		log.Printf("[download] resuming from %d bytes", offset)
+		slog.Info("[download] resuming from partial download",
+			"offset_bytes", offset)
 	}
 
 	var lastErr error
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if attempt > 0 {
 			backoff := time.Duration(1<<(attempt-1)) * time.Second
-			log.Printf("[download] attempt %d/%d: waiting %v", attempt+1, maxRetries+1, backoff)
+			slog.Warn("[download] retrying after backoff",
+				"attempt", attempt+1,
+				"total_attempts", maxRetries+1,
+				"backoff", backoff.String())
 			time.Sleep(backoff)
 		}
 
@@ -87,7 +94,8 @@ func downloadWithResume(downloadURL string, maxRetries int, onProgress ProgressC
 
 		// Check if server supports Range requests
 		if offset > 0 && resp.StatusCode != http.StatusPartialContent {
-			log.Printf("[download] server doesn't support resume (status %d), starting fresh", resp.StatusCode)
+			slog.Warn("[download] server doesn't support resume, starting fresh",
+				"status_code", resp.StatusCode)
 			resp.Body.Close()
 			cancel()
 			offset = 0
@@ -133,7 +141,9 @@ func downloadWithResume(downloadURL string, maxRetries int, onProgress ProgressC
 		cancel()
 
 		if err != nil {
-			log.Printf("[download] attempt %d failed: %v", attempt+1, err)
+			slog.Warn("[download] attempt failed",
+				"attempt", attempt+1,
+				"error", err.Error())
 			lastErr = &InstallError{Type: ErrNetwork, Message: fmt.Sprintf("download failed: %v", err), Err: err}
 			continue // Keep tmp file for retry
 		}
@@ -147,7 +157,8 @@ func downloadWithResume(downloadURL string, maxRetries int, onProgress ProgressC
 
 		// Clean up on success
 		os.Remove(tmpFile)
-		log.Printf("[download] completed: %d bytes", len(data))
+		slog.Info("[download] completed with resume support",
+			"bytes", len(data))
 		return data, nil
 	}
 
@@ -158,9 +169,10 @@ func downloadWithResume(downloadURL string, maxRetries int, onProgress ProgressC
 func CleanupTmpDownloadFiles() {
 	tmpDir := filepath.Join(os.TempDir(), tmpDownloadDir)
 	if err := os.RemoveAll(tmpDir); err != nil {
-		log.Printf("[download] failed to cleanup tmp dir: %v", err)
+		slog.Warn("[download] failed to cleanup tmp dir",
+			"error", err.Error())
 	} else {
-		log.Printf("[download] cleaned up tmp download files")
+		slog.Info("[download] cleaned up tmp download files")
 	}
 }
 
