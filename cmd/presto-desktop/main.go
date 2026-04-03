@@ -33,6 +33,7 @@ import (
 	"github.com/mrered/presto/internal/api"
 	"github.com/mrered/presto/internal/template"
 	"github.com/mrered/presto/internal/typst"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 // version is set at build time via -ldflags "-X main.version=..."
@@ -43,9 +44,10 @@ var startupURL string
 
 // Logging configuration
 var (
-	logger      *slog.Logger
-	verbose     bool
-	logFilePath string
+	logger        *slog.Logger
+	verbose       bool
+	logFilePath   string
+	loggerLogFile *lumberjack.Logger // for cleanup on shutdown
 )
 
 func init() {
@@ -940,15 +942,23 @@ func initLogger() {
 	var writer io.Writer = os.Stderr
 
 	if logFilePath != "" {
-		// Open log file (create if not exists, append if exists)
-		logFile, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-		if err != nil {
-			// Fallback to stderr if file open fails
-			log.Printf("[logger] failed to open log file %s: %v", logFilePath, err)
-		} else {
-			// Write to both stderr and file
-			writer = io.MultiWriter(os.Stderr, logFile)
+		// Use lumberjack for log rotation (10MB max, keep 5 backups)
+		loggerLogFile = &lumberjack.Logger{
+			Filename:   logFilePath,
+			MaxSize:    10,   // megabytes
+			MaxBackups: 5,    // keep at most 5 old log files
+			MaxAge:     0,    // days (0 = don't delete based on age)
+			Compress:   false, // don't compress old files
+			LocalTime:  true,  // use local time for rotation timestamp
 		}
+
+		// Write to both stderr and file
+		writer = io.MultiWriter(os.Stderr, loggerLogFile)
+
+		logger.Info("[logger] log rotation enabled",
+			"max_size_mb", 10,
+			"max_backups", 5,
+			"log_file", logFilePath)
 	}
 
 	// Create text handler (human-readable)
@@ -970,8 +980,9 @@ func initLogger() {
 
 // closeLogger closes the log file if opened
 func closeLogger() {
-	if logFilePath != "" {
+	if loggerLogFile != nil {
 		logger.Info("[presto] shutting down logger")
+		loggerLogFile.Close()
 	}
 }
 
