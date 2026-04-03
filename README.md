@@ -42,6 +42,10 @@ docker run -d -p 8080:8080 -v presto-data:/home/presto/.presto ghcr.io/presto-io
 
 浏览器打开 `http://localhost:8080`。
 
+## 平台支持
+
+Presto 支持 Windows、macOS 和 Linux。详见 [平台说明](docs/platform-notes.md)。
+
 ## 文档
 
 - **官网**：[https://presto.mre.red](https://presto.mre.red)
