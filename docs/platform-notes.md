@@ -87,6 +87,30 @@ path := ".presto/templates/official"  // Windows 会失败
 ./presto-desktop --log-file presto.log
 ```
 
+### 日志轮转
+
+Presto 自动轮转日志文件以避免占用过多磁盘空间：
+
+- **最大文件大小**: 10MB
+- **保留历史文件**: 最多 5 个
+- **轮转策略**: 当日志文件达到 10MB 时，自动轮转并创建新文件
+- **文件命名**:
+  - 当前日志: `presto.log`
+  - 轮转后: `presto-{timestamp}.log` (由 lumberjack 自动管理)
+
+**示例：**
+
+```text
+~/.presto/logs/
+├── presto.log              (当前日志，10MB 以内)
+├── presto-2026-04-03T10-00-00.log  (轮转文件 1)
+├── presto-2026-04-03T11-30-00.log  (轮转文件 2)
+├── ...
+└── presto-2026-04-03T15-00-00.log  (轮转文件 5)
+```
+
+超过 5 个历史文件后，最旧的文件会被自动删除。
+
 ## 报告问题
 
 如果您遇到平台特定问题，请提供：
