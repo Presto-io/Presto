@@ -11,6 +11,8 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"time"
 )
 
@@ -88,7 +90,62 @@ func downloadWithResume(downloadURL string, maxRetries int, onProgress ProgressC
 		resp, err := downloadClient.Do(req)
 		if err != nil {
 			cancel()
-			lastErr = &InstallError{Type: ErrNetwork, Message: fmt.Sprintf("download failed: %v", err), Err: err}
+
+			// DOWN-03/DOWN-04: Check for timeout and connection errors
+			if context.DeadlineExceeded == ctx.Err() {
+				slog.Error("[templates] download timeout",
+					"url", SanitizeURL(downloadURL),
+					"timeout_seconds", 120,
+					"error", err.Error())
+
+				lastErr = &InstallError{
+					Type: ErrNetwork,
+					Message: fmt.Sprintf("下载超时（120 秒）:\n\n"+
+						"URL: %s\n\n"+
+						"可能的原因:\n"+
+						"1. 网络连接不稳定\n"+
+						"2. 服务器响应缓慢\n"+
+						"3. 防火墙阻止连接\n\n"+
+						"建议: 检查网络连接或稍后重试", SanitizeURL(downloadURL)),
+					Err: err,
+				}
+			} else {
+				// DOWN-03: Windows-specific firewall/antivirus hints
+				isConnectionError := strings.Contains(err.Error(), "connection refused") ||
+					strings.Contains(err.Error(), "connection reset") ||
+					strings.Contains(err.Error(), "timeout")
+
+				if isConnectionError && runtime.GOOS == "windows" {
+					slog.Warn("[templates] Windows network error detected",
+						"error", err.Error(),
+						"suggestion", "firewall or antivirus may be blocking")
+
+					lastErr = &InstallError{
+						Type: ErrNetwork,
+						Message: fmt.Sprintf("网络连接失败:\n\n"+
+							"错误: %v\n\n"+
+							"可能的原因:\n"+
+							"1. Windows 防火墙阻止 Presto 访问网络\n"+
+							"2. 杀毒软件阻止下载\n"+
+							"3. 网络代理配置问题\n\n"+
+							"建议:\n"+
+							"- 检查 Windows 防火墙设置（允许 Presto）\n"+
+							"- 暂时禁用杀毒软件\n"+
+							"- 检查代理设置", err),
+						Err: err,
+					}
+				} else {
+					lastErr = &InstallError{
+						Type:    ErrNetwork,
+						Message: fmt.Sprintf("download failed: %v", err),
+						Err:     err,
+					}
+				}
+			}
+
+			slog.Warn("[download] attempt failed",
+				"attempt", attempt+1,
+				"error", err.Error())
 			continue
 		}
 

@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -207,6 +207,10 @@ func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
 
 	// SEC-06/SEC-17: Validate owner and repo names
 	if err := validateName(owner); err != nil {
+		slog.Error("[templates] invalid owner name",
+			"error_type", string(ErrNotFound),
+			"owner", owner,
+			"error", err.Error())
 		return &InstallError{
 			Type:    ErrNotFound,
 			Message: fmt.Sprintf("invalid owner: %v", err),
@@ -214,6 +218,10 @@ func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
 		}
 	}
 	if err := validateName(repo); err != nil {
+		slog.Error("[templates] invalid repo name",
+			"error_type", string(ErrNotFound),
+			"repo", repo,
+			"error", err.Error())
 		return &InstallError{
 			Type:    ErrNotFound,
 			Message: fmt.Sprintf("invalid repo: %v", err),
@@ -233,14 +241,19 @@ func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
 
 		if gitHubReachable {
 			// Try GitHub first
-			log.Printf("[templates] downloading %s/%s from GitHub: %s", owner, repo, opts.DownloadURL)
-			downloadURL = opts.DownloadURL
+			slog.Info("[templates] starting download",
+				"owner", owner,
+				"repo", repo,
+				"source", "github",
+				"url", SanitizeURL(opts.DownloadURL))
 
 			data, err := downloadWithResume(downloadURL, 3, opts.OnProgress)
 			if err != nil {
 				// GitHub failed, try CDN fallback
 				if opts.CdnURL != "" {
-					log.Printf("[templates] GitHub failed: %v, falling back to CDN: %s", err, opts.CdnURL)
+					slog.Warn("[templates] GitHub failed, falling back to CDN",
+						"error", err.Error(),
+						"cdn_url", SanitizeURL(opts.CdnURL))
 					downloadURL = opts.CdnURL
 					data, err = downloadWithResume(downloadURL, 3, opts.OnProgress)
 					if err != nil {
@@ -256,10 +269,16 @@ func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
 		} else {
 			// GitHub probe failed, go directly to CDN
 			if opts.CdnURL != "" {
-				log.Printf("[templates] GitHub unreachable, downloading %s/%s from CDN: %s", owner, repo, opts.CdnURL)
+				slog.Info("[templates] GitHub unreachable, using CDN",
+					"owner", owner,
+					"repo", repo,
+					"cdn_url", SanitizeURL(opts.CdnURL))
 				downloadURL = opts.CdnURL
 			} else {
-				log.Printf("[templates] GitHub unreachable, downloading %s/%s from GitHub URL: %s", owner, repo, opts.DownloadURL)
+				slog.Info("[templates] GitHub unreachable, using GitHub URL",
+					"owner", owner,
+					"repo", repo,
+					"url", SanitizeURL(opts.DownloadURL))
 				downloadURL = opts.DownloadURL
 			}
 
@@ -273,11 +292,18 @@ func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
 		}
 	} else {
 		// Discovery install path (no opts)
-		log.Printf("[templates] discovery install: %s/%s (fetching from release)", owner, repo)
+		slog.Info("[templates] discovery install",
+		"owner", owner,
+		"repo", repo)
 
 		apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", owner, repo)
 		resp, err := httpClient.Get(apiURL)
 		if err != nil {
+			slog.Error("[templates] fetch release failed",
+				"error_type", string(ErrNetwork),
+				"owner", owner,
+				"repo", repo,
+				"error", err.Error())
 			return &InstallError{
 				Type:    ErrNetwork,
 				Message: fmt.Sprintf("fetch release: %v", err),
@@ -287,6 +313,11 @@ func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
 		defer resp.Body.Close()
 
 		if err := checkHTTPStatus(resp, "fetch release"); err != nil {
+			slog.Error("[templates] fetch release HTTP error",
+				"error_type", string(ErrNotFound),
+				"owner", owner,
+				"repo", repo,
+				"error", err.Error())
 			return &InstallError{
 				Type:    ErrNotFound,
 				Message: fmt.Sprintf("fetch release: %v", err),
@@ -296,6 +327,11 @@ func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
 
 		var release GitHubRelease
 		if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+			slog.Error("[templates] decode release failed",
+				"error_type", string(ErrServer),
+				"owner", owner,
+				"repo", repo,
+				"error", err.Error())
 			return &InstallError{
 				Type:    ErrServer,
 				Message: fmt.Sprintf("decode release: %v", err),
@@ -316,6 +352,12 @@ func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
 			}
 		}
 		if downloadURL == "" {
+			slog.Error("[templates] no binary found for platform",
+				"error_type", string(ErrNotFound),
+				"owner", owner,
+				"repo", repo,
+				"os", runtime.GOOS,
+				"arch", runtime.GOARCH)
 			return &InstallError{
 				Type:    ErrNotFound,
 				Message: fmt.Sprintf("no binary found for %s/%s", runtime.GOOS, runtime.GOARCH),
@@ -326,11 +368,16 @@ func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
 		// SEC-01: Try to fetch checksums from release assets (same-source, weaker)
 		expectedHash = lookupChecksumFromRelease(release.Assets, assetName)
 		if expectedHash == "" {
-			log.Printf("[security] WARNING: no checksums.txt/SHA256SUMS found in release for %s/%s", owner, repo)
+			slog.Warn("[security] no checksum found in release",
+				"owner", owner,
+				"repo", repo)
 		}
 
 		// Download with retry
-		log.Printf("[templates] downloading %s/%s from %s", owner, repo, downloadURL)
+		slog.Info("[templates] downloading binary",
+			"owner", owner,
+			"repo", repo,
+			"url", SanitizeURL(downloadURL))
 		data, err := downloadWithResume(downloadURL, 3, nil)
 		if err != nil {
 			return err
@@ -352,6 +399,11 @@ func (m *Manager) completeInstall(owner, repo string, data []byte, expectedHash 
 	if expectedHash == "" {
 		// SEC-01: official 和 verified 模板必须有 SHA256，缺失则拒绝安装
 		if opts != nil && (opts.Trust == "official" || opts.Trust == "verified") {
+			slog.Error("[templates] SHA256 required for trusted template",
+				"error_type", string(ErrChecksumMismatch),
+				"owner", owner,
+				"repo", repo,
+				"trust", opts.Trust)
 			return &InstallError{
 				Type:    ErrChecksumMismatch,
 				Message: fmt.Sprintf("SHA256 required for %s templates but not found", opts.Trust),
@@ -359,17 +411,27 @@ func (m *Manager) completeInstall(owner, repo string, data []byte, expectedHash 
 			}
 		}
 		// SEC-30: 社区模板无校验时记录警告
-		log.Printf("[security] WARNING: installing %s/%s without SHA256 verification (hash: %s)", owner, repo, actualHex)
+		slog.Warn("[security] installing without SHA256 verification",
+			"owner", owner,
+			"repo", repo,
+			"hash", actualHex)
 	} else {
 		if actualHex != expectedHash {
-			log.Printf("[templates] SHA256 mismatch for %s/%s: expected %s, got %s", owner, repo, expectedHash, actualHex)
+			slog.Error("[templates] SHA256 mismatch",
+				"owner", owner,
+				"repo", repo,
+				"expected", expectedHash,
+				"actual", actualHex)
 			return &InstallError{
 				Type:    ErrChecksumMismatch,
 				Message: fmt.Sprintf("SHA256 mismatch: expected %s, got %s", expectedHash, actualHex),
 				Err:     fmt.Errorf("checksum mismatch"),
 			}
 		}
-		log.Printf("[templates] SHA256 verified for %s/%s: %s", owner, repo, actualHex)
+		slog.Info("[templates] SHA256 verified",
+			"owner", owner,
+			"repo", repo,
+			"hash", actualHex)
 	}
 
 	// Step 3: 验证通过后才执行二进制
@@ -442,8 +504,35 @@ func (m *Manager) completeInstall(owner, repo string, data []byte, expectedHash 
 		}
 	}
 
+	// DOWN-01: Windows-specific path validation (MAX_PATH, invalid chars, reserved names)
+	if runtime.GOOS == "windows" {
+		if err := validateWindowsPath(tplDir); err != nil {
+			slog.Error("[templates] Windows path validation failed",
+				"path", tplDir,
+				"error", err.Error())
+			return &InstallError{
+				Type:    ErrServer,
+				Message: fmt.Sprintf("Windows path error: %v", err),
+				Err:     err,
+			}
+		}
+	}
+
 	// SEC-28: Use restrictive permissions
 	if err := os.MkdirAll(tplDir, 0700); err != nil {
+		slog.Error("[templates] failed to create template directory",
+			"path", tplDir,
+			"error", err.Error())
+
+		// DOWN-02: Windows-specific permission error detection
+		if runtime.GOOS == "windows" && isWindowsPermissionError(err) {
+			return &InstallError{
+				Type:    ErrServer,
+				Message: windowsPermissionErrorMsg(tplDir),
+				Err:     err,
+			}
+		}
+
 		return &InstallError{
 			Type:    ErrServer,
 			Message: fmt.Sprintf("create template dir: %v", err),
@@ -455,6 +544,19 @@ func (m *Manager) completeInstall(owner, repo string, data []byte, expectedHash 
 
 	binPath := filepath.Join(tplDir, binaryName)
 	if err := os.WriteFile(binPath, data, 0700); err != nil {
+		slog.Error("[templates] failed to write binary",
+			"path", binPath,
+			"error", err.Error())
+
+		// DOWN-02: Windows-specific permission error detection
+		if runtime.GOOS == "windows" && isWindowsPermissionError(err) {
+			return &InstallError{
+				Type:    ErrServer,
+				Message: windowsPermissionErrorMsg(binPath),
+				Err:     err,
+			}
+		}
+
 		return &InstallError{
 			Type:    ErrServer,
 			Message: fmt.Sprintf("write binary: %v", err),
@@ -464,7 +566,21 @@ func (m *Manager) completeInstall(owner, repo string, data []byte, expectedHash 
 
 	// Write manifest.json
 	// SEC-45: Restrictive file permissions
-	if err := os.WriteFile(filepath.Join(tplDir, "manifest.json"), manifestBytes, 0600); err != nil {
+	manifestPath := filepath.Join(tplDir, "manifest.json")
+	if err := os.WriteFile(manifestPath, manifestBytes, 0600); err != nil {
+		slog.Error("[templates] failed to write manifest",
+			"path", manifestPath,
+			"error", err.Error())
+
+		// DOWN-02: Windows-specific permission error detection
+		if runtime.GOOS == "windows" && isWindowsPermissionError(err) {
+			return &InstallError{
+				Type:    ErrServer,
+				Message: windowsPermissionErrorMsg(manifestPath),
+				Err:     err,
+			}
+		}
+
 		return &InstallError{
 			Type:    ErrServer,
 			Message: fmt.Sprintf("write manifest: %v", err),
@@ -474,7 +590,11 @@ func (m *Manager) completeInstall(owner, repo string, data []byte, expectedHash 
 
 	// Log completion with duration
 	duration := time.Since(startTime)
-	log.Printf("[templates] installed %s/%s successfully in %s", owner, repo, duration)
+	slog.Info("[templates] installed successfully",
+		"owner", owner,
+		"repo", repo,
+		"duration", duration.String(),
+		"duration_ms", duration.Milliseconds())
 
 	return nil
 }
@@ -488,7 +608,8 @@ func lookupChecksumFromRelease(assets []GitHubAsset, assetName string) string {
 		}
 		// SEC-07: Validate checksum file URL domain
 		if checksumURL, err := url.Parse(asset.BrowserDownloadURL); err != nil || !isAllowedDownloadHost(checksumURL.Host) {
-			log.Printf("[security] BLOCKED: checksum URL host not in whitelist: %s", asset.BrowserDownloadURL)
+			slog.Warn("[security] blocked checksum URL host not in whitelist",
+				"url", SanitizeURL(asset.BrowserDownloadURL))
 			return ""
 		}
 		resp, err := httpClient.Get(asset.BrowserDownloadURL)
@@ -521,23 +642,26 @@ func isGitHubReachable() bool {
 
 	req, err := http.NewRequestWithContext(ctx, "HEAD", "https://api.github.com/zen", nil)
 	if err != nil {
-		log.Printf("[templates] GitHub probe failed: %v", err)
+		slog.Debug("[templates] GitHub probe failed",
+			"error", err.Error())
 		return false
 	}
 
 	resp, err := probeClient.Do(req)
 	if err != nil {
-		log.Printf("[templates] GitHub probe failed: %v", err)
+		slog.Debug("[templates] GitHub probe failed",
+			"error", err.Error())
 		return false
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		log.Printf("[templates] GitHub probe succeeded")
+		slog.Debug("[templates] GitHub probe succeeded")
 		return true
 	}
 
-	log.Printf("[templates] GitHub probe failed: HTTP %d", resp.StatusCode)
+	slog.Debug("[templates] GitHub probe failed",
+		"status_code", resp.StatusCode)
 	return false
 }
 
@@ -556,7 +680,9 @@ func downloadWithRetry(downloadURL string, maxRetries int, onProgress ProgressCa
 		}
 	}
 	if !isAllowedDownloadHost(parsedURL.Host) {
-		log.Printf("[security] BLOCKED: download URL host not in whitelist: %s (full URL: %s)", parsedURL.Host, downloadURL)
+		slog.Warn("[security] blocked download URL host not in whitelist",
+			"host", parsedURL.Host,
+			"url", SanitizeURL(downloadURL))
 		return nil, &InstallError{
 			Type:    ErrNotFound,
 			Message: fmt.Sprintf("download URL host not allowed: %s", parsedURL.Host),
@@ -569,11 +695,17 @@ func downloadWithRetry(downloadURL string, maxRetries int, onProgress ProgressCa
 		if attempt > 0 {
 			// Exponential backoff: 1s, 2s, 4s
 			backoff := time.Duration(1<<(attempt-1)) * time.Second
-			log.Printf("[templates] download attempt %d/%d: waiting %v before retry", attempt+1, maxRetries+1, backoff)
+			slog.Warn("[templates] download failed, retrying",
+				"attempt", attempt+1,
+				"total_attempts", maxRetries+1,
+				"backoff", backoff.String())
 			time.Sleep(backoff)
 		}
 
-		log.Printf("[templates] download attempt %d/%d: %s", attempt+1, maxRetries+1, downloadURL)
+		slog.Info("[templates] download attempt",
+			"attempt", attempt+1,
+			"total_attempts", maxRetries+1,
+			"url", SanitizeURL(downloadURL))
 
 		ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 		req, err := http.NewRequestWithContext(ctx, "GET", downloadURL, nil)
@@ -592,13 +724,63 @@ func downloadWithRetry(downloadURL string, maxRetries int, onProgress ProgressCa
 
 		if err != nil {
 			cancel() // Cancel on error
-			// Network error - retry
-			lastErr = &InstallError{
-				Type:    ErrNetwork,
-				Message: fmt.Sprintf("download failed: %v", err),
-				Err:     err,
+
+			// DOWN-03/DOWN-04: Check for timeout and connection errors
+			if context.DeadlineExceeded == ctx.Err() {
+				slog.Error("[templates] download timeout",
+					"url", SanitizeURL(downloadURL),
+					"timeout_seconds", 120,
+					"error", err.Error())
+
+				lastErr = &InstallError{
+					Type: ErrNetwork,
+					Message: fmt.Sprintf("下载超时（120 秒）:\n\n"+
+						"URL: %s\n\n"+
+						"可能的原因:\n"+
+						"1. 网络连接不稳定\n"+
+						"2. 服务器响应缓慢\n"+
+						"3. 防火墙阻止连接\n\n"+
+						"建议: 检查网络连接或稍后重试", SanitizeURL(downloadURL)),
+					Err: err,
+				}
+			} else {
+				// DOWN-03: Windows-specific firewall/antivirus hints
+				isConnectionError := strings.Contains(err.Error(), "connection refused") ||
+					strings.Contains(err.Error(), "connection reset") ||
+					strings.Contains(err.Error(), "timeout")
+
+				if isConnectionError && runtime.GOOS == "windows" {
+					slog.Warn("[templates] Windows network error detected",
+						"error", err.Error(),
+						"suggestion", "firewall or antivirus may be blocking")
+
+					lastErr = &InstallError{
+						Type: ErrNetwork,
+						Message: fmt.Sprintf("网络连接失败:\n\n"+
+							"错误: %v\n\n"+
+							"可能的原因:\n"+
+							"1. Windows 防火墙阻止 Presto 访问网络\n"+
+							"2. 杀毒软件阻止下载\n"+
+							"3. 网络代理配置问题\n\n"+
+							"建议:\n"+
+							"- 检查 Windows 防火墙设置（允许 Presto）\n"+
+							"- 暂时禁用杀毒软件\n"+
+							"- 检查代理设置", err),
+						Err: err,
+					}
+				} else {
+					// Network error - retry
+					lastErr = &InstallError{
+						Type:    ErrNetwork,
+						Message: fmt.Sprintf("download failed: %v", err),
+						Err:     err,
+					}
+				}
 			}
-			log.Printf("[templates] download attempt %d failed: %v", attempt+1, err)
+
+			slog.Warn("[templates] download attempt failed",
+				"attempt", attempt+1,
+				"error", err.Error())
 			continue
 		}
 
@@ -624,7 +806,9 @@ func downloadWithRetry(downloadURL string, maxRetries int, onProgress ProgressCa
 				Message: fmt.Sprintf("server error: %v", err),
 				Err:     err,
 			}
-			log.Printf("[templates] download attempt %d failed with server error: HTTP %d", attempt+1, statusCode)
+			slog.Warn("[templates] download attempt failed with server error",
+				"attempt", attempt+1,
+				"status_code", statusCode)
 			continue
 		}
 
@@ -647,12 +831,15 @@ func downloadWithRetry(downloadURL string, maxRetries int, onProgress ProgressCa
 				Message: fmt.Sprintf("read response failed: %v", err),
 				Err:     err,
 			}
-			log.Printf("[templates] download attempt %d failed: %v", attempt+1, err)
+			slog.Warn("[templates] download attempt failed",
+				"attempt", attempt+1,
+				"error", err.Error())
 			continue
 		}
 
 		// Success
-		log.Printf("[templates] download succeeded: %d bytes", len(data))
+		slog.Info("[templates] download completed",
+			"bytes", len(data))
 		return data, nil
 	}
 
