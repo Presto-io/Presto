@@ -111,6 +111,40 @@ Presto 自动轮转日志文件以避免占用过多磁盘空间：
 
 超过 5 个历史文件后，最旧的文件会被自动删除。
 
+### 断点续传
+
+Presto 支持模板下载的断点续传功能：
+
+**工作原理：**
+1. 下载时，Presto 将部分下载的文件保存在临时目录中
+   - **Windows**: `%TEMP%\presto-downloads\`
+   - **macOS/Linux**: `/tmp/presto-downloads/`
+
+2. 如果下载中断（网络错误、超时、手动停止），临时文件会被保留
+
+3. 下次下载相同模板时，Presto 会：
+   - 检测临时文件的存在
+   - 使用 HTTP Range 请求从断点继续
+   - 如果服务器不支持 Range，则从头开始（优雅降级）
+
+**临时文件管理：**
+- 文件名：URL hash + `.tmp`（例如：`a1b2c3d4e5f6.tmp`）
+- 清理时机：
+  - 下载成功后立即清理
+  - 应用启动时自动清理所有临时下载文件
+  - 手动清理：可以安全删除 `presto-downloads/` 目录
+
+**注意事项：**
+- 断点续传依赖服务器支持 HTTP Range 请求
+- GitHub Releases 和大多数 CDN 都支持 Range 请求
+- 如果服务器不支持，Presto 会自动降级到普通下载（不影响功能）
+
+**日志示例：**
+```
+INFO [download] resuming from partial download offset_bytes=5242880
+INFO [download] completed with resume support bytes=10485760
+```
+
 ## 报告问题
 
 如果您遇到平台特定问题，请提供：
