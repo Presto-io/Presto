@@ -1,24 +1,9 @@
 <script lang="ts">
-  import { installState } from '$lib/stores/install-state.svelte';
+  import { installState, type ActiveDownloadEntry } from '$lib/stores/install-state.svelte';
   import { fly } from 'svelte/transition';
 
-  interface ProgressItem {
-    name: string;
-    progress: {
-      downloaded: number;
-      total: number;
-      percent: number;
-    };
-  }
-
-  // Get all installing templates with progress
-  // Note: We need to track this from a separate store or pass from parent
-  // For now, this is a placeholder - actual implementation needs template list
-  let downloadingTemplates = $derived(() => {
-    const items: ProgressItem[] = [];
-    // Note: We need to track this from a separate store or pass from parent
-    // For now, this is a placeholder - actual implementation needs template list
-    return items;
+  let downloadingTemplates = $derived.by((): ActiveDownloadEntry[] => {
+    return installState.getActiveDownloads();
   });
 
   // Color palette (5 colors based on template name hash)
@@ -42,7 +27,7 @@
 </script>
 
 <div class="progress-container">
-  {#each downloadingTemplates() as item (item.name)}
+  {#each downloadingTemplates as item (item.name)}
     <div
       class="progress-bar"
       style="--color: {getColorForTemplate(item.name)}"
