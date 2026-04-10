@@ -6,7 +6,7 @@
 
 type InstallStatus = 'idle' | 'installing' | 'installed';
 
-interface DownloadProgress {
+export interface DownloadProgress {
   downloaded: number;  // bytes
   total: number;       // bytes
   percent: number;     // 0-100
@@ -15,6 +15,11 @@ interface DownloadProgress {
 interface InstallStateEntry {
   status: InstallStatus;
   progress?: DownloadProgress;  // undefined when not downloading
+}
+
+export interface ActiveDownloadEntry {
+  name: string;
+  progress: DownloadProgress;
 }
 
 let _states = $state<Map<string, InstallStateEntry>>(new Map());
@@ -26,6 +31,16 @@ export const installState = {
 
   getProgress(templateName: string): DownloadProgress | undefined {
     return _states.get(templateName)?.progress;
+  },
+
+  getActiveDownloads(): ActiveDownloadEntry[] {
+    return Array.from(_states.entries()).flatMap(([name, entry]) => {
+      if (entry.status !== 'installing' || !entry.progress) {
+        return [];
+      }
+
+      return [{ name, progress: entry.progress }];
+    });
   },
 
   setInstalling(templateName: string): void {
