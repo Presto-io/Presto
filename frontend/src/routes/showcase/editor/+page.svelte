@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
+  import { onDestroy } from 'svelte';
   import { page } from '$app/stores';
   import Editor from '$lib/components/Editor.svelte';
   import Preview from '$lib/components/Preview.svelte';
@@ -10,7 +10,7 @@
   import gongwenPage2 from '$lib/showcase/svg/gongwen-page-2.svg?raw';
   import jiaoanPage1 from '$lib/showcase/svg/jiaoan-page-1.svg?raw';
 
-  // Local presets for known templates
+  // Fallback presets for offline/error states.
   const localPresets: Record<string, { example: string; svgs: string[]; displayName: string }> = {
     gongwen: { example: gongwenExample, svgs: [gongwenPage1, gongwenPage2], displayName: '类公文模板' },
     'jiaoan-shicao': { example: jiaoanExample, svgs: [jiaoanPage1], displayName: '实操教案模板' },
@@ -24,46 +24,45 @@
   let loading = $state(false);
   let error = $state('');
 
-  // Registry CDN base URL (configurable)
-  const REGISTRY_BASE = 'https://raw.githubusercontent.com/Presto-io/template-registry/main/templates';
+  const REGISTRY_BASE = 'https://presto.c-1o.top/templates';
+  const FETCH_INIT: RequestInit = { cache: 'no-store' };
+
+  function applyLocalPreset(id: string) {
+    const local = localPresets[id];
+    if (!local) return false;
+
+    editorValue = local.example;
+    svgPages = local.svgs;
+    templateName = local.displayName;
+    return true;
+  }
 
   async function loadFromRegistry(id: string) {
     loading = true;
     error = '';
 
-    // Try local presets first
-    const local = localPresets[id];
-    if (local) {
-      editorValue = local.example;
-      svgPages = local.svgs;
-      templateName = local.displayName;
-      loading = false;
-      return;
-    }
-
-    // Otherwise fetch from registry CDN
     try {
       const [exampleRes, manifestRes] = await Promise.all([
-        fetch(`${REGISTRY_BASE}/${id}/example.md`),
-        fetch(`${REGISTRY_BASE}/${id}/manifest.json`),
+        fetch(`${REGISTRY_BASE}/${id}/example.md`, FETCH_INIT),
+        fetch(`${REGISTRY_BASE}/${id}/manifest.json`, FETCH_INIT),
       ]);
 
       if (!exampleRes.ok) throw new Error(`模板 "${id}" 未找到`);
 
       editorValue = await exampleRes.text();
+      const manifest = manifestRes.ok ? await manifestRes.json() : null;
+      const versionToken = manifest?.version ? `?v=${encodeURIComponent(manifest.version)}` : '';
 
-      if (manifestRes.ok) {
-        const manifest = await manifestRes.json();
+      if (manifest) {
         templateName = manifest.displayName || manifest.name || id;
       } else {
         templateName = id;
       }
 
-      // Try to fetch preview SVGs (up to 5 pages)
       const svgs: string[] = [];
       for (let i = 1; i <= 5; i++) {
         try {
-          const svgRes = await fetch(`${REGISTRY_BASE}/${id}/preview-${i}.svg`);
+          const svgRes = await fetch(`${REGISTRY_BASE}/${id}/preview-${i}.svg${versionToken}`, FETCH_INIT);
           if (!svgRes.ok) break;
           const svg = await svgRes.text();
           svgs.push(DOMPurify.sanitize(svg, {
@@ -77,10 +76,12 @@
       }
       svgPages = svgs;
     } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
-      editorValue = '';
-      svgPages = [];
-      templateName = id;
+      if (!applyLocalPreset(id)) {
+        error = e instanceof Error ? e.message : String(e);
+        editorValue = '';
+        svgPages = [];
+        templateName = id;
+      }
     } finally {
       loading = false;
     }
