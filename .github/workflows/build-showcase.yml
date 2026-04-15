@@ -46,10 +46,3 @@ jobs:
           name: showcase-static
           path: showcase-output
           retention-days: 30
-
-      - name: Trigger Homepage sync
-        uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # v3
-        with:
-          token: ${{ secrets.HOMEPAGE_DISPATCH_TOKEN }}
-          repository: Presto-io/Presto-Homepage
-          event-type: showcase-updated
