@@ -6,6 +6,7 @@
 	import FirstLaunchBanner from '$lib/components/FirstLaunchBanner.svelte';
 	import DownloadProgressBar from '$lib/components/DownloadProgressBar.svelte';
 	import { fileRouter } from '$lib/stores/file-router.svelte';
+	import { notificationStore } from '$lib/stores/notification.svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 
@@ -92,7 +93,14 @@
 		window.addEventListener('dragleave', handleDragLeave, true);
 		window.addEventListener('drop', handleDrop, true);
 
+		// Flush pending notifications when window regains focus
+		window.addEventListener('focus', notificationStore.flushPending);
+
 		if (window.runtime?.EventsOn) {
+			// App notification events from Go backend
+			window.runtime.EventsOn('app:notification', (data: any) => {
+				notificationStore.show(data.message, data.type || 'info');
+			});
 			// URL scheme: presto://install/{name} → navigate to template detail page
 			// Hot start: event pushed from Go via SingleInstanceLock
 			window.runtime.EventsOn('url-scheme-open-template', (name: string) => {
@@ -160,6 +168,7 @@
 			window.removeEventListener('dragover', handleDragOver, true);
 			window.removeEventListener('dragleave', handleDragLeave, true);
 			window.removeEventListener('drop', handleDrop, true);
+			window.removeEventListener('focus', notificationStore.flushPending);
 		};
 	});
 </script>
@@ -189,6 +198,12 @@
 			{fileRouter.toast.message}
 		</div>
 	{/if}
+
+	{#each notificationStore.items as notif (notif.id)}
+		<div class="app-notification" class:notif-success={notif.type === 'success'} class:notif-error={notif.type === 'error'}>
+			{notif.message}
+		</div>
+	{/each}
 	{/if}
 </div>
 
@@ -305,5 +320,26 @@
 		background: var(--color-accent);
 		color: var(--color-bg);
 		border-color: var(--color-accent);
+	}
+	.app-notification {
+		position: fixed;
+		top: var(--space-xl);
+		right: var(--space-xl);
+		z-index: 9002;
+		padding: var(--space-sm) var(--space-lg);
+		background: var(--color-surface);
+		color: var(--color-text);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		font-size: 0.8125rem;
+		font-weight: 500;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+		animation: toast-in 200ms ease-out;
+	}
+	.app-notification.notif-success {
+		border-color: var(--color-success);
+	}
+	.app-notification.notif-error {
+		border-color: var(--color-danger);
 	}
 </style>
