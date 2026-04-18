@@ -731,6 +731,10 @@ func (a *App) GetVersion() string {
 	return version
 }
 
+func (a *App) GetPlatform() string {
+	return runtime.GOOS
+}
+
 // UpdateInfo holds the result of a version check against GitHub releases.
 type UpdateInfo struct {
 	HasUpdate      bool   `json:"hasUpdate"`
