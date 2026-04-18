@@ -24,6 +24,8 @@
         SaveMarkdown: (content: string, filePath: string) => Promise<void>;
         SaveMarkdownAs: (content: string) => Promise<string>;
         UpdateMenuState: (hasContent: boolean) => Promise<void>;
+        GetPlatform: () => Promise<string>;
+        SetWindowTitle: (title: string) => Promise<void>;
       } } };
       runtime?: {
         EventsOn: (event: string, cb: (...args: any[]) => void) => void;
@@ -54,6 +56,16 @@
       tryAutoDetectTemplate(editor.markdown);
       handleConvert(editor.markdown);
     }
+  });
+
+  // Dynamic window title: *filename - Presto (Windows only)
+  $effect(() => {
+    if (!window.go?.main?.App?.SetWindowTitle) return;
+    const filename = editor.currentFilePath
+      ? editor.currentFilePath.split(/[/\\]/).pop() || '未命名'
+      : '未命名';
+    const dirtyMark = editor.isDirty ? '*' : '';
+    window.go.main.App.SetWindowTitle(`${dirtyMark}${filename} - Presto`);
   });
 
   let editorScrollRatio = $state(0);

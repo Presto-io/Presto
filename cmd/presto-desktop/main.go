@@ -735,6 +735,12 @@ func (a *App) GetPlatform() string {
 	return runtime.GOOS
 }
 
+func (a *App) SetWindowTitle(title string) {
+	if runtime.GOOS == "windows" {
+		wailsRuntime.WindowSetTitle(a.ctx, title)
+	}
+}
+
 // UpdateInfo holds the result of a version check against GitHub releases.
 type UpdateInfo struct {
 	HasUpdate      bool   `json:"hasUpdate"`
