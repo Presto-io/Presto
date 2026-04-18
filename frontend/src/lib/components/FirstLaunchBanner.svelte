@@ -1,11 +1,19 @@
 <script lang="ts">
   import { firstLaunchStore } from '$lib/stores/first-launch.svelte';
+  import { onMount } from 'svelte';
 
   let { state, getManualDownloadUrl } = firstLaunchStore;
+
+  let isMac = $state(false);
+  onMount(async () => {
+    if (window.go?.main?.App?.GetPlatform) {
+      isMac = (await window.go.main.App.GetPlatform()) === 'darwin';
+    }
+  });
 </script>
 
 {#if state.isActive || state.errorMessage}
-  <div class="banner">
+  <div class="banner" class:mac-offset={isMac}>
     {#if state.isActive}
       <div class="progress-info">
         <span class="text">
@@ -56,6 +64,10 @@
     padding: 8px 16px;
     z-index: 100;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  .banner.mac-offset {
+    padding-left: 78px;
   }
 
   .progress-info {
