@@ -706,6 +706,10 @@ func (a *App) InstallTemplate(templateName string) error {
 
 	// Emit templates-changed event to refresh frontend
 	wailsRuntime.EventsEmit(a.ctx, "templates-changed")
+	wailsRuntime.EventsEmit(a.ctx, "app:notification", map[string]string{
+		"message": fmt.Sprintf("模板 %s 下载完成", templateName),
+		"type":    "success",
+	})
 	return nil
 }
 
@@ -862,6 +866,10 @@ func (a *App) SavePDF(markdown string, templateId string, workDir string) error 
 	}
 
 	logger.Info("[desktop] saved PDF", "path", savePath, "bytes", len(pdf))
+	wailsRuntime.EventsEmit(a.ctx, "app:notification", map[string]string{
+		"message": "PDF 导出成功",
+		"type":    "success",
+	})
  return nil
 }
 
