@@ -277,6 +277,12 @@
     return installedVersions.has(name);
   }
 
+  function formatBytes(bytes: number): string {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
   function hasUpdate(name: string, latestVersion: string): boolean {
     const installedVersion = installedVersions.get(name);
     if (!installedVersion) return false;
@@ -559,7 +565,7 @@
               onclick={() => selectTemplate(tpl.name)}
             >
               <span class="nav-tpl-name">{tpl.displayName}</span>
-              <span class="nav-trust-dot" style="background:{badge.color}"></span>
+              <span class="nav-trust-dot" class:installing={installState.isInstalling(tpl.name)} style="background:{badge.color}"></span>
             </button>
           {/each}
         </nav>
@@ -682,9 +688,22 @@
             <div class="actions-left">
               {#if mode === 'desktop' && installFn}
                 {#if installState.isInstalling(selectedTemplate.name)}
-                  <button class="btn-installing" disabled>
-                    <span class="status-dot"></span><span>安装中...</span>
-                  </button>
+                  {@const progress = installState.getProgress(selectedTemplate.name)}
+                  {@const pct = progress?.percent ?? 0}
+                  {@const circumference = 2 * Math.PI * 14}
+                  {@const offset = circumference * (1 - pct / 100)}
+                  <div class="progress-ring-wrapper" title={progress ? `${formatBytes(progress.downloaded)} / ${formatBytes(progress.total)}` : '准备中...'}>
+                    <svg class="progress-ring" width="36" height="36" viewBox="0 0 36 36">
+                      <circle class="progress-ring-track" cx="18" cy="18" r="14" />
+                      <circle
+                        class="progress-ring-fill"
+                        cx="18" cy="18" r="14"
+                        stroke-dasharray={circumference}
+                        stroke-dashoffset={offset}
+                      />
+                    </svg>
+                    <span class="progress-ring-stop">■</span>
+                  </div>
                 {:else if isInstalled(selectedTemplate.name) && hasUpdate(selectedTemplate.name, selectedTemplate.version)}
                   <button class="btn-install" onclick={() => handleInstall(selectedTemplate!)}>
                     <RefreshCw size={14} /><span>更新</span>
@@ -1380,6 +1399,9 @@
     border-radius: 50%;
     flex-shrink: 0;
   }
+  .nav-trust-dot.installing {
+    animation: pulse 1s ease-in-out infinite;
+  }
 
   /* Detail panel */
   .store-detail {
@@ -1716,6 +1738,40 @@
     background: var(--color-accent);
     animation: pulse 1s ease-in-out infinite;
   }
+
+  /* Progress ring (iOS App Store style) */
+  .progress-ring-wrapper {
+    position: relative;
+    width: 36px;
+    height: 36px;
+    cursor: default;
+  }
+  .progress-ring {
+    transform: rotate(-90deg);
+  }
+  .progress-ring-track {
+    fill: none;
+    stroke: var(--color-border);
+    stroke-width: 2.5;
+  }
+  .progress-ring-fill {
+    fill: none;
+    stroke: var(--color-accent);
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 300ms linear;
+  }
+  .progress-ring-stop {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: var(--color-accent);
+    pointer-events: none;
+  }
+
   @keyframes pulse {
     0%, 100% { opacity: 0.4; }
     50% { opacity: 1; }
