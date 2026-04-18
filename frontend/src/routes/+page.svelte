@@ -26,6 +26,8 @@
         UpdateMenuState: (hasContent: boolean) => Promise<void>;
         GetPlatform: () => Promise<string>;
         SetWindowTitle: (title: string) => Promise<void>;
+        ConfirmSaveDialog: (filename: string) => Promise<string>;
+        QuitApp: () => Promise<void>;
       } } };
       runtime?: {
         EventsOn: (event: string, cb: (...args: any[]) => void) => void;
@@ -220,9 +222,19 @@
     return 'output';
   }
 
-  function handleNew() {
+  async function handleNew() {
     if (editor.isDirty && editor.markdown.trim()) {
-      if (!confirm('当前文档未保存，是否继续？')) return;
+      if (window.go?.main?.App?.ConfirmSaveDialog) {
+        const filename = editor.currentFilePath?.split(/[/\\]/).pop() || '';
+        const result = await window.go.main.App.ConfirmSaveDialog(filename);
+        if (result === 'Save') {
+          await handleSave();
+        } else if (result === 'Cancel') {
+          return;
+        }
+      } else {
+        if (!confirm('当前文档未保存，是否继续？')) return;
+      }
     }
     editor.markdown = '';
     editor.typstSource = '';
@@ -384,6 +396,15 @@
   }
 
   onMount(() => {
+    // Intercept window close when editor has unsaved changes
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      if (editor.isDirty && editor.markdown.trim()) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
     // Listen for Wails menu events
     if (window.runtime?.EventsOn) {
       window.runtime.EventsOn('menu:open', handleOpen);
@@ -394,6 +415,21 @@
       window.runtime.EventsOn('menu:save', handleSave);
       window.runtime.EventsOn('menu:saveas', handleSaveAs);
       window.runtime.EventsOn('menu:store', () => goto('/store-templates'));
+
+      window.runtime.EventsOn('menu:quit', async () => {
+        if (editor.isDirty && editor.markdown.trim()) {
+          const filename = editor.currentFilePath?.split(/[/\\]/).pop() || '';
+          const result = await window.go!.main.App.ConfirmSaveDialog(filename);
+          if (result === 'Save') {
+            await handleSave();
+            window.go!.main.App.QuitApp();
+          } else if (result === "Don't Save") {
+            window.go!.main.App.QuitApp();
+          }
+        } else {
+          window.go?.main?.App?.QuitApp();
+        }
+      });
     }
     // Keyboard shortcut for web: Cmd+, opens settings
     function handleKeydown(e: KeyboardEvent) {
@@ -409,6 +445,7 @@
     document.addEventListener('keydown', handleKeydown);
     return () => {
       document.removeEventListener('keydown', handleKeydown);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
       if (window.runtime?.EventsOff) {
         window.runtime.EventsOff('menu:open');
         window.runtime.EventsOff('menu:export');
@@ -418,6 +455,7 @@
         window.runtime.EventsOff('menu:save');
         window.runtime.EventsOff('menu:saveas');
         window.runtime.EventsOff('menu:store');
+        window.runtime.EventsOff('menu:quit');
       }
     };
   });

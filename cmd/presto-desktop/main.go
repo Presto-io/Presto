@@ -529,7 +529,7 @@ func buildMenu(app *App) *menu.Menu {
 	})
 	fileMenu.AddSeparator()
 	fileMenu.AddText("退出", keys.CmdOrCtrl("w"), func(_ *menu.CallbackData) {
-		wailsRuntime.Quit(app.ctx)
+		wailsRuntime.EventsEmit(app.ctx, "menu:quit")
 	})
 
 	// 编辑菜单（Wails 内置）
@@ -743,6 +743,33 @@ func (a *App) SetWindowTitle(title string) {
 	if runtime.GOOS == "windows" {
 		wailsRuntime.WindowSetTitle(a.ctx, title)
 	}
+}
+
+func (a *App) ConfirmSaveDialog(filename string) (string, error) {
+	msg := "是否保存对文档的更改？"
+	if filename != "" {
+		msg = fmt.Sprintf("是否保存对 \"%s\" 的更改？", filename)
+	}
+	result, err := wailsRuntime.MessageDialog(a.ctx, wailsRuntime.MessageDialogOptions{
+		Type:    wailsRuntime.QuestionDialog,
+		Title:   "Presto",
+		Message: msg,
+	})
+	if err != nil {
+		return "Cancel", err
+	}
+	switch result {
+	case "Yes":
+		return "Save", nil
+	case "No":
+		return "Don't Save", nil
+	default:
+		return "Cancel", nil
+	}
+}
+
+func (a *App) QuitApp() {
+	wailsRuntime.Quit(a.ctx)
 }
 
 // UpdateInfo holds the result of a version check against GitHub releases.
