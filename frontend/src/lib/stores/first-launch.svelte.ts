@@ -165,6 +165,10 @@ export const firstLaunchStore = {
     });
 
     console.log('[first-launch] all event listeners registered successfully');
+
+    // Signal Go backend that frontend is ready to receive events
+    rt.EventsEmit('frontend:ready');
+    console.log('[first-launch] emitted frontend:ready signal');
   },
 
   reset() {
