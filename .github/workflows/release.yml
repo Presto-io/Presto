@@ -16,8 +16,33 @@ env:
   TYPST_VERSION: '0.14.2'
 
 jobs:
+  verify-tag-source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify tag is on main lineage
+        run: |
+          if [[ "${{ github.event_name }}" != "push" ]] || [[ ! "${{ github.ref }}" =~ ^refs/tags/v ]]; then
+            echo "Not a tag push, skipping lineage verification."
+            exit 0
+          fi
+
+          git fetch origin main --tags
+          if git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "Tag commit is on origin/main lineage."
+            exit 0
+          fi
+
+          echo "::error::Release tag ${GITHUB_REF_NAME} does not belong to origin/main lineage."
+          echo "::error::Create release tags from main to keep git describe / changelog history correct."
+          exit 1
+
   # ── Frontend: build once, share across platforms ──────────
   build-frontend:
+    needs: verify-tag-source
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
