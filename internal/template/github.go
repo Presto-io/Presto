@@ -247,7 +247,7 @@ func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
 				"source", "github",
 				"url", SanitizeURL(opts.DownloadURL))
 
-			data, err := downloadWithResume(downloadURL, 3, opts.OnProgress)
+			data, err := downloadWithResume(opts.DownloadURL, 3, opts.OnProgress)
 			if err != nil {
 				// GitHub failed, try CDN fallback
 				if opts.CdnURL != "" {

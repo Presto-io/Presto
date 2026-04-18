@@ -138,8 +138,25 @@ func (a *App) startup(ctx context.Context) {
 		}
 	})
 
-	// Check if this is first launch (no templates installed)
-	go a.checkFirstLaunch()
+	// Wait for frontend to signal readiness before emitting first-launch events.
+	// Without this, events fire before the WebView registers listeners and are lost.
+	frontendReady := make(chan struct{}, 1)
+	wailsRuntime.EventsOnce(ctx, "frontend:ready", func(optionalData ...interface{}) {
+		select {
+		case frontendReady <- struct{}{}:
+		default:
+		}
+	})
+
+	go func() {
+		select {
+		case <-frontendReady:
+			logger.Info("[startup] frontend ready, checking first launch")
+		case <-time.After(5 * time.Second):
+			logger.Warn("[startup] frontend ready timeout, proceeding anyway")
+		}
+		a.checkFirstLaunch()
+	}()
 }
 
 // checkFirstLaunch detects if this is the first launch (no templates installed)
