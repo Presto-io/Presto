@@ -4,6 +4,7 @@
 	import { FileText } from 'lucide-svelte';
 	import WizardOverlay from '$lib/components/wizard/WizardOverlay.svelte';
 	import DownloadProgressBar from '$lib/components/DownloadProgressBar.svelte';
+	import FirstLaunchBanner from '$lib/components/FirstLaunchBanner.svelte';
 	import { fileRouter } from '$lib/stores/file-router.svelte';
 	import { notificationStore } from '$lib/stores/notification.svelte';
 	import { page } from '$app/stores';
@@ -177,7 +178,10 @@
 		{@render children()}
 	</main>
 	{#if !isShowcase}
-		<DownloadProgressBar />
+		<div class="bottom-status">
+			<FirstLaunchBanner />
+			<DownloadProgressBar />
+		</div>
 	<WizardOverlay />
 
 	{#if dragOver}
@@ -228,6 +232,13 @@
 		overflow: hidden;
 		display: flex;
 		flex-direction: column;
+	}
+	.bottom-status {
+		position: fixed;
+		bottom: 0;
+		left: 0;
+		right: 0;
+		z-index: 9000;
 	}
 	.drop-overlay {
 		position: fixed;
