@@ -3,7 +3,6 @@
 	import { onMount } from 'svelte';
 	import { FileText } from 'lucide-svelte';
 	import WizardOverlay from '$lib/components/wizard/WizardOverlay.svelte';
-	import FirstLaunchBanner from '$lib/components/FirstLaunchBanner.svelte';
 	import DownloadProgressBar from '$lib/components/DownloadProgressBar.svelte';
 	import { fileRouter } from '$lib/stores/file-router.svelte';
 	import { notificationStore } from '$lib/stores/notification.svelte';
@@ -179,7 +178,6 @@
 	</main>
 	{#if !isShowcase}
 		<DownloadProgressBar />
-		<FirstLaunchBanner />
 	<WizardOverlay />
 
 	{#if dragOver}
