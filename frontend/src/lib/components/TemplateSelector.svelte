@@ -6,6 +6,7 @@
   import { goto } from '$app/navigation';
   import { templateStore } from '$lib/stores/templates.svelte';
   import { firstLaunchStore } from '$lib/stores/first-launch.svelte';
+  import { editor } from '$lib/stores/editor.svelte';
 
   let {
     selected = $bindable(''),
@@ -50,7 +51,7 @@
 
   onMount(() => {
     templateStore.load().then(() => {
-      if (!selected && templates.length > 0) {
+      if (!selected && templates.length > 0 && !editor.markdown.trim() && !editor.pendingExternalLoad) {
         if (onbeforechange) {
           onbeforechange(templates[0].name);
         } else {
