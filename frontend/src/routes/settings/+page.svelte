@@ -585,7 +585,14 @@
             </div>
 
             <h4 class="subsection-title">快捷键</h4>
+            <p class="section-desc">
+              Web 端通过工具栏 + 快捷键提供菜单兼容，不显示桌面式菜单栏；退出应用等行为继续交给桌面原生菜单，不在浏览器中模拟。
+            </p>
             <div class="shortcut-list">
+              <div class="shortcut-row">
+                <span class="shortcut-action">新建文档</span>
+                <span class="shortcut-keys"><kbd>{mod}</kbd><kbd>N</kbd></span>
+              </div>
               <div class="shortcut-row">
                 <span class="shortcut-action">打开文件</span>
                 <span class="shortcut-keys"><kbd>{mod}</kbd><kbd>O</kbd></span>

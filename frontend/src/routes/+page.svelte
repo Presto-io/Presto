@@ -390,52 +390,83 @@
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     // Listen for Wails menu events
-    if (window.runtime?.EventsOn) {
-      window.runtime.EventsOn('menu:open', handleOpen);
-      window.runtime.EventsOn('menu:export', handleDownload);
-      window.runtime.EventsOn('menu:settings', () => goto('/settings'));
-      window.runtime.EventsOn('menu:templates', () => goto('/settings'));
-      window.runtime.EventsOn('menu:new', handleNew);
-      window.runtime.EventsOn('menu:save', handleSave);
-      window.runtime.EventsOn('menu:saveas', handleSaveAs);
-      window.runtime.EventsOn('menu:store', () => goto('/store-templates'));
+    const runtime = window.runtime;
+    const hasDesktopRuntime = Boolean(runtime?.EventsOn);
 
-      window.runtime.EventsOn('menu:quit', async () => {
+    if (runtime?.EventsOn) {
+      runtime.EventsOn('menu:open', handleOpen);
+      runtime.EventsOn('menu:export', handleDownload);
+      runtime.EventsOn('menu:settings', () => goto('/settings'));
+      runtime.EventsOn('menu:templates', () => goto('/settings?panel=tpl-manage'));
+      runtime.EventsOn('menu:new', handleNew);
+      runtime.EventsOn('menu:save', handleSave);
+      runtime.EventsOn('menu:saveas', handleSaveAs);
+      runtime.EventsOn('menu:store', () => goto('/store-templates'));
+
+      runtime.EventsOn('menu:quit', async () => {
         window.go?.main?.App?.QuitApp();
       });
 
-      window.runtime.EventsOn('app:save-and-close', async () => {
+      runtime.EventsOn('app:save-and-close', async () => {
         await handleSave();
         window.go?.main?.App?.SetDirtyState?.(false, '');
         window.go!.main.App.QuitApp();
       });
     }
-    // Keyboard shortcut for web: Cmd+, opens settings
+    // Browser-only menu compatibility shortcuts. Desktop keeps using native menus.
     function handleKeydown(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key === ',') {
+      if (hasDesktopRuntime || (!e.metaKey && !e.ctrlKey)) return;
+
+      const key = e.key.toLowerCase();
+
+      if (key === ',') {
         e.preventDefault();
         goto('/settings');
+        return;
       }
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 't' || e.key === 'T')) {
+
+      if (e.shiftKey && key === 't') {
         e.preventDefault();
-        goto('/settings');
+        goto('/settings?panel=tpl-manage');
+        return;
+      }
+
+      if (key === 'o') {
+        e.preventDefault();
+        void handleOpen();
+        return;
+      }
+
+      if (key === 'e') {
+        e.preventDefault();
+        void handleDownload();
+        return;
+      }
+
+      if (key === 'n') {
+        e.preventDefault();
+        void handleNew();
       }
     }
-    document.addEventListener('keydown', handleKeydown);
+    if (!hasDesktopRuntime) {
+      document.addEventListener('keydown', handleKeydown);
+    }
     return () => {
-      document.removeEventListener('keydown', handleKeydown);
+      if (!hasDesktopRuntime) {
+        document.removeEventListener('keydown', handleKeydown);
+      }
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      if (window.runtime?.EventsOff) {
-        window.runtime.EventsOff('menu:open');
-        window.runtime.EventsOff('menu:export');
-        window.runtime.EventsOff('menu:settings');
-        window.runtime.EventsOff('menu:templates');
-        window.runtime.EventsOff('menu:new');
-        window.runtime.EventsOff('menu:save');
-        window.runtime.EventsOff('menu:saveas');
-        window.runtime.EventsOff('menu:store');
-        window.runtime.EventsOff('menu:quit');
-        window.runtime.EventsOff('app:save-and-close');
+      if (runtime?.EventsOff) {
+        runtime.EventsOff('menu:open');
+        runtime.EventsOff('menu:export');
+        runtime.EventsOff('menu:settings');
+        runtime.EventsOff('menu:templates');
+        runtime.EventsOff('menu:new');
+        runtime.EventsOff('menu:save');
+        runtime.EventsOff('menu:saveas');
+        runtime.EventsOff('menu:store');
+        runtime.EventsOff('menu:quit');
+        runtime.EventsOff('app:save-and-close');
       }
     };
   });

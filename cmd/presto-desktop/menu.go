@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"runtime"
 
 	"github.com/wailsapp/wails/v2/pkg/menu"
 	"github.com/wailsapp/wails/v2/pkg/menu/keys"
@@ -9,9 +10,31 @@ import (
 )
 
 func buildMenu(app *App) *menu.Menu {
-	appMenu := menu.NewMenu()
-	appMenu.Append(menu.AppMenu())
+	return buildMenuForPlatform(app, runtime.GOOS)
+}
 
+func buildMenuForPlatform(app *App, platform string) *menu.Menu {
+	appMenu := menu.NewMenu()
+	isDarwin := platform == "darwin"
+
+	if isDarwin {
+		appMenu.Append(menu.AppMenu())
+	}
+
+	addFileMenu(appMenu, app)
+	appMenu.Append(menu.EditMenu())
+	addTemplateMenu(appMenu, app)
+
+	if isDarwin {
+		appMenu.Append(menu.WindowMenu())
+	}
+
+	addHelpMenu(appMenu, app, !isDarwin)
+
+	return appMenu
+}
+
+func addFileMenu(appMenu *menu.Menu, app *App) {
 	fileMenu := appMenu.AddSubmenu("文件")
 	fileMenu.AddText("新建", keys.CmdOrCtrl("n"), func(_ *menu.CallbackData) {
 		wailsRuntime.EventsEmit(app.ctx, "menu:new")
@@ -33,20 +56,9 @@ func buildMenu(app *App) *menu.Menu {
 	fileMenu.AddText("设置…", keys.CmdOrCtrl(","), func(_ *menu.CallbackData) {
 		wailsRuntime.EventsEmit(app.ctx, "menu:settings")
 	})
-	fileMenu.AddSeparator()
-	fileMenu.AddText("最小化", keys.CmdOrCtrl("m"), func(_ *menu.CallbackData) {
-		wailsRuntime.WindowMinimise(app.ctx)
-	})
-	fileMenu.AddText("缩放", nil, func(_ *menu.CallbackData) {
-		wailsRuntime.WindowToggleMaximise(app.ctx)
-	})
-	fileMenu.AddSeparator()
-	fileMenu.AddText("退出", keys.CmdOrCtrl("w"), func(_ *menu.CallbackData) {
-		wailsRuntime.EventsEmit(app.ctx, "menu:quit")
-	})
+}
 
-	appMenu.Append(menu.EditMenu())
-
+func addTemplateMenu(appMenu *menu.Menu, app *App) {
 	templateMenu := appMenu.AddSubmenu("模板")
 	templateMenu.AddText("模板商店", nil, func(_ *menu.CallbackData) {
 		wailsRuntime.EventsEmit(app.ctx, "menu:store")
@@ -54,19 +66,21 @@ func buildMenu(app *App) *menu.Menu {
 	templateMenu.AddText("模板管理…", keys.Combo("t", keys.CmdOrCtrlKey, keys.ShiftKey), func(_ *menu.CallbackData) {
 		wailsRuntime.EventsEmit(app.ctx, "menu:templates")
 	})
+}
 
+func addHelpMenu(appMenu *menu.Menu, app *App, includeAbout bool) {
 	helpMenu := appMenu.AddSubmenu("帮助")
 	helpMenu.AddText("文档", nil, func(_ *menu.CallbackData) {
 		wailsRuntime.BrowserOpenURL(app.ctx, "https://presto.io/docs")
 	})
-	helpMenu.AddText("关于 Presto", nil, func(_ *menu.CallbackData) {
-		app.ShowAboutDialog()
-	})
+	if includeAbout {
+		helpMenu.AddText("关于 Presto", nil, func(_ *menu.CallbackData) {
+			app.ShowAboutDialog()
+		})
+	}
 	helpMenu.AddText("检查更新", nil, func(_ *menu.CallbackData) {
 		go app.CheckAndNotifyUpdate()
 	})
-
-	return appMenu
 }
 
 func (a *App) ShowAboutDialog() {

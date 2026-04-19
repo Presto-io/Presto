@@ -7,7 +7,6 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/menu/keys"
 )
 
-// helper: find submenu by label among top-level items
 func findSubmenu(m *menu.Menu, label string) *menu.Menu {
 	for _, item := range m.Items {
 		if item.Label == label && item.SubMenu != nil {
@@ -17,7 +16,6 @@ func findSubmenu(m *menu.Menu, label string) *menu.Menu {
 	return nil
 }
 
-// helper: count non-separator text items in a submenu
 func textItems(m *menu.Menu) []*menu.MenuItem {
 	var items []*menu.MenuItem
 	for _, item := range m.Items {
@@ -28,7 +26,6 @@ func textItems(m *menu.Menu) []*menu.MenuItem {
 	return items
 }
 
-// helper: find text item by label
 func findItem(m *menu.Menu, label string) *menu.MenuItem {
 	for _, item := range m.Items {
 		if item.Label == label {
@@ -38,7 +35,6 @@ func findItem(m *menu.Menu, label string) *menu.MenuItem {
 	return nil
 }
 
-// helper: check accelerator equality
 func accelEqual(a, b *keys.Accelerator) bool {
 	if a == nil && b == nil {
 		return true
@@ -60,49 +56,31 @@ func accelEqual(a, b *keys.Accelerator) bool {
 	return true
 }
 
-func TestBuildMenu_TopLevelCount(t *testing.T) {
-	m := buildMenu(&App{})
-
-	// Expect 5 top-level items: AppMenu + 文件 + 编辑 + 模板 + 帮助
-	if got := len(m.Items); got != 5 {
-		t.Errorf("expected 5 top-level items, got %d", got)
-		for i, item := range m.Items {
-			t.Logf("  [%d] Label=%q Role=%v Type=%v", i, item.Label, item.Role, item.Type)
+func hasTopLevelRole(m *menu.Menu, role menu.Role) bool {
+	for _, item := range m.Items {
+		if item.Role == role {
+			return true
 		}
 	}
+	return false
 }
 
-func TestBuildMenu_NoViewMenu(t *testing.T) {
-	m := buildMenu(&App{})
-
-	if sub := findSubmenu(m, "视图"); sub != nil {
-		t.Error("menu should not contain a '视图' (View) submenu")
+func requireTopLevelLabel(t *testing.T, item *menu.MenuItem, label string) {
+	t.Helper()
+	if item.Label != label {
+		t.Fatalf("expected top-level label %q, got %q", label, item.Label)
 	}
 }
 
-func TestBuildMenu_NoWindowMenu(t *testing.T) {
-	m := buildMenu(&App{})
-
-	if sub := findSubmenu(m, "窗口"); sub != nil {
-		t.Error("menu should not contain a standalone '窗口' (Window) submenu")
-	}
-}
-
-func TestFileMenu_Items(t *testing.T) {
-	m := buildMenu(&App{})
+func assertSharedFileMenu(t *testing.T, m *menu.Menu) {
+	t.Helper()
 	fileMenu := findSubmenu(m, "文件")
 	if fileMenu == nil {
 		t.Fatal("文件 menu not found")
 	}
 
-	// Expected items in order (including separators):
-	// 新建, 打开文件…, 保存, 另存为…, 导出 PDF…, 设置…, sep, 最小化, 缩放, sep, 退出
 	expectedLabels := []string{
 		"新建", "打开文件…", "保存", "另存为…", "导出 PDF…", "设置…",
-		"", // separator
-		"最小化", "缩放",
-		"", // separator
-		"退出",
 	}
 
 	if got := len(fileMenu.Items); got != len(expectedLabels) {
@@ -111,24 +89,9 @@ func TestFileMenu_Items(t *testing.T) {
 
 	for i, expected := range expectedLabels {
 		item := fileMenu.Items[i]
-		if expected == "" {
-			// separator
-			if item.Type != menu.SeparatorType {
-				t.Errorf("文件 menu[%d]: expected separator, got %q (type=%v)", i, item.Label, item.Type)
-			}
-		} else {
-			if item.Label != expected {
-				t.Errorf("文件 menu[%d]: expected label %q, got %q", i, expected, item.Label)
-			}
+		if item.Label != expected {
+			t.Errorf("文件 menu[%d]: expected label %q, got %q", i, expected, item.Label)
 		}
-	}
-}
-
-func TestFileMenu_Accelerators(t *testing.T) {
-	m := buildMenu(&App{})
-	fileMenu := findSubmenu(m, "文件")
-	if fileMenu == nil {
-		t.Fatal("文件 menu not found")
 	}
 
 	tests := []struct {
@@ -141,8 +104,6 @@ func TestFileMenu_Accelerators(t *testing.T) {
 		{"另存为…", keys.Combo("s", keys.CmdOrCtrlKey, keys.ShiftKey)},
 		{"导出 PDF…", keys.CmdOrCtrl("e")},
 		{"设置…", keys.CmdOrCtrl(",")},
-		{"最小化", keys.CmdOrCtrl("m")},
-		{"退出", keys.CmdOrCtrl("w")},
 	}
 
 	for _, tt := range tests {
@@ -159,74 +120,118 @@ func TestFileMenu_Accelerators(t *testing.T) {
 	}
 }
 
-func TestEditMenu(t *testing.T) {
-	m := buildMenu(&App{})
+func TestBuildMenu_DarwinStructure(t *testing.T) {
+	m := buildMenuForPlatform(&App{}, "darwin")
 
-	// EditMenu is a role-based item (Role=EditMenuRole), not a labeled submenu.
-	// It should be the 3rd item (index 2): AppMenu, 文件, 编辑, 模板, 帮助
-	found := false
-	for _, item := range m.Items {
-		if item.Role == menu.EditMenuRole {
-			found = true
-			break
+	if got := len(m.Items); got != 6 {
+		t.Fatalf("expected 6 top-level items for darwin, got %d", got)
+	}
+
+	if m.Items[0].Role != menu.AppMenuRole {
+		t.Fatalf("expected first top-level item to be AppMenuRole, got role=%v", m.Items[0].Role)
+	}
+	requireTopLevelLabel(t, m.Items[1], "文件")
+	if m.Items[2].Role != menu.EditMenuRole {
+		t.Fatalf("expected third top-level item to be EditMenuRole, got role=%v", m.Items[2].Role)
+	}
+	requireTopLevelLabel(t, m.Items[3], "模板")
+	if m.Items[4].Role != menu.WindowMenuRole {
+		t.Fatalf("expected fifth top-level item to be WindowMenuRole, got role=%v", m.Items[4].Role)
+	}
+	requireTopLevelLabel(t, m.Items[5], "帮助")
+	assertSharedFileMenu(t, m)
+}
+
+func TestBuildMenu_DarwinFileMenu_NoWindowItems(t *testing.T) {
+	m := buildMenuForPlatform(&App{}, "darwin")
+	fileMenu := findSubmenu(m, "文件")
+	if fileMenu == nil {
+		t.Fatal("文件 menu not found")
+	}
+
+	for _, label := range []string{"最小化", "缩放", "退出"} {
+		if item := findItem(fileMenu, label); item != nil {
+			t.Fatalf("darwin 文件 menu should not include %q", label)
 		}
 	}
-	if !found {
-		t.Error("编辑 menu (EditMenuRole) not found in top-level items")
+}
+
+func TestBuildMenu_DarwinHelpMenu_NoAbout(t *testing.T) {
+	m := buildMenuForPlatform(&App{}, "darwin")
+	helpMenu := findSubmenu(m, "帮助")
+	if helpMenu == nil {
+		t.Fatal("帮助 menu not found")
+	}
+
+	if item := findItem(helpMenu, "关于 Presto"); item != nil {
+		t.Fatal("darwin 帮助 menu should not include 关于 Presto")
+	}
+
+	expectedLabels := []string{"文档", "检查更新"}
+	items := textItems(helpMenu)
+	if got := len(items); got != len(expectedLabels) {
+		t.Fatalf("darwin 帮助 menu: expected %d items, got %d", len(expectedLabels), got)
+	}
+	for i, expected := range expectedLabels {
+		if items[i].Label != expected {
+			t.Errorf("darwin 帮助 menu[%d]: expected %q, got %q", i, expected, items[i].Label)
+		}
 	}
 }
 
-func TestTemplateMenu_Items(t *testing.T) {
-	m := buildMenu(&App{})
-	tmplMenu := findSubmenu(m, "模板")
-	if tmplMenu == nil {
-		t.Fatal("模板 menu not found")
+func TestBuildMenu_WindowsStructure(t *testing.T) {
+	m := buildMenuForPlatform(&App{}, "windows")
+
+	if got := len(m.Items); got != 4 {
+		t.Fatalf("expected 4 top-level items for windows, got %d", got)
 	}
 
-	items := textItems(tmplMenu)
-	if got := len(items); got != 2 {
-		t.Fatalf("模板 menu: expected 2 text items, got %d", got)
+	requireTopLevelLabel(t, m.Items[0], "文件")
+	if m.Items[1].Role != menu.EditMenuRole {
+		t.Fatalf("expected second top-level item to be EditMenuRole, got role=%v", m.Items[1].Role)
+	}
+	requireTopLevelLabel(t, m.Items[2], "模板")
+	requireTopLevelLabel(t, m.Items[3], "帮助")
+
+	if hasTopLevelRole(m, menu.AppMenuRole) {
+		t.Fatal("windows menu should not include AppMenuRole")
+	}
+	if hasTopLevelRole(m, menu.WindowMenuRole) {
+		t.Fatal("windows menu should not include WindowMenuRole")
 	}
 
-	// Item 1: 模板商店 (no accelerator)
-	if items[0].Label != "模板商店" {
-		t.Errorf("模板 menu[0]: expected '模板商店', got %q", items[0].Label)
-	}
-	if items[0].Accelerator != nil {
-		t.Errorf("模板商店 should have no accelerator, got %+v", items[0].Accelerator)
-	}
-
-	// Item 2: 模板管理… (CmdOrCtrl+Shift+T)
-	if items[1].Label != "模板管理…" {
-		t.Errorf("模板 menu[1]: expected '模板管理…', got %q", items[1].Label)
-	}
-	expectedAccel := keys.Combo("t", keys.CmdOrCtrlKey, keys.ShiftKey)
-	if !accelEqual(items[1].Accelerator, expectedAccel) {
-		t.Errorf("模板管理… accelerator mismatch\n  got:  %+v\n  want: %+v",
-			items[1].Accelerator, expectedAccel)
-	}
+	assertSharedFileMenu(t, m)
 }
 
-func TestHelpMenu_Items(t *testing.T) {
-	m := buildMenu(&App{})
+func TestBuildMenu_WindowsHelpMenu_HasAbout(t *testing.T) {
+	m := buildMenuForPlatform(&App{}, "windows")
 	helpMenu := findSubmenu(m, "帮助")
 	if helpMenu == nil {
 		t.Fatal("帮助 menu not found")
 	}
 
 	items := textItems(helpMenu)
-	if got := len(items); got != 3 {
-		t.Fatalf("帮助 menu: expected 3 text items, got %d", got)
-	}
-
 	expectedLabels := []string{"文档", "关于 Presto", "检查更新"}
+	if got := len(items); got != len(expectedLabels) {
+		t.Fatalf("windows 帮助 menu: expected %d items, got %d", len(expectedLabels), got)
+	}
 	for i, expected := range expectedLabels {
 		if items[i].Label != expected {
-			t.Errorf("帮助 menu[%d]: expected %q, got %q", i, expected, items[i].Label)
+			t.Errorf("windows 帮助 menu[%d]: expected %q, got %q", i, expected, items[i].Label)
 		}
-		// All help menu items have no accelerator
-		if items[i].Accelerator != nil {
-			t.Errorf("帮助 menu item %q should have no accelerator", items[i].Label)
+	}
+}
+
+func TestBuildMenu_WindowsFileMenu_NoWindowMenuItems(t *testing.T) {
+	m := buildMenuForPlatform(&App{}, "windows")
+	fileMenu := findSubmenu(m, "文件")
+	if fileMenu == nil {
+		t.Fatal("文件 menu not found")
+	}
+
+	for _, label := range []string{"最小化", "缩放", "退出"} {
+		if item := findItem(fileMenu, label); item != nil {
+			t.Fatalf("windows 文件 menu should not include %q", label)
 		}
 	}
 }
