@@ -138,6 +138,8 @@ dist-macos-universal: _build-macos-arm64 _build-macos-amd64
 		$(DIST)/_bin/typst-darwin-amd64 \
 		-output "$(DIST)/$(APP_NAME).app/Contents/Resources/typst"
 	cp packaging/macos/Info.plist "$(DIST)/$(APP_NAME).app/Contents/"
+	cp packaging/macos/zh-Hans.lproj/InfoPlist.strings \
+		"$(DIST)/$(APP_NAME).app/Contents/Resources/zh-Hans.lproj/InfoPlist.strings"
 	sed -i '' 's/0\.1\.0/$(VERSION)/g' "$(DIST)/$(APP_NAME).app/Contents/Info.plist"
 	@if [ -f packaging/macos/icon.icns ]; then \
 		cp packaging/macos/icon.icns "$(DIST)/$(APP_NAME).app/Contents/Resources/"; \
@@ -156,6 +158,8 @@ _bundle-app:
 		"$(DIST)/$(APP_NAME).app/Contents/MacOS/$(APP_NAME)"
 	cp $(TYPST_BIN) "$(DIST)/$(APP_NAME).app/Contents/Resources/typst"
 	cp packaging/macos/Info.plist "$(DIST)/$(APP_NAME).app/Contents/"
+	cp packaging/macos/zh-Hans.lproj/InfoPlist.strings \
+		"$(DIST)/$(APP_NAME).app/Contents/Resources/zh-Hans.lproj/InfoPlist.strings"
 	sed -i '' 's/0\.1\.0/$(VERSION)/g' "$(DIST)/$(APP_NAME).app/Contents/Info.plist"
 	@if [ -f packaging/macos/icon.icns ]; then \
 		cp packaging/macos/icon.icns "$(DIST)/$(APP_NAME).app/Contents/Resources/"; \
