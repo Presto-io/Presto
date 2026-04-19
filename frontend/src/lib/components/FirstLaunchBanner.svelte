@@ -2,7 +2,7 @@
   import { firstLaunchStore } from '$lib/stores/first-launch.svelte';
   import { onMount } from 'svelte';
 
-  let { state, getManualDownloadUrl } = firstLaunchStore;
+  let { state: launchState, getManualDownloadUrl } = firstLaunchStore;
 
   let isMac = $state(false);
   onMount(async () => {
@@ -12,28 +12,28 @@
   });
 </script>
 
-{#if state.isActive || state.errorMessage}
+{#if launchState.isActive || launchState.errorMessage}
   <div class="banner" class:mac-offset={isMac}>
-    {#if state.isActive}
+    {#if launchState.isActive}
       <div class="progress-info">
         <span class="text">
-          正在下载默认模板... {state.downloaded + state.failed}/{state.total}
+          正在下载默认模板... {launchState.downloaded + launchState.failed}/{launchState.total}
         </span>
         <div class="progress-bar">
           <div
             class="progress-fill"
-            style="width: {((state.downloaded + state.failed) / state.total) * 100}%"
+            style="width: {((launchState.downloaded + launchState.failed) / launchState.total) * 100}%"
           ></div>
         </div>
       </div>
-    {:else if state.errorMessage}
+    {:else if launchState.errorMessage}
       <div class="error-info">
-        <span class="error-text">{state.errorMessage}</span>
-        {#if state.failed > 0}
+        <span class="error-text">{launchState.errorMessage}</span>
+        {#if launchState.failed > 0}
           <details class="manual-download">
             <summary>手动下载模板</summary>
             <div class="download-links">
-              {#each [...state.templates.values()] as tpl (tpl.name)}
+              {#each [...launchState.templates.values()] as tpl (tpl.name)}
                 {#if tpl.status === 'error'}
                   <a
                     href={getManualDownloadUrl(tpl.name)}
