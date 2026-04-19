@@ -29,6 +29,7 @@ interface WailsApp {
 	GetStartupFiles: () => Promise<
 		{ name: string; content: string; dir: string; isZip: boolean; path?: string }[] | null
 	>;
+	SetFileOpenReady: () => Promise<void>;
 	InstallTemplate: (templateName: string) => Promise<void>;
 	DeleteTemplate: (name: string) => Promise<void>;
 	GetInstalledTemplates: () => Promise<string[]>;
