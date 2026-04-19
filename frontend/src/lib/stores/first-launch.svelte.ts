@@ -94,7 +94,11 @@ export const firstLaunchStore = {
 
         // Auto-select and load example for first successfully downloaded template
         // Prefer 'gongwen' if it's among the downloads
-        if (!editor.selectedTemplate) {
+        const canSeedEditor = !editor.pendingExternalLoad &&
+          !editor.currentFilePath &&
+          !editor.markdown.trim();
+
+        if (!editor.selectedTemplate && canSeedEditor) {
           const templates = Array.from(_state.templates.keys());
           const successTemplates = templates.filter((t: string) =>
             _state.templates.get(t)?.status === 'success'

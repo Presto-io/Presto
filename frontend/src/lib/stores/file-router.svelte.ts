@@ -67,7 +67,7 @@ export const fileRouter = {
    * Returns true immediately if the editor is empty.
    */
   async promptReplace(): Promise<boolean> {
-    if (!editor.markdown.trim()) return true;
+    if (!editor.markdown.trim() || !editor.isDirty) return true;
     _confirmVisible = true;
     return new Promise((resolve) => {
       _confirmResolve = resolve;
