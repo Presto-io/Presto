@@ -12,30 +12,6 @@
   import { triggerAction, shouldShowPoint } from '$lib/stores/wizard.svelte';
   import { fileRouter } from '$lib/stores/file-router.svelte';
 
-  // Wails runtime bindings (available when running as desktop app)
-  declare global {
-    interface Window {
-      go?: { main: { App: {
-        SavePDF: (markdown: string, templateId: string, workDir: string) => Promise<void>;
-        OpenFile: () => Promise<{ content: string; dir: string } | null>;
-        OpenFiles: () => Promise<{ name: string; content: string; dir: string; isZip: boolean; path?: string }[] | null>;
-        CompileSVG: (typstSource: string, workDir: string) => Promise<string[]>;
-        ImportBatchZip: (filePath: string) => Promise<any>;
-        SaveMarkdown: (content: string, filePath: string) => Promise<void>;
-        SaveMarkdownAs: (content: string) => Promise<string>;
-        UpdateMenuState: (hasContent: boolean) => Promise<void>;
-        GetPlatform: () => Promise<string>;
-        SetWindowTitle: (title: string) => Promise<void>;
-        ConfirmSaveDialog: (filename: string) => Promise<string>;
-        QuitApp: () => Promise<void>;
-      } } };
-      runtime?: {
-        EventsOn: (event: string, cb: (...args: any[]) => void) => void;
-        EventsOff: (event: string) => void;
-      };
-    }
-  }
-
   // Derive missing fonts for the currently selected template
   let currentMissingFonts = $derived(
     templateStore.templates
