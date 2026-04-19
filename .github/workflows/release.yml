@@ -30,11 +30,23 @@ jobs:
             exit 0
           fi
 
-          git fetch origin main --tags
-          if git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+          if ! git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main; then
+            echo "::error::Failed to refresh origin/main for release tag lineage verification."
+            exit 1
+          fi
+
+          TAG_COMMIT="$(git rev-parse "${GITHUB_REF}^{commit}")"
+          MAIN_COMMIT="$(git rev-parse refs/remotes/origin/main)"
+          echo "Resolved release tag ${GITHUB_REF_NAME} to commit ${TAG_COMMIT}"
+          echo "origin/main currently points to ${MAIN_COMMIT}"
+
+          if git merge-base --is-ancestor "$TAG_COMMIT" refs/remotes/origin/main; then
+            echo "Lineage check result: tag commit is reachable from origin/main."
             echo "Tag commit is on origin/main lineage."
             exit 0
           fi
+
+          echo "Lineage check result: tag commit is NOT reachable from origin/main."
 
           echo "::error::Release tag ${GITHUB_REF_NAME} does not belong to origin/main lineage."
           echo "::error::Create release tags from main to keep git describe / changelog history correct."
