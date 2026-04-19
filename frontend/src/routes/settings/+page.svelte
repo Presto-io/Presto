@@ -49,9 +49,8 @@
     })
   );
 
-  import type { Component } from 'svelte';
-
-  const sections: { id: string; label: string; icon: Component }[] = [
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sections: { id: string; label: string; icon: any }[] = [
     { id: 'general', label: '通用', icon: Settings },
     { id: 'help', label: '帮助', icon: HelpCircle },
     { id: 'template-dev', label: '模板开发', icon: BookOpen },
