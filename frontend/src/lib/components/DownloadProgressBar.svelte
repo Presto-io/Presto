@@ -1,14 +1,6 @@
 <script lang="ts">
   import { installState, type ActiveDownloadEntry } from '$lib/stores/install-state.svelte';
   import { fly } from 'svelte/transition';
-  import { onMount } from 'svelte';
-
-  let isMac = $state(false);
-  onMount(async () => {
-    if (window.go?.main?.App?.GetPlatform) {
-      isMac = (await window.go.main.App.GetPlatform()) === 'darwin';
-    }
-  });
 
   let downloadingTemplates = $derived.by((): ActiveDownloadEntry[] => {
     return installState.getActiveDownloads();
@@ -34,13 +26,13 @@
   }
 </script>
 
-<div class="progress-container" class:mac-offset={isMac}>
+<div class="progress-container">
   {#each downloadingTemplates as item (item.name)}
     <div
       class="progress-bar"
       style="--color: {getColorForTemplate(item.name)}"
-      in:fly={{ y: -20, duration: 300 }}
-      out:fly={{ y: -20, duration: 500 }}
+      in:fly={{ y: 20, duration: 300 }}
+      out:fly={{ y: 20, duration: 500 }}
     >
       <div
         class="progress-fill"
@@ -59,17 +51,13 @@
 <style>
   .progress-container {
     position: fixed;
-    top: 0;
+    bottom: 0;
     left: 0;
     right: 0;
     z-index: 9001;
     display: flex;
     flex-direction: column;
     gap: 0;
-  }
-
-  .progress-container.mac-offset {
-    padding-left: 78px;
   }
 
   .progress-bar {
@@ -105,7 +93,7 @@
 
   .tooltip {
     position: absolute;
-    top: 100%;
+    bottom: 100%;
     left: 50%;
     transform: translateX(-50%);
     padding: 4px 8px;

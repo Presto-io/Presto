@@ -174,14 +174,12 @@
 </script>
 
 <div class="app">
-	{#if !isShowcase}
-		<DownloadProgressBar />
-		<FirstLaunchBanner />
-	{/if}
 	<main id="main-content">
 		{@render children()}
 	</main>
 	{#if !isShowcase}
+		<DownloadProgressBar />
+		<FirstLaunchBanner />
 	<WizardOverlay />
 
 	{#if dragOver}

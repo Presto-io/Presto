@@ -1,19 +1,12 @@
 <script lang="ts">
   import { firstLaunchStore } from '$lib/stores/first-launch.svelte';
-  import { onMount } from 'svelte';
+  import { fly } from 'svelte/transition';
 
   let { state: launchState, getManualDownloadUrl } = firstLaunchStore;
-
-  let isMac = $state(false);
-  onMount(async () => {
-    if (window.go?.main?.App?.GetPlatform) {
-      isMac = (await window.go.main.App.GetPlatform()) === 'darwin';
-    }
-  });
 </script>
 
 {#if launchState.isActive || launchState.errorMessage}
-  <div class="banner" class:mac-offset={isMac}>
+  <div class="banner" transition:fly={{ y: 30, duration: 300 }}>
     {#if launchState.isActive}
       <div class="progress-info">
         <span class="text">
@@ -56,18 +49,15 @@
 <style>
   .banner {
     position: fixed;
-    top: 0;
+    bottom: 0;
     left: 0;
     right: 0;
-    background: #3b82f6;
-    color: white;
-    padding: 8px 16px;
-    z-index: 100;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  }
-
-  .banner.mac-offset {
-    padding-left: 78px;
+    background: var(--color-surface, #1e1e1e);
+    color: var(--color-muted, #999);
+    padding: 4px 12px;
+    z-index: 9000;
+    border-top: 1px solid var(--color-border, #333);
+    font-size: 12px;
   }
 
   .progress-info {
@@ -77,21 +67,21 @@
   }
 
   .text {
-    font-size: 14px;
+    font-size: 12px;
   }
 
   .progress-bar {
     flex: 1;
     max-width: 200px;
-    height: 6px;
-    background: rgba(255, 255, 255, 0.3);
-    border-radius: 3px;
+    height: 4px;
+    background: var(--color-border, #444);
+    border-radius: 2px;
     overflow: hidden;
   }
 
   .progress-fill {
     height: 100%;
-    background: white;
+    background: var(--color-accent, #3b82f6);
     transition: width 0.3s ease;
   }
 
@@ -102,7 +92,7 @@
   }
 
   .error-text {
-    font-size: 14px;
+    font-size: 12px;
   }
 
   .manual-download {
