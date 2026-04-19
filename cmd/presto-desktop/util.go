@@ -31,6 +31,11 @@ func (a *App) QuitApp() {
 	wailsRuntime.Quit(a.ctx)
 }
 
+func (a *App) SetDirtyState(dirty bool, filename string) {
+	a.hasDirtyContent = dirty
+	a.currentFilename = filename
+}
+
 func (a *App) ImportBatchZip(filePath string) (*api.BatchImportResult, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {

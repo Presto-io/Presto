@@ -219,6 +219,7 @@
     editor.documentDir = '';
     editor.isDirty = false;
     editor.documentTitle = '';
+    window.go?.main?.App?.SetDirtyState?.(false, '');
     window.go?.main?.App?.UpdateMenuState?.(false);
   }
 
@@ -229,6 +230,7 @@
       if (editor.currentFilePath) {
         await window.go.main.App.SaveMarkdown(editor.markdown, editor.currentFilePath);
         editor.isDirty = false;
+        window.go?.main?.App?.SetDirtyState?.(false, '');
       } else {
         await handleSaveAs();
       }
@@ -247,6 +249,7 @@
       if (savedPath) {
         editor.currentFilePath = savedPath;
         editor.isDirty = false;
+        window.go?.main?.App?.SetDirtyState?.(false, '');
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -257,6 +260,8 @@
   /** Wrapper: track dirty state + update menu before converting. */
   function handleEditorChange(md: string) {
     editor.isDirty = true;
+    const filename = editor.currentFilePath?.split(/[/\\]/).pop() || '';
+    window.go?.main?.App?.SetDirtyState?.(true, filename);
     window.go?.main?.App?.UpdateMenuState?.(md.trim().length > 0);
     handleConvert(md);
   }
@@ -396,18 +401,13 @@
       window.runtime.EventsOn('menu:store', () => goto('/store-templates'));
 
       window.runtime.EventsOn('menu:quit', async () => {
-        if (editor.isDirty && editor.markdown.trim()) {
-          const filename = editor.currentFilePath?.split(/[/\\]/).pop() || '';
-          const result = await window.go!.main.App.ConfirmSaveDialog(filename);
-          if (result === 'Save') {
-            await handleSave();
-            window.go!.main.App.QuitApp();
-          } else if (result === "Don't Save") {
-            window.go!.main.App.QuitApp();
-          }
-        } else {
-          window.go?.main?.App?.QuitApp();
-        }
+        window.go?.main?.App?.QuitApp();
+      });
+
+      window.runtime.EventsOn('app:save-and-close', async () => {
+        await handleSave();
+        window.go?.main?.App?.SetDirtyState?.(false, '');
+        window.go!.main.App.QuitApp();
       });
     }
     // Keyboard shortcut for web: Cmd+, opens settings
@@ -435,6 +435,7 @@
         window.runtime.EventsOff('menu:saveas');
         window.runtime.EventsOff('menu:store');
         window.runtime.EventsOff('menu:quit');
+        window.runtime.EventsOff('app:save-and-close');
       }
     };
   });
