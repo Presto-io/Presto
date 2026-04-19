@@ -26,6 +26,9 @@ interface WailsApp {
 	UpdateMenuState: (hasContent: boolean) => Promise<void>;
 	SetDirtyState: (dirty: boolean, filename: string) => Promise<void>;
 	GetStartupURL: () => Promise<string>;
+	GetStartupFiles: () => Promise<
+		{ name: string; content: string; dir: string; isZip: boolean; path?: string }[] | null
+	>;
 	InstallTemplate: (templateName: string) => Promise<void>;
 	DeleteTemplate: (name: string) => Promise<void>;
 	GetInstalledTemplates: () => Promise<string[]>;

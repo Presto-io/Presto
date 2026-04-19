@@ -81,12 +81,14 @@ export const fileRouter = {
    * @param files - File objects (markdown only when zipResults provided)
    * @param currentPath - Current route path (e.g. '/', '/batch', '/settings')
    * @param documentDirs - Optional map of filename → directory (desktop mode)
+   * @param filePaths - Optional map of filename → absolute file path (desktop mode)
    * @param zipResults - Pre-processed ZIP results from Wails binding (desktop mode)
    */
   async processFiles(
     files: File[],
     currentPath: string,
     documentDirs?: Map<string, string>,
+    filePaths?: Map<string, string>,
     zipResults?: BatchImportResult[],
   ): Promise<void> {
     if (files.length === 0 && (!zipResults || zipResults.length === 0)) return;
@@ -192,6 +194,8 @@ export const fileRouter = {
         const dir = perFileDirs.get(file.name) || workDir || '';
         editor.markdown = content;
         editor.documentDir = dir;
+        editor.currentFilePath = filePaths?.get(file.name) || '';
+        editor.isDirty = false;
         editor.pendingExternalLoad = true;
         if (currentPath !== '/') await goto('/');
       } else {

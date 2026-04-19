@@ -326,12 +326,14 @@
     try {
       let files: File[];
       let documentDirs: Map<string, string> | undefined;
+      let filePaths: Map<string, string> | undefined;
 
       if (window.go?.main?.App?.OpenFiles) {
         // Desktop: multi-file dialog (supports ZIP + markdown)
         const results = await window.go.main.App.OpenFiles();
         if (!results || results.length === 0) return;
         documentDirs = new Map();
+        filePaths = new Map();
         const zipResults: any[] = [];
         files = [];
         for (const r of results) {
@@ -345,17 +347,13 @@
             }
           } else if (!r.isZip) {
             documentDirs.set(r.name, r.dir);
+            if (r.path) filePaths.set(r.name, r.path);
             files.push(new File([r.content], r.name, { type: 'text/markdown' }));
           }
         }
         if (files.length === 0 && zipResults.length === 0) return;
-        // Track file path for single non-ZIP file (enables direct save)
-        if (results.length === 1 && !results[0].isZip && results[0].path) {
-          editor.currentFilePath = results[0].path;
-          editor.isDirty = false;
-        }
         await fileRouter.processFiles(
-          files, '/', documentDirs,
+          files, '/', documentDirs, filePaths,
           zipResults.length > 0 ? zipResults : undefined,
         );
         return;
@@ -372,7 +370,7 @@
       }
 
       if (files.length === 0) return;
-      await fileRouter.processFiles(files, '/', documentDirs);
+      await fileRouter.processFiles(files, '/', documentDirs, filePaths);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       errorMsg = msg;

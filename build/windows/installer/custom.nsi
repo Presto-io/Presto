@@ -128,6 +128,32 @@ Section "Registry" SEC_REGISTRY
                      "NoModify" 1
   WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Presto" \
                      "NoRepair" 1
+
+  ; Register Presto as an available editor for Markdown files
+  WriteRegStr HKLM "Software\Classes\Presto.Markdown" "" "Presto Markdown Document"
+  WriteRegStr HKLM "Software\Classes\Presto.Markdown" "FriendlyTypeName" "Markdown Document"
+  WriteRegStr HKLM "Software\Classes\Presto.Markdown\DefaultIcon" "" "$INSTDIR\Presto.exe,0"
+  WriteRegStr HKLM "Software\Classes\Presto.Markdown\shell" "" "open"
+  WriteRegStr HKLM "Software\Classes\Presto.Markdown\shell\open" "" "Open with Presto"
+  WriteRegStr HKLM "Software\Classes\Presto.Markdown\shell\open\command" "" "$\"$INSTDIR\Presto.exe$\" $\"%1$\""
+
+  WriteRegStr HKLM "Software\Classes\Applications\Presto.exe" "FriendlyAppName" "Presto"
+  WriteRegStr HKLM "Software\Classes\Applications\Presto.exe\DefaultIcon" "" "$INSTDIR\Presto.exe,0"
+  WriteRegStr HKLM "Software\Classes\Applications\Presto.exe\shell\open" "" "Open with Presto"
+  WriteRegStr HKLM "Software\Classes\Applications\Presto.exe\shell\open\command" "" "$\"$INSTDIR\Presto.exe$\" $\"%1$\""
+  WriteRegStr HKLM "Software\Classes\Applications\Presto.exe\SupportedTypes" ".md" ""
+  WriteRegStr HKLM "Software\Classes\Applications\Presto.exe\SupportedTypes" ".markdown" ""
+
+  WriteRegStr HKLM "Software\Classes\.md\OpenWithProgids" "Presto.Markdown" ""
+  WriteRegStr HKLM "Software\Classes\.markdown\OpenWithProgids" "Presto.Markdown" ""
+
+  WriteRegStr HKLM "Software\RegisteredApplications" "Presto" "Software\Clients\Presto\Capabilities"
+  WriteRegStr HKLM "Software\Clients\Presto\Capabilities" "ApplicationName" "Presto"
+  WriteRegStr HKLM "Software\Clients\Presto\Capabilities" "ApplicationDescription" "Markdown to Typst to PDF editor"
+  WriteRegStr HKLM "Software\Clients\Presto\Capabilities\FileAssociations" ".md" "Presto.Markdown"
+  WriteRegStr HKLM "Software\Clients\Presto\Capabilities\FileAssociations" ".markdown" "Presto.Markdown"
+
+  System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, p 0, p 0)'
 SectionEnd
 
 ; ========================================
@@ -194,6 +220,13 @@ Section "Uninstall"
 
   ; Delete registry key
   DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Presto"
+  DeleteRegValue HKLM "Software\Classes\.md\OpenWithProgids" "Presto.Markdown"
+  DeleteRegValue HKLM "Software\Classes\.markdown\OpenWithProgids" "Presto.Markdown"
+  DeleteRegKey HKLM "Software\Classes\Applications\Presto.exe"
+  DeleteRegKey HKLM "Software\Classes\Presto.Markdown"
+  DeleteRegValue HKLM "Software\RegisteredApplications" "Presto"
+  DeleteRegKey HKLM "Software\Clients\Presto"
+  System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, p 0, p 0)'
 
   ; Display completion message
   MessageBox MB_OK "Presto has been successfully uninstalled."

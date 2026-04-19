@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/wailsapp/wails/v2"
@@ -27,8 +28,8 @@ import (
 )
 
 var (
-	version    string
-	startupURL string
+	version       string
+	startupURL    string
 	logger        *slog.Logger
 	verbose       bool
 	logFilePath   string
@@ -53,6 +54,9 @@ type App struct {
 	exportMenuItem  *menu.MenuItem
 	hasDirtyContent bool
 	currentFilename string
+	externalFilesMu sync.Mutex
+	startupFiles    []OpenFilesItem
+	frontendReady   bool
 }
 
 type spaFallbackHandler struct {
@@ -96,6 +100,7 @@ func (a *App) startup(ctx context.Context) {
 	})
 	frontendReady := make(chan struct{}, 1)
 	wailsRuntime.EventsOnce(ctx, "frontend:ready", func(optionalData ...interface{}) {
+		a.markFrontendReady()
 		select {
 		case frontendReady <- struct{}{}:
 		default:
@@ -154,6 +159,7 @@ func main() {
 			break
 		}
 	}
+	app.dispatchOrQueueExternalFiles(os.Args[1:])
 	err = wails.Run(&options.App{
 		Title:     "Presto",
 		Width:     1280,
@@ -187,11 +193,18 @@ func main() {
 				return true
 			}
 		},
-		Bind:      []interface{}{app},
+		Bind: []interface{}{app},
 		SingleInstanceLock: &options.SingleInstanceLock{
 			UniqueId: "com.mrered.presto",
 			OnSecondInstanceLaunch: func(data options.SecondInstanceData) {
-				logger.Debug("[url-scheme] second instance args", "args", data.Args)
+				logger.Debug("[single-instance] second instance args", "args", data.Args)
+				for _, arg := range data.Args {
+					if strings.HasPrefix(arg, "presto://") {
+						go app.handlePrestoURL(arg)
+						return
+					}
+				}
+				app.dispatchOrQueueExternalFiles(data.Args)
 			},
 		},
 		Mac: &macOptions.Options{
@@ -199,6 +212,10 @@ func main() {
 			About: &macOptions.AboutInfo{
 				Title:   "Presto",
 				Message: "Markdown → Typst → PDF",
+			},
+			OnFileOpen: func(filePath string) {
+				logger.Debug("[file-open] macOS open file", "path", filePath)
+				app.dispatchOrQueueExternalFiles([]string{filePath})
 			},
 			OnUrlOpen: func(url string) {
 				logger.Debug("[url-scheme] OnUrlOpen", "url", url)
