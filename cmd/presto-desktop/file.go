@@ -14,6 +14,7 @@ import (
 type OpenFileResult struct {
 	Content string `json:"content"`
 	Dir     string `json:"dir"`
+	Path    string `json:"path"`
 }
 
 type OpenFilesItem struct {
@@ -44,6 +45,7 @@ func (a *App) OpenFile() (*OpenFileResult, error) {
 	return &OpenFileResult{
 		Content: string(data),
 		Dir:     filepath.Dir(path),
+		Path:    path,
 	}, nil
 }
 
@@ -65,6 +67,7 @@ func (a *App) readFilePaths(paths []string) []OpenFilesItem {
 				continue
 			}
 			item.Content = string(data)
+			item.Path = p
 		}
 		items = append(items, item)
 	}
@@ -95,9 +98,15 @@ func (a *App) SaveMarkdown(content string, filePath string) error {
 	return nil
 }
 
-func (a *App) SaveMarkdownAs(content string) (string, error) {
+func (a *App) SaveMarkdownAs(content string, defaultFilename string) (string, error) {
+	if defaultFilename == "" {
+		defaultFilename = "untitled.md"
+	}
+	if !strings.HasSuffix(strings.ToLower(defaultFilename), ".md") {
+		defaultFilename += ".md"
+	}
 	savePath, err := wailsRuntime.SaveFileDialog(a.ctx, wailsRuntime.SaveDialogOptions{
-		DefaultFilename: "untitled.md",
+		DefaultFilename: defaultFilename,
 		Filters: []wailsRuntime.FileFilter{
 			{DisplayName: "Markdown", Pattern: "*.md"},
 			{DisplayName: "所有文件", Pattern: "*.*"},

@@ -1,13 +1,13 @@
 interface WailsApp {
 	SavePDF: (markdown: string, templateId: string, workDir: string) => Promise<void>;
-	OpenFile: () => Promise<{ content: string; dir: string } | null>;
+	OpenFile: () => Promise<{ content: string; dir: string; path: string } | null>;
 	OpenFiles: () => Promise<
 		{ name: string; content: string; dir: string; isZip: boolean; path?: string }[] | null
 	>;
 	CompileSVG: (typstSource: string, workDir: string) => Promise<string[]>;
 	ImportBatchZip: (filePath: string) => Promise<any>;
 	SaveMarkdown: (content: string, filePath: string) => Promise<void>;
-	SaveMarkdownAs: (content: string) => Promise<string>;
+	SaveMarkdownAs: (content: string, defaultFilename: string) => Promise<string>;
 	SaveFile: (b64Data: string, defaultFilename: string) => Promise<void>;
 	GetVersion: () => Promise<string>;
 	GetPlatform: () => Promise<string>;
