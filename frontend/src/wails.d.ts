@@ -24,6 +24,7 @@ interface WailsApp {
 	}>;
 	DownloadAndInstallUpdate: (downloadURL: string) => Promise<void>;
 	UpdateMenuState: (hasContent: boolean) => Promise<void>;
+	SetDirtyState: (dirty: boolean, filename: string) => Promise<void>;
 	GetStartupURL: () => Promise<string>;
 	InstallTemplate: (templateName: string) => Promise<void>;
 	DeleteTemplate: (name: string) => Promise<void>;

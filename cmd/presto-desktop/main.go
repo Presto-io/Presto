@@ -45,12 +45,14 @@ func init() {
 var assets embed.FS
 
 type App struct {
-	ctx            context.Context
-	manager        *template.Manager
-	compiler       *typst.Compiler
-	registry       *template.RegistryCache
-	saveMenuItem   *menu.MenuItem
-	exportMenuItem *menu.MenuItem
+	ctx             context.Context
+	manager         *template.Manager
+	compiler        *typst.Compiler
+	registry        *template.RegistryCache
+	saveMenuItem    *menu.MenuItem
+	exportMenuItem  *menu.MenuItem
+	hasDirtyContent bool
+	currentFilename string
 }
 
 type spaFallbackHandler struct {
@@ -167,6 +169,24 @@ func main() {
 		},
 		Menu:      appMenu,
 		OnStartup: app.startup,
+		OnBeforeClose: func(ctx context.Context) (prevent bool) {
+			if !app.hasDirtyContent {
+				return false
+			}
+			result, err := app.ConfirmSaveDialog(app.currentFilename)
+			if err != nil {
+				return false
+			}
+			switch result {
+			case "Save":
+				wailsRuntime.EventsEmit(ctx, "app:save-and-close")
+				return true
+			case "Don't Save":
+				return false
+			default:
+				return true
+			}
+		},
 		Bind:      []interface{}{app},
 		SingleInstanceLock: &options.SingleInstanceLock{
 			UniqueId: "com.mrered.presto",

@@ -131,17 +131,20 @@ func (a *App) ConfirmSaveDialog(filename string) (string, error) {
 		msg = fmt.Sprintf("是否保存对 \"%s\" 的更改？", filename)
 	}
 	result, err := wailsRuntime.MessageDialog(a.ctx, wailsRuntime.MessageDialogOptions{
-		Type:    wailsRuntime.QuestionDialog,
-		Title:   "Presto",
-		Message: msg,
+		Type:          wailsRuntime.WarningDialog,
+		Title:         "Presto",
+		Message:       msg,
+		Buttons:       []string{"保存", "不保存", "取消"},
+		DefaultButton: "保存",
+		CancelButton:  "取消",
 	})
 	if err != nil {
 		return "Cancel", err
 	}
 	switch result {
-	case "Yes":
+	case "保存":
 		return "Save", nil
-	case "No":
+	case "不保存":
 		return "Don't Save", nil
 	default:
 		return "Cancel", nil
