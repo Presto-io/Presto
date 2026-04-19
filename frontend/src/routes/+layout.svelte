@@ -1,6 +1,6 @@
 <script lang="ts">
 	import '../app.css';
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { FileText } from 'lucide-svelte';
 	import WizardOverlay from '$lib/components/wizard/WizardOverlay.svelte';
 	import DownloadProgressBar from '$lib/components/DownloadProgressBar.svelte';
@@ -162,14 +162,14 @@
 				}
 			});
 		}
+	});
 
-		return () => {
-			window.removeEventListener('dragenter', handleDragEnter, true);
-			window.removeEventListener('dragover', handleDragOver, true);
-			window.removeEventListener('dragleave', handleDragLeave, true);
-			window.removeEventListener('drop', handleDrop, true);
-			window.removeEventListener('focus', notificationStore.flushPending);
-		};
+	onDestroy(() => {
+		window.removeEventListener('dragenter', handleDragEnter, true);
+		window.removeEventListener('dragover', handleDragOver, true);
+		window.removeEventListener('dragleave', handleDragLeave, true);
+		window.removeEventListener('drop', handleDrop, true);
+		window.removeEventListener('focus', notificationStore.flushPending);
 	});
 </script>
 
