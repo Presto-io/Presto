@@ -38,16 +38,25 @@ func (a *App) markFrontendReady() {
 	a.externalFilesMu.Unlock()
 }
 
+func (a *App) SetFileOpenReady() {
+	a.externalFilesMu.Lock()
+	a.fileOpenReady = true
+	a.externalFilesMu.Unlock()
+	logger.Debug("[file-open] frontend listeners ready")
+}
+
 func (a *App) GetStartupFiles() []OpenFilesItem {
 	a.externalFilesMu.Lock()
 	defer a.externalFilesMu.Unlock()
 
 	if len(a.startupFiles) == 0 {
+		logger.Debug("[file-open] GetStartupFiles empty")
 		return nil
 	}
 
 	items := append([]OpenFilesItem(nil), a.startupFiles...)
 	a.startupFiles = nil
+	logger.Debug("[file-open] GetStartupFiles drained", "count", len(items))
 	return items
 }
 
@@ -63,14 +72,16 @@ func (a *App) dispatchOrQueueExternalFiles(paths []string) {
 	}
 
 	a.externalFilesMu.Lock()
-	if !a.frontendReady || a.ctx == nil {
+	if !a.fileOpenReady || a.ctx == nil {
 		a.queueStartupFilesLocked(items)
 		a.externalFilesMu.Unlock()
+		logger.Debug("[file-open] queued files", "count", len(items))
 		return
 	}
 	ctx := a.ctx
 	a.externalFilesMu.Unlock()
 
+	logger.Debug("[file-open] emitting files", "count", len(items))
 	wailsRuntime.EventsEmit(ctx, "native-file-open", items)
 }
 

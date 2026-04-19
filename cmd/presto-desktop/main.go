@@ -57,6 +57,7 @@ type App struct {
 	externalFilesMu sync.Mutex
 	startupFiles    []OpenFilesItem
 	frontendReady   bool
+	fileOpenReady   bool
 }
 
 type spaFallbackHandler struct {

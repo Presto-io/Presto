@@ -172,15 +172,6 @@
 				console.error('[url-scheme] GetStartupURL failed:', e);
 			}
 
-			try {
-				const startupFiles = await (window as any).go.main.App.GetStartupFiles();
-				if (startupFiles?.length) {
-					await handleNativeItems(startupFiles, 'open');
-				}
-			} catch (e) {
-				console.error('[file-open] GetStartupFiles failed:', e);
-			}
-
 			const handleNativeEvent = async (...args: any[]) => {
 				const items: any[] = Array.isArray(args[0]) ? args[0] : args;
 				await handleNativeItems(items, 'open');
@@ -191,6 +182,21 @@
 				await handleNativeItems(items, 'drop');
 			});
 			window.runtime.EventsOn('native-file-open', handleNativeEvent);
+
+			try {
+				await (window as any).go.main.App.SetFileOpenReady();
+			} catch (e) {
+				console.error('[file-open] SetFileOpenReady failed:', e);
+			}
+
+			try {
+				const startupFiles = await (window as any).go.main.App.GetStartupFiles();
+				if (startupFiles?.length) {
+					await handleNativeItems(startupFiles, 'open');
+				}
+			} catch (e) {
+				console.error('[file-open] GetStartupFiles failed:', e);
+			}
 		}
 	});
 
