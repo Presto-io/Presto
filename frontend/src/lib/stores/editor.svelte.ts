@@ -11,4 +11,5 @@ export const editor = $state({
   pendingExternalLoad: false,
   currentFilePath: '',
   isDirty: false,
+  documentTitle: '',
 });

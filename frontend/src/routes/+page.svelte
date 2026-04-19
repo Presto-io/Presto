@@ -218,6 +218,7 @@
     editor.currentFilePath = '';
     editor.documentDir = '';
     editor.isDirty = false;
+    editor.documentTitle = '';
     window.go?.main?.App?.UpdateMenuState?.(false);
   }
 
@@ -241,7 +242,8 @@
     if (!editor.markdown.trim()) return;
     if (!window.go?.main?.App?.SaveMarkdownAs) return;
     try {
-      const savedPath = await window.go.main.App.SaveMarkdownAs(editor.markdown);
+      const defaultName = (editor.documentTitle || 'untitled') + '.md';
+      const savedPath = await window.go.main.App.SaveMarkdownAs(editor.markdown, defaultName);
       if (savedPath) {
         editor.currentFilePath = savedPath;
         editor.isDirty = false;
@@ -271,6 +273,7 @@
       converting = true;
       try {
         editor.typstSource = await convert(md, editor.selectedTemplate);
+        editor.documentTitle = extractTypstTitle(editor.typstSource);
         // Compile to SVG for preview — use Wails binding when available
         // (Wails WebView strips HTTP headers/query params, so workDir gets lost via fetch)
         if (window.go?.main?.App?.CompileSVG) {
