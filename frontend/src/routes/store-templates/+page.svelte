@@ -6,14 +6,6 @@
   import type { RegistryItem } from '$lib/api/types';
   import { page } from '$app/stores';
 
-  declare global {
-    interface Window {
-      go?: { main: { App: {
-        InstallTemplate: (templateName: string) => Promise<void>;
-      } } };
-    }
-  }
-
   const isDev = import.meta.env.DEV || import.meta.env.VITE_MOCK === '1';
   let installedVersions = $derived(new Map(templateStore.templates.map(t => [t.name, t.version])));
   let communityEnabled = $state(false);

@@ -64,17 +64,6 @@
     { id: 'tpl-store' as const, label: '模板商店', icon: ShoppingBag },
   ];
 
-  declare global {
-    interface Window {
-      go?: { main: { App: {
-        GetVersion: () => Promise<string>;
-        CheckForUpdate: () => Promise<{ hasUpdate: boolean; currentVersion: string; latestVersion: string; downloadURL: string; releaseURL: string }>;
-        DownloadAndInstallUpdate: (downloadURL: string) => Promise<void>;
-        DeleteTemplate: (name: string) => Promise<void>;
-      } } };
-    }
-  }
-
   function openExternal(url: string) {
     if ((window as any).runtime?.BrowserOpenURL) {
       (window as any).runtime.BrowserOpenURL(url);
