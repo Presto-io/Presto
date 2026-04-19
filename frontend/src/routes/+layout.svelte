@@ -7,6 +7,7 @@
 	import FirstLaunchBanner from '$lib/components/FirstLaunchBanner.svelte';
 	import { fileRouter } from '$lib/stores/file-router.svelte';
 	import { notificationStore } from '$lib/stores/notification.svelte';
+	import { editor } from '$lib/stores/editor.svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 
@@ -73,6 +74,53 @@
 		await fileRouter.processFiles(files, window.location.pathname);
 	}
 
+	async function handleNativeItems(items: any[], source: 'drop' | 'open') {
+		dragCounter = 0;
+		dragOver = false;
+
+		const documentDirs = new Map<string, string>();
+		const filePaths = new Map<string, string>();
+		const files: File[] = [];
+		const zipResults: any[] = [];
+
+		for (const item of items) {
+			if (item.isZip && item.path) {
+				try {
+					const result = await (window as any).go.main.App.ImportBatchZip(item.path);
+					zipResults.push(result);
+				} catch (err) {
+					console.error('ImportBatchZip failed:', err);
+					fileRouter.showToast(
+						err instanceof Error ? err.message : 'ZIP 导入失败',
+						'error',
+					);
+				}
+			} else {
+				documentDirs.set(item.name, item.dir);
+				if (item.path) filePaths.set(item.name, item.path);
+				files.push(new File([item.content], item.name, { type: 'text/markdown' }));
+			}
+		}
+
+		if (files.length === 0 && zipResults.length === 0) return;
+
+		if (files.length !== 1 || zipResults.length > 0) {
+			editor.currentFilePath = '';
+		}
+
+		const targetPath = source === 'open' && files.length === 1 && zipResults.length === 0
+			? '/'
+			: window.location.pathname;
+
+		await fileRouter.processFiles(
+			files,
+			targetPath,
+			documentDirs.size > 0 ? documentDirs : undefined,
+			filePaths.size > 0 ? filePaths : undefined,
+			zipResults.length > 0 ? zipResults : undefined,
+		);
+	}
+
 	// Sync confirm dialog with fileRouter state
 	$effect(() => {
 		if (fileRouter.confirmVisible) {
@@ -124,43 +172,25 @@
 				console.error('[url-scheme] GetStartupURL failed:', e);
 			}
 
+			try {
+				const startupFiles = await (window as any).go.main.App.GetStartupFiles();
+				if (startupFiles?.length) {
+					await handleNativeItems(startupFiles, 'open');
+				}
+			} catch (e) {
+				console.error('[file-open] GetStartupFiles failed:', e);
+			}
+
+			const handleNativeEvent = async (...args: any[]) => {
+				const items: any[] = Array.isArray(args[0]) ? args[0] : args;
+				await handleNativeItems(items, 'open');
+			};
+
 			window.runtime.EventsOn('native-file-drop', async (...args: any[]) => {
 				const items: any[] = Array.isArray(args[0]) ? args[0] : args;
-				dragCounter = 0;
-				dragOver = false;
-
-				const documentDirs = new Map<string, string>();
-				const files: File[] = [];
-				const zipResults: any[] = [];
-
-				for (const item of items) {
-					if (item.isZip && item.path) {
-						// Call Wails binding directly — bypasses WebView HTTP layer
-						try {
-							const result = await (window as any).go.main.App.ImportBatchZip(item.path);
-							zipResults.push(result);
-						} catch (err) {
-							console.error('ImportBatchZip failed:', err);
-							fileRouter.showToast(
-								err instanceof Error ? err.message : 'ZIP 导入失败',
-								'error',
-							);
-						}
-					} else {
-						documentDirs.set(item.name, item.dir);
-						files.push(new File([item.content], item.name, { type: 'text/markdown' }));
-					}
-				}
-
-				if (files.length > 0 || zipResults.length > 0) {
-					fileRouter.processFiles(
-						files,
-						window.location.pathname,
-						documentDirs.size > 0 ? documentDirs : undefined,
-						zipResults.length > 0 ? zipResults : undefined,
-					);
-				}
+				await handleNativeItems(items, 'drop');
 			});
+			window.runtime.EventsOn('native-file-open', handleNativeEvent);
 		}
 	});
 
@@ -170,6 +200,8 @@
 		window.removeEventListener('dragleave', handleDragLeave, true);
 		window.removeEventListener('drop', handleDrop, true);
 		window.removeEventListener('focus', notificationStore.flushPending);
+		window.runtime?.EventsOff?.('native-file-drop');
+		window.runtime?.EventsOff?.('native-file-open');
 	});
 </script>
 
