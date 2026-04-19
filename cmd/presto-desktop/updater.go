@@ -4,8 +4,10 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"compress/gzip"
+	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -16,6 +18,80 @@ import (
 
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
+
+// UpdateInfo holds the result of a version check against GitHub releases.
+type UpdateInfo struct {
+	HasUpdate      bool   `json:"hasUpdate"`
+	CurrentVersion string `json:"currentVersion"`
+	LatestVersion  string `json:"latestVersion"`
+	DownloadURL    string `json:"downloadURL"`
+	ReleaseURL     string `json:"releaseURL"`
+}
+
+// CheckForUpdate queries GitHub for the latest release and compares with the current version.
+func (a *App) CheckForUpdate() (*UpdateInfo, error) {
+	current := a.GetVersion()
+	info := &UpdateInfo{CurrentVersion: current}
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Get("https://api.github.com/repos/Presto-io/Presto-Homepage/releases/latest")
+	if err != nil {
+		return nil, fmt.Errorf("failed to check update: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var release struct {
+		TagName string `json:"tag_name"`
+		HTMLURL string `json:"html_url"`
+		Assets  []struct {
+			Name               string `json:"name"`
+			BrowserDownloadURL string `json:"browser_download_url"`
+		} `json:"assets"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return nil, fmt.Errorf("failed to parse release: %w", err)
+	}
+
+	latest := strings.TrimPrefix(release.TagName, "v")
+	info.LatestVersion = latest
+	info.ReleaseURL = release.HTMLURL
+
+	if latest != current && current != "dev" {
+		info.HasUpdate = true
+	}
+
+	osName := runtime.GOOS
+	if osName == "darwin" {
+		osName = "macOS"
+	}
+	pattern := fmt.Sprintf("%s-%s", osName, runtime.GOARCH)
+	for _, asset := range release.Assets {
+		if strings.Contains(asset.Name, pattern) {
+			info.DownloadURL = asset.BrowserDownloadURL
+			break
+		}
+	}
+
+	return info, nil
+}
+
+// CheckAndNotifyUpdate checks for updates and notifies the frontend or shows a dialog.
+func (a *App) CheckAndNotifyUpdate() {
+	info, err := a.CheckForUpdate()
+	if err != nil {
+		log.Printf("[desktop] update check failed: %v", err)
+		return
+	}
+	if info.HasUpdate {
+		wailsRuntime.EventsEmit(a.ctx, "menu:update-available", info)
+	} else {
+		wailsRuntime.MessageDialog(a.ctx, wailsRuntime.MessageDialogOptions{
+			Type:    wailsRuntime.InfoDialog,
+			Title:   "检查更新",
+			Message: "已是最新版本",
+		})
+	}
+}
 
 // DownloadAndInstallUpdate downloads the release asset and installs it in-place.
 // Progress is reported via Wails events: "update:progress" (int 0-100), "update:status" (string).

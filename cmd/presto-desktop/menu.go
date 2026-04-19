@@ -1,0 +1,89 @@
+package main
+
+import (
+	"fmt"
+
+	"github.com/wailsapp/wails/v2/pkg/menu"
+	"github.com/wailsapp/wails/v2/pkg/menu/keys"
+	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
+)
+
+func buildMenu(app *App) *menu.Menu {
+	appMenu := menu.NewMenu()
+	appMenu.Append(menu.AppMenu())
+
+	fileMenu := appMenu.AddSubmenu("文件")
+	fileMenu.AddText("新建", keys.CmdOrCtrl("n"), func(_ *menu.CallbackData) {
+		wailsRuntime.EventsEmit(app.ctx, "menu:new")
+	})
+	fileMenu.AddText("打开文件…", keys.CmdOrCtrl("o"), func(_ *menu.CallbackData) {
+		wailsRuntime.EventsEmit(app.ctx, "menu:open")
+	})
+	app.saveMenuItem = fileMenu.AddText("保存", keys.CmdOrCtrl("s"), func(_ *menu.CallbackData) {
+		wailsRuntime.EventsEmit(app.ctx, "menu:save")
+	})
+	app.saveMenuItem.Disabled = true
+	fileMenu.AddText("另存为…", keys.Combo("s", keys.CmdOrCtrlKey, keys.ShiftKey), func(_ *menu.CallbackData) {
+		wailsRuntime.EventsEmit(app.ctx, "menu:saveas")
+	})
+	app.exportMenuItem = fileMenu.AddText("导出 PDF…", keys.CmdOrCtrl("e"), func(_ *menu.CallbackData) {
+		wailsRuntime.EventsEmit(app.ctx, "menu:export")
+	})
+	app.exportMenuItem.Disabled = true
+	fileMenu.AddText("设置…", keys.CmdOrCtrl(","), func(_ *menu.CallbackData) {
+		wailsRuntime.EventsEmit(app.ctx, "menu:settings")
+	})
+	fileMenu.AddSeparator()
+	fileMenu.AddText("最小化", keys.CmdOrCtrl("m"), func(_ *menu.CallbackData) {
+		wailsRuntime.WindowMinimise(app.ctx)
+	})
+	fileMenu.AddText("缩放", nil, func(_ *menu.CallbackData) {
+		wailsRuntime.WindowToggleMaximise(app.ctx)
+	})
+	fileMenu.AddSeparator()
+	fileMenu.AddText("退出", keys.CmdOrCtrl("w"), func(_ *menu.CallbackData) {
+		wailsRuntime.EventsEmit(app.ctx, "menu:quit")
+	})
+
+	appMenu.Append(menu.EditMenu())
+
+	templateMenu := appMenu.AddSubmenu("模板")
+	templateMenu.AddText("模板商店", nil, func(_ *menu.CallbackData) {
+		wailsRuntime.EventsEmit(app.ctx, "menu:store")
+	})
+	templateMenu.AddText("模板管理…", keys.Combo("t", keys.CmdOrCtrlKey, keys.ShiftKey), func(_ *menu.CallbackData) {
+		wailsRuntime.EventsEmit(app.ctx, "menu:templates")
+	})
+
+	helpMenu := appMenu.AddSubmenu("帮助")
+	helpMenu.AddText("文档", nil, func(_ *menu.CallbackData) {
+		wailsRuntime.BrowserOpenURL(app.ctx, "https://presto.io/docs")
+	})
+	helpMenu.AddText("关于 Presto", nil, func(_ *menu.CallbackData) {
+		app.ShowAboutDialog()
+	})
+	helpMenu.AddText("检查更新", nil, func(_ *menu.CallbackData) {
+		go app.CheckAndNotifyUpdate()
+	})
+
+	return appMenu
+}
+
+func (a *App) ShowAboutDialog() {
+	ver := a.GetVersion()
+	wailsRuntime.MessageDialog(a.ctx, wailsRuntime.MessageDialogOptions{
+		Type:    wailsRuntime.InfoDialog,
+		Title:   "关于 Presto",
+		Message: fmt.Sprintf("Presto %s\nMarkdown → Typst → PDF\n\n© 2024-2026 Presto", ver),
+	})
+}
+
+func (a *App) UpdateMenuState(hasContent bool) {
+	if a.saveMenuItem != nil {
+		a.saveMenuItem.Disabled = !hasContent
+	}
+	if a.exportMenuItem != nil {
+		a.exportMenuItem.Disabled = !hasContent
+	}
+	wailsRuntime.MenuUpdateApplicationMenu(a.ctx)
+}
