@@ -1,17 +1,14 @@
 /**
  * Unified file processing logic for drag-drop and Open button.
- * Handles ZIP template installation, markdown routing, toast + confirm UI state.
+ * Handles ZIP template installation, markdown routing, notification + confirm UI state.
  */
 import { importBatchZip } from '$lib/api/client';
 import type { BatchImportResult } from '$lib/api/types';
 import { templateStore } from '$lib/stores/templates.svelte';
 import { editor } from '$lib/stores/editor.svelte';
+import { notificationStore } from '$lib/stores/notification.svelte';
 import { pendingDrop } from '$lib/stores/pending-drop.svelte';
 import { goto } from '$app/navigation';
-
-// --- Toast state ---
-let _toast = $state<{ message: string; type: 'success' | 'error' } | null>(null);
-let _toastTimer: ReturnType<typeof setTimeout>;
 
 // --- Confirm replace dialog state ---
 let _confirmVisible = $state(false);
@@ -30,16 +27,13 @@ function isZip(name: string): boolean {
 }
 
 export const fileRouter = {
-  // Toast
-  get toast() {
-    return _toast;
-  },
   showToast(message: string, type: 'success' | 'error') {
-    clearTimeout(_toastTimer);
-    _toast = { message, type };
-    _toastTimer = setTimeout(() => {
-      _toast = null;
-    }, 2500);
+    notificationStore.show({
+      message,
+      type,
+      source: 'file-router',
+      durationMs: type === 'success' ? 2800 : 4500,
+    });
   },
 
   // Confirm replace dialog
