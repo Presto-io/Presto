@@ -5,6 +5,7 @@
 	import WizardOverlay from '$lib/components/wizard/WizardOverlay.svelte';
 	import DownloadProgressBar from '$lib/components/DownloadProgressBar.svelte';
 	import FirstLaunchBanner from '$lib/components/FirstLaunchBanner.svelte';
+	import NotificationCenter from '$lib/components/NotificationCenter.svelte';
 	import { fileRouter } from '$lib/stores/file-router.svelte';
 	import { notificationStore } from '$lib/stores/notification.svelte';
 	import { editor } from '$lib/stores/editor.svelte';
@@ -231,17 +232,7 @@
 		</div>
 	{/if}
 
-	{#if fileRouter.toast}
-		<div class="toast" class:toast-error={fileRouter.toast.type === 'error'}>
-			{fileRouter.toast.message}
-		</div>
-	{/if}
-
-	{#each notificationStore.items as notif (notif.id)}
-		<div class="app-notification" class:notif-success={notif.type === 'success'} class:notif-error={notif.type === 'error'}>
-			{notif.message}
-		</div>
-	{/each}
+	<NotificationCenter />
 	{/if}
 </div>
 
@@ -300,28 +291,6 @@
 		font-size: 1rem;
 		font-weight: 500;
 	}
-	.toast {
-		position: fixed;
-		bottom: var(--space-xl);
-		left: 50%;
-		transform: translateX(-50%);
-		z-index: 9001;
-		padding: var(--space-sm) var(--space-lg);
-		background: var(--color-success);
-		color: var(--color-bg);
-		border-radius: var(--radius-md);
-		font-size: 0.8125rem;
-		font-weight: 500;
-		pointer-events: none;
-		animation: toast-in 200ms ease-out;
-	}
-	.toast-error {
-		background: var(--color-danger);
-	}
-	@keyframes toast-in {
-		from { opacity: 0; transform: translateX(-50%) translateY(8px); }
-		to { opacity: 1; transform: translateX(-50%) translateY(0); }
-	}
 	.confirm-dialog {
 		border: 1px solid var(--color-border);
 		border-radius: var(--radius-md, 8px);
@@ -365,26 +334,5 @@
 		background: var(--color-accent);
 		color: var(--color-bg);
 		border-color: var(--color-accent);
-	}
-	.app-notification {
-		position: fixed;
-		top: var(--space-xl);
-		right: var(--space-xl);
-		z-index: 9002;
-		padding: var(--space-sm) var(--space-lg);
-		background: var(--color-surface);
-		color: var(--color-text);
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-md);
-		font-size: 0.8125rem;
-		font-weight: 500;
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-		animation: toast-in 200ms ease-out;
-	}
-	.app-notification.notif-success {
-		border-color: var(--color-success);
-	}
-	.app-notification.notif-error {
-		border-color: var(--color-danger);
 	}
 </style>

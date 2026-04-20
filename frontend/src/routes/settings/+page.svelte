@@ -6,6 +6,7 @@
   import { goto } from '$app/navigation';
   import { listTemplates, deleteTemplate, importTemplateZip, renameTemplate } from '$lib/api/client';
   import type { Template } from '$lib/api/types';
+  import { notificationStore } from '$lib/stores/notification.svelte';
   import { templateStore } from '$lib/stores/templates.svelte';
   import { triggerAction, resetWizard } from '$lib/stores/wizard.svelte';
 
@@ -253,9 +254,9 @@
       }
       installed = (await listTemplates()) ?? [];
       await templateStore.refresh();
-      showImportToast(`模板 "${name}" 已卸载`, 'success');
+      notifyTemplateEvent(`模板 "${name}" 已卸载`, 'success');
     } catch (err) {
-      showImportToast(err instanceof Error ? err.message : String(err), 'error');
+      notifyTemplateEvent(err instanceof Error ? err.message : String(err), 'error');
     }
   }
 
@@ -263,14 +264,14 @@
   let importingZip = $state(false);
   let zipInput: HTMLInputElement | undefined = $state();
   let conflictModal = $state<{ file: File; conflicts: string[] } | null>(null);
-  let importToast = $state<{ message: string; type: 'success' | 'error' | 'warning' | 'info' } | null>(null);
-  let importToastTimer: ReturnType<typeof setTimeout>;
 
-  function showImportToast(message: string, type: 'success' | 'error' | 'warning' | 'info') {
-    clearTimeout(importToastTimer);
-    importToast = { message, type };
-    const duration = type === 'success' ? 2500 : 4000;
-    importToastTimer = setTimeout(() => { importToast = null; }, duration);
+  function notifyTemplateEvent(message: string, type: 'success' | 'error' | 'warning' | 'info') {
+    notificationStore.show({
+      message,
+      type,
+      source: 'settings-template',
+      durationMs: type === 'success' ? 2800 : 4500,
+    });
   }
 
   function handleImportZipClick() {
@@ -297,12 +298,12 @@
       installedLoaded = true;
       const names = tpls.map(t => t.displayName || t.name).join('、');
       const verify = importVerifyInfo(tpls);
-      showImportToast(`模板 "${names}" 导入成功${verify.suffix}`, verify.type);
+      notifyTemplateEvent(`模板 "${names}" 导入成功${verify.suffix}`, verify.type);
     } catch (err: any) {
       if (err.conflicts) {
         conflictModal = { file, conflicts: err.conflicts };
       } else {
-        showImportToast(err instanceof Error ? err.message : String(err), 'error');
+        notifyTemplateEvent(err instanceof Error ? err.message : String(err), 'error');
       }
     } finally {
       importingZip = false;
@@ -321,9 +322,9 @@
       const names = tpls.map(t => t.displayName || t.name).join('、');
       const strategySuffix = strategy === 'rename' ? '（已自动重命名）' : strategy === 'skip' ? '（已跳过重复）' : '（已覆盖）';
       const verify = importVerifyInfo(tpls);
-      showImportToast(`模板 "${names}" 导入成功${strategySuffix}${verify.suffix}`, verify.type);
+      notifyTemplateEvent(`模板 "${names}" 导入成功${strategySuffix}${verify.suffix}`, verify.type);
     } catch (err) {
-      showImportToast(err instanceof Error ? err.message : String(err), 'error');
+      notifyTemplateEvent(err instanceof Error ? err.message : String(err), 'error');
     } finally {
       importingZip = false;
     }
@@ -360,9 +361,9 @@
       await renameTemplate(tplName, newDisplayName);
       installed = (await listTemplates()) ?? [];
       installedLoaded = true;
-      showImportToast(`模板已重命名为 "${newDisplayName}"`, 'success');
+      notifyTemplateEvent(`模板已重命名为 "${newDisplayName}"`, 'success');
     } catch (err) {
-      showImportToast(err instanceof Error ? err.message : String(err), 'error');
+      notifyTemplateEvent(err instanceof Error ? err.message : String(err), 'error');
     } finally {
       cancelRename();
     }
@@ -805,12 +806,6 @@
         <button class="btn-danger" onclick={confirmDelete}>卸载</button>
       </div>
     </div>
-  </div>
-{/if}
-
-{#if importToast}
-  <div class="import-toast" class:toast-error={importToast.type === 'error'} class:toast-warning={importToast.type === 'warning'} class:toast-info={importToast.type === 'info'}>
-    {importToast.message}
   </div>
 {/if}
 
@@ -1513,27 +1508,4 @@
   .modal-icon.conflict { color: var(--color-warning); }
   .conflict-actions { flex-wrap: wrap; }
 
-  /* --- Import toast --- */
-  .import-toast {
-    position: fixed;
-    bottom: var(--space-xl);
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 9001;
-    padding: var(--space-sm) var(--space-lg);
-    background: var(--color-success);
-    color: var(--color-bg);
-    border-radius: var(--radius-md);
-    font-size: 0.8125rem;
-    font-weight: 500;
-    pointer-events: none;
-    animation: toast-in 200ms ease-out;
-  }
-  .import-toast.toast-error { background: var(--color-danger); }
-  .import-toast.toast-warning { background: var(--color-warning); color: #1a1a1a; }
-  .import-toast.toast-info { background: var(--color-accent); }
-  @keyframes toast-in {
-    from { opacity: 0; transform: translateX(-50%) translateY(8px); }
-    to { opacity: 1; transform: translateX(-50%) translateY(0); }
-  }
 </style>

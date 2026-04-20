@@ -21,6 +21,10 @@ func (a *App) GetPlatform() string {
 	return runtime.GOOS
 }
 
+func (a *App) IsVerbose() bool {
+	return verbose
+}
+
 func (a *App) SetWindowTitle(title string) {
 	if runtime.GOOS == "windows" {
 		wailsRuntime.WindowSetTitle(a.ctx, title)
@@ -34,6 +38,10 @@ func (a *App) QuitApp() {
 func (a *App) SetDirtyState(dirty bool, filename string) {
 	a.hasDirtyContent = dirty
 	a.currentFilename = filename
+}
+
+func (a *App) CopyText(text string) error {
+	return wailsRuntime.ClipboardSetText(a.ctx, text)
 }
 
 func (a *App) ImportBatchZip(filePath string) (*api.BatchImportResult, error) {

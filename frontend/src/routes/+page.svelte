@@ -8,6 +8,7 @@
   import { goto } from '$app/navigation';
   import { editor } from '$lib/stores/editor.svelte';
   import { templateStore } from '$lib/stores/templates.svelte';
+  import { notificationStore } from '$lib/stores/notification.svelte';
   import { extractTemplateName, resolveTemplate } from '$lib/utils/frontmatter';
   import { triggerAction, shouldShowPoint } from '$lib/stores/wizard.svelte';
   import { fileRouter } from '$lib/stores/file-router.svelte';
@@ -24,6 +25,8 @@
 
   let converting = $state(false);
   let errorMsg = $state('');
+  let isDebugMode = $state(import.meta.env.DEV);
+  let inlineErrorGroup = $state<string | null>(null);
   let autoDetectedOnce = $state(false);
 
   // React to external content load (drag-drop or file-router)
@@ -87,6 +90,81 @@
       clearTimeout(hideTimer);
       hideTimer = setTimeout(() => { hiddenButtonsVisible = false; }, 800);
     }
+  }
+
+  async function copyErrorText(text: string) {
+    if (window.go?.main?.App?.CopyText) {
+      await window.go.main.App.CopyText(text);
+      return;
+    }
+
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+
+    throw new Error('当前环境不支持复制日志');
+  }
+
+  function clearInlineError(groupKey: string) {
+    if (inlineErrorGroup === groupKey) {
+      inlineErrorGroup = null;
+      errorMsg = '';
+    }
+  }
+
+  function clearEditorError(groupKey: string) {
+    notificationStore.dismissGroup(groupKey);
+    clearInlineError(groupKey);
+  }
+
+  function showEditorError(
+    message: string,
+    options: {
+      groupKey: string;
+      copyText?: string;
+      durationMs?: number;
+      inlineInDebug?: boolean;
+    },
+  ) {
+    if (options.inlineInDebug && isDebugMode) {
+      inlineErrorGroup = options.groupKey;
+      errorMsg = message;
+    } else {
+      clearInlineError(options.groupKey);
+    }
+
+    notificationStore.dismissGroup(options.groupKey);
+    notificationStore.show({
+      message,
+      type: 'error',
+      source: 'editor',
+      groupKey: options.groupKey,
+      durationMs: options.durationMs ?? 4500,
+      action: options.copyText
+        ? {
+            label: '复制日志',
+            run: async () => {
+              try {
+                await copyErrorText(options.copyText!);
+                notificationStore.show({
+                  message: '已复制编译日志',
+                  type: 'success',
+                  source: 'editor',
+                  durationMs: 2400,
+                });
+              } catch (error) {
+                notificationStore.show({
+                  message: error instanceof Error ? error.message : '复制日志失败',
+                  type: 'error',
+                  source: 'editor',
+                  durationMs: 4500,
+                });
+              }
+            },
+          }
+        : undefined,
+    });
   }
 
   onDestroy(() => { clearTimeout(hideTimer); });
@@ -219,6 +297,8 @@
     editor.documentDir = '';
     editor.isDirty = false;
     editor.documentTitle = '';
+    clearEditorError('compile-error');
+    clearEditorError('editor-action');
     window.go?.main?.App?.SetDirtyState?.(false, '');
     window.go?.main?.App?.UpdateMenuState?.(false);
   }
@@ -231,12 +311,13 @@
         await window.go.main.App.SaveMarkdown(editor.markdown, editor.currentFilePath);
         editor.isDirty = false;
         window.go?.main?.App?.SetDirtyState?.(false, '');
+        clearEditorError('editor-action');
       } else {
         await handleSaveAs();
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      errorMsg = msg;
+      showEditorError(msg, { groupKey: 'editor-action', durationMs: 4500 });
     }
   }
 
@@ -250,10 +331,11 @@
         editor.currentFilePath = savedPath;
         editor.isDirty = false;
         window.go?.main?.App?.SetDirtyState?.(false, '');
+        clearEditorError('editor-action');
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      errorMsg = msg;
+      showEditorError(msg, { groupKey: 'editor-action', durationMs: 4500 });
     }
   }
 
@@ -267,8 +349,11 @@
   }
 
   async function handleConvert(md: string) {
-    if (!editor.selectedTemplate || !md.trim()) return;
-    errorMsg = '';
+    if (!editor.selectedTemplate || !md.trim()) {
+      clearEditorError('compile-error');
+      return;
+    }
+    clearInlineError('compile-error');
 
     // Wizard: detect image syntax
     if (md.includes('![') && shouldShowPoint('image-path')) triggerAction('image-path');
@@ -286,10 +371,16 @@
         } else {
           editor.svgPages = await compileSvg(editor.typstSource, editor.documentDir || undefined);
         }
+        clearEditorError('compile-error');
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         console.error('Convert failed:', msg);
-        errorMsg = msg;
+        showEditorError(msg, {
+          groupKey: 'compile-error',
+          copyText: msg,
+          durationMs: 12000,
+          inlineInDebug: true,
+        });
         // Wizard: detect image-related errors and hint about path rules
         if (/image|图片|not found|file not|读取/.test(msg.toLowerCase())) {
           setTimeout(() => triggerAction('image-error'), 500);
@@ -302,10 +393,10 @@
 
   async function handleDownload() {
     if (!editor.selectedTemplate || !editor.markdown.trim()) return;
-    errorMsg = '';
     try {
       if (window.go?.main?.App?.SavePDF) {
         await window.go.main.App.SavePDF(editor.markdown, editor.selectedTemplate, editor.documentDir);
+        clearEditorError('editor-action');
         return;
       }
       const blob = await convertAndCompile(editor.markdown, editor.selectedTemplate, editor.documentDir || undefined);
@@ -315,10 +406,11 @@
       a.download = extractTypstTitle(editor.typstSource) + '.pdf';
       a.click();
       URL.revokeObjectURL(url);
+      clearEditorError('editor-action');
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error('Download failed:', msg);
-      errorMsg = msg;
+      showEditorError(msg, { groupKey: 'editor-action', durationMs: 4500 });
     }
   }
 
@@ -356,6 +448,7 @@
           files, '/', documentDirs, filePaths,
           zipResults.length > 0 ? zipResults : undefined,
         );
+        clearEditorError('editor-action');
         return;
       } else {
         // Browser: file input (multiple, supports ZIP)
@@ -371,9 +464,10 @@
 
       if (files.length === 0) return;
       await fileRouter.processFiles(files, '/', documentDirs, filePaths);
+      clearEditorError('editor-action');
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      errorMsg = msg;
+      showEditorError(msg, { groupKey: 'editor-action', durationMs: 4500 });
     }
   }
 
@@ -386,6 +480,20 @@
       }
     }
     window.addEventListener('beforeunload', handleBeforeUnload);
+
+    if (window.go?.main?.App?.IsVerbose) {
+      void window.go.main.App.IsVerbose()
+        .then((verbose) => {
+          if (typeof verbose === 'boolean') {
+            isDebugMode = verbose;
+            if (!verbose) {
+              inlineErrorGroup = null;
+              errorMsg = '';
+            }
+          }
+        })
+        .catch(() => {});
+    }
 
     // Listen for Wails menu events
     const runtime = window.runtime;
@@ -483,7 +591,7 @@
     onmouseenter={handleToolbarRightEnter}
     onmouseleave={handleToolbarRightLeave}
   >
-    {#if errorMsg}
+    {#if isDebugMode && errorMsg}
       <span class="error-msg" title={errorMsg}>{errorMsg}</span>
     {/if}
     <div class="toolbar-hidden-group" class:visible={hiddenButtonsVisible}>
