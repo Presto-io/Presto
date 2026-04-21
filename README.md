@@ -60,9 +60,18 @@ Presto 支持 Windows、macOS 和 Linux。详见 [平台说明](docs/platform-no
 ```bash
 git clone https://github.com/Presto-io/Presto.git
 cd Presto
-make templates && make install-templates
-cd frontend && npm install && cd ..
+npm install --prefix frontend
+make check
 make dev
+```
+
+常用本地命令：
+
+```bash
+make check             # 推荐的统一质量入口
+make check-go          # Go 测试 + vet
+make check-frontend    # 前端检查 + 构建
+make desktop           # 本地桌面端构建（不属于默认 CI 基线）
 ```
 
 ## 开源协议
