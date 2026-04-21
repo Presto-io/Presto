@@ -231,9 +231,34 @@ func (a *App) installMacOS(dmgPath, tmpDir string) error {
 	return nil
 }
 
-// --- Windows: extract zip, schedule replacement via script, relaunch ---
+// --- Windows: launch installer or extract legacy zip, then relaunch/quit ---
 
-func (a *App) installWindows(zipPath, tmpDir string) error {
+func (a *App) installWindows(archivePath, tmpDir string) error {
+	switch strings.ToLower(filepath.Ext(archivePath)) {
+	case ".exe":
+		return a.installWindowsInstaller(archivePath, tmpDir)
+	case ".zip":
+		return a.installWindowsZip(archivePath, tmpDir)
+	default:
+		return fmt.Errorf("unsupported Windows update package: %s", filepath.Base(archivePath))
+	}
+}
+
+func (a *App) installWindowsInstaller(installerPath, tmpDir string) error {
+	// Launch the installer shortly after the app exits to avoid file locking issues.
+	script := fmt.Sprintf("@echo off\r\ntimeout /t 2 /nobreak >nul\r\nstart \"\" \"%s\"\r\n", installerPath)
+	scriptPath := filepath.Join(tmpDir, "launch-installer.bat")
+	if err := os.WriteFile(scriptPath, []byte(script), 0755); err != nil {
+		return fmt.Errorf("write installer launcher: %w", err)
+	}
+
+	wailsRuntime.EventsEmit(a.ctx, "update:status", "正在启动安装程序…")
+	exec.Command("cmd", "/c", "start", "/b", scriptPath).Start()
+	wailsRuntime.Quit(a.ctx)
+	return nil
+}
+
+func (a *App) installWindowsZip(zipPath, tmpDir string) error {
 	extractDir := filepath.Join(tmpDir, "extracted")
 	if err := os.MkdirAll(extractDir, 0755); err != nil {
 		return fmt.Errorf("mkdir extract: %w", err)
