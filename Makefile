@@ -1,4 +1,4 @@
-.PHONY: frontend server desktop build dev run-desktop clean \
+.PHONY: frontend server desktop build dev run-desktop check check-go check-frontend clean \
        _build-macos-arm64 _build-macos-amd64 \
        dist-macos dist-macos-arm64 dist-macos-amd64 dist-macos-universal \
        dist-dmg dist-dmg-arm64 dist-dmg-amd64 dist-dmg-universal \
@@ -40,6 +40,16 @@ desktop: frontend
 		go build -tags "$(WAILS_TAGS)" -ldflags "$(LDFLAGS)" -o bin/presto-desktop $(DESKTOP_SRC)/
 
 build: server
+
+check: check-go check-frontend
+
+check-go:
+	go test ./...
+	go vet ./...
+
+check-frontend:
+	cd frontend && npm run check
+	cd frontend && npm run build
 
 dev:
 	go run ./cmd/presto-server/

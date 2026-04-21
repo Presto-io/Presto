@@ -46,18 +46,24 @@ presto/
 
 ## 构建命令
 
-所有构建通过 Makefile 管理：
+所有构建和基础检查都以 `Presto/` 仓库根目录为执行基准：
 
 ```bash
+make check                 # 推荐的统一质量入口
+make check-go              # Go baseline: go test ./... + go vet ./...
+make check-frontend        # Frontend baseline: npm run check + npm run build
 make frontend              # 构建前端 (cd frontend && npm run build)
 make server                # 构建 HTTP 服务器 → bin/presto-server
 make desktop               # 构建桌面端 → bin/presto-desktop
-make templates             # 构建模板二进制 → bin/presto-template-*
-make install-templates     # 安装模板到 ~/.presto/templates/
 make dev                   # 开发模式运行服务器 (go run ./cmd/presto-server/)
 make run-desktop           # 构建并运行桌面端
 make clean                 # 清理构建产物
 ```
+
+说明：
+
+- `make check` 是当前推荐的本地 / CI 共用基础入口。
+- `make desktop`、`dist-*` 等桌面或平台特定构建不属于当前默认自动化基线。
 
 ### 跨平台打包
 
@@ -73,16 +79,22 @@ make dist                  # 全平台打包
 ## 测试
 
 ```bash
-go test ./internal/...     # 运行所有 Go 单元测试
+make check                 # 推荐先跑的完整基线
+make check-go              # Go baseline
+go test ./internal/...     # 运行内部 Go 单元测试
 go test ./internal/template/...  # 模板相关测试
 go test ./internal/typst/...     # Typst 编译器测试
+go test ./... -race        # 扩展检查（较慢，不在默认 make check 中）
 go vet ./...               # Go 静态检查
+go build ./cmd/presto-desktop    # 本地桌面构建验证（平台相关）
 ```
 
 前端检查：
 
 ```bash
+make check-frontend             # 推荐入口
 cd frontend && npm run check     # svelte-check + TypeScript
+cd frontend && npm run build     # 生产构建验证
 ```
 
 ## 架构要点
