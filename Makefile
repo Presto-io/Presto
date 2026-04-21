@@ -8,6 +8,7 @@
 APP_NAME     := Presto
 APP_ID       := com.mrered.presto
 VERSION      ?= $(shell git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo "0.0.0-dev")
+VERSION_BASE := $(shell printf '%s' "$(VERSION)" | sed 's/-.*//')
 TYPST_VERSION:= 0.14.2
 WAILS_TAGS   := desktop,production
 LDFLAGS      := -s -w -X main.version=$(VERSION)
@@ -282,10 +283,17 @@ clean:
 	echo '<!doctype html>' > $(DESKTOP_EMBED)/index.html
 
 # ─── NSIS Windows Installer ──────────────────────────────
-# Note: Requires NSIS 3.08+ installed on Windows
+# Note: Requires `makensis` in PATH
 
 .PHONY: nsis
 nsis: dist-windows-amd64
 	@echo "==> Building NSIS installer..."
-	wails build -platform windows/amd64 -nsis
-	@echo "==> Installer created: build/bin/Presto-$(VERSION)-installer.exe"
+	makensis \
+		-DARG_VERSION=$(VERSION) \
+		-DARG_FILE_VERSION=$(VERSION_BASE).0 \
+		-DARG_ARCH=amd64 \
+		-DARG_BINARY="$(PWD)/$(DIST)/$(APP_NAME)-$(VERSION)-windows.exe" \
+		-DARG_TYPST_BINARY="$(PWD)/$(DIST)/typst.exe" \
+		-DARG_OUTPUT_NAME="$(PWD)/$(DIST)/$(APP_NAME)-$(VERSION)-windows-amd64-installer.exe" \
+		build/windows/installer/custom.nsi
+	@echo "==> Installer created: $(DIST)/$(APP_NAME)-$(VERSION)-windows-amd64-installer.exe"
