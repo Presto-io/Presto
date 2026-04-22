@@ -149,7 +149,7 @@
   }
 </script>
 
-<div class="toolbar" onmousemove={handleToolbarMouseMove}>
+<div class="toolbar" onmousemove={handleToolbarMouseMove} role="toolbar" aria-label="编辑器工具栏" tabindex="-1">
   <div class="toolbar-left">
     <span class="template-name">
       {#if loading}
@@ -162,6 +162,7 @@
     {/if}
   </div>
   <div
+    role="group"
     class="toolbar-right"
     bind:this={toolbarRightEl}
     onmouseenter={handleToolbarRightEnter}

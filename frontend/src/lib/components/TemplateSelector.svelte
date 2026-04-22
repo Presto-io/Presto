@@ -129,7 +129,7 @@
   });
 </script>
 
-<div class="selector-wrapper" bind:this={wrapperEl} onkeydown={handleKeydown}>
+<div class="selector-wrapper" bind:this={wrapperEl} onkeydown={handleKeydown} role="combobox" aria-expanded={open} aria-controls="selector-listbox" tabindex="0">
   <button
     bind:this={triggerEl}
     class="selector-trigger"
@@ -154,7 +154,7 @@
 
   {#if open}
     <div
-      class="selector-dropdown"
+      class="selector-dropdown" id="selector-listbox"
       role="listbox"
       transition:fly={{ y: -4, duration: 150, easing: cubicOut }}
     >
