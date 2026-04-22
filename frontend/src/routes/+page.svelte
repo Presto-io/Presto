@@ -578,7 +578,7 @@
   });
 </script>
 
-<div class="toolbar" style="--wails-draggable:drag" onmousemove={handleToolbarMouseMove}>
+<div class="toolbar" style="--wails-draggable:drag" onmousemove={handleToolbarMouseMove} role="toolbar" aria-label="主工具栏" tabindex="-1">
   <div class="toolbar-left">
     <TemplateSelector selected={editor.selectedTemplate} onbeforechange={handleTemplateChange} />
     {#if converting}
@@ -586,6 +586,7 @@
     {/if}
   </div>
   <div
+    role="group"
     class="toolbar-right"
     bind:this={toolbarRightEl}
     onmouseenter={handleToolbarRightEnter}

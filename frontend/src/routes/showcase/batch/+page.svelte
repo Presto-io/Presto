@@ -182,9 +182,10 @@
           <div class="file-list">
             {#each group.files as bf (bf.id)}
               <div
-                class="file-row batch-file-row"
+                class="file-row batch-file-row" tabindex="0"
                 class:selected={selectedFileIds.has(bf.id)}
                 onclick={(e) => toggleSelect(bf.id, e)}
+                onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleSelect(bf.id, e as any); } }}
                 draggable="true"
                 ondragstart={(e) => handleFileDragStart(e, bf.id)}
                 role="option"
@@ -326,16 +327,6 @@
     font-weight: 600;
     flex-shrink: 0;
     font-family: var(--font-mono);
-  }
-  .badge-builtin {
-    font-size: 0.5625rem;
-    font-weight: 600;
-    padding: 0 4px;
-    border-radius: 3px;
-    background: var(--color-accent);
-    color: var(--color-bg);
-    flex-shrink: 0;
-    line-height: 1.4;
   }
   .batch-content {
     flex: 1;

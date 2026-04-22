@@ -72,12 +72,13 @@
   }
 </script>
 
-<div class="toolbar" onmousemove={handleToolbarMouseMove}>
+<div class="toolbar" onmousemove={handleToolbarMouseMove} role="toolbar" aria-label="编辑器工具栏" tabindex="-1">
   <div class="toolbar-left">
     <span class="template-name">实操教案模板</span>
     <div class="status-dot"></div>
   </div>
   <div
+    role="group"
     class="toolbar-right"
     bind:this={toolbarRightEl}
     onmouseenter={handleToolbarRightEnter}

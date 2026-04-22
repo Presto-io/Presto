@@ -609,7 +609,7 @@
         {#each groups as group (group.templateId)}
           <div class="section">
             <div
-              class="section-header group-header"
+              class="section-header group-header" role="listitem"
               ondragover={handleGroupHeaderDragOver}
               ondrop={(e) => handleGroupHeaderDrop(e, group.templateId)}
             >
@@ -622,10 +622,11 @@
                   class="file-row"
                   class:selected={selectedFileIds.has(bf.id)}
                   onclick={(e) => toggleSelect(bf.id, e)}
+                  onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleSelect(bf.id, e as any); } }}
                   draggable="true"
                   ondragstart={(e) => handleFileDragStart(e, bf.id)}
                   ondragend={handleFileDragEnd}
-                  role="option"
+                  role="option" tabindex="0"
                   aria-selected={selectedFileIds.has(bf.id)}
                 >
                   <span class="drag-handle"><GripVertical size={12} /></span>
@@ -851,16 +852,6 @@
     font-weight: 600;
     flex-shrink: 0;
     font-family: var(--font-mono);
-  }
-  .badge-builtin {
-    font-size: 0.5625rem;
-    font-weight: 600;
-    padding: 0 4px;
-    border-radius: 3px;
-    background: var(--color-accent);
-    color: var(--color-bg);
-    flex-shrink: 0;
-    line-height: 1.4;
   }
 
   /* Right: batch content */
