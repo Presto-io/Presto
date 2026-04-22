@@ -100,11 +100,9 @@ Function .onInit
 
   ReadRegStr $0 HKLM "${UNINST_KEY}" "UninstallString"
   ${If} $0 != ""
-    MessageBox MB_YESNO|MB_ICONQUESTION "Presto is already installed.$\n$\nDo you want to uninstall the existing version first?" IDYES uninstall_prev
+    MessageBox MB_YESNO|MB_ICONQUESTION "Presto is already installed.$\n$\nDo you want to uninstall the existing version first?" IDYES +2
     Abort
-
-    uninstall_prev:
-      ExecWait '"$0" /S _?=$INSTDIR'
+    ExecWait '"$0" /S _?=$INSTDIR'
   ${EndIf}
 FunctionEnd
 
@@ -170,10 +168,8 @@ Section "Download Templates" SEC_TEMPLATES
     Banner::destroy
 
     ${If} $0 != 0
-      MessageBox MB_YESNO|MB_ICONWARNING "Template download failed. You can download templates later from within the application.$\n$\nContinue installation?" IDYES continue_install
+      MessageBox MB_YESNO|MB_ICONWARNING "Template download failed. You can download templates later from within the application.$\n$\nContinue installation?" IDYES +2
       Abort
-
-      continue_install:
     ${EndIf}
   ${EndIf}
 SectionEnd
