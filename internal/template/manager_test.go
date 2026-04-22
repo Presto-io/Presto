@@ -17,7 +17,7 @@ func TestManagerListTemplates(t *testing.T) {
 
 	bin := createMockTemplate(t, t.TempDir())
 	data, _ := os.ReadFile(bin)
-	os.WriteFile(filepath.Join(tplDir, "presto-template-mock"), data, 0755)
+	os.WriteFile(filepath.Join(tplDir, templateBinaryName("mock")), data, 0755)
 
 	mgr := NewManager(dir)
 	templates, err := mgr.List()
@@ -43,7 +43,7 @@ func TestManagerGet(t *testing.T) {
 
 	bin := createMockTemplate(t, t.TempDir())
 	data, _ := os.ReadFile(bin)
-	os.WriteFile(filepath.Join(tplDir, "presto-template-mock"), data, 0755)
+	os.WriteFile(filepath.Join(tplDir, templateBinaryName("mock")), data, 0755)
 
 	mgr := NewManager(dir)
 	tpl, err := mgr.Get("mock")
