@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -23,11 +25,18 @@ func NewExecutor(binaryPath string) *Executor {
 // SEC-10: Minimal environment for template execution
 // SEC-12: Timeout via context
 func (e *Executor) run(args []string, stdin string) ([]byte, error) {
+	var pathEnv string
+	if runtime.GOOS == "windows" {
+		pathEnv = os.TempDir() + ";C:\\Windows\\System32"
+	} else {
+		pathEnv = "/usr/local/bin:/usr/bin:/bin"
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), executorTimeout)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, e.BinaryPath, args...)
-	cmd.Env = []string{"PATH=/usr/local/bin:/usr/bin:/bin"}
+	cmd.Env = []string{"PATH=" + pathEnv}
 	if stdin != "" {
 		cmd.Stdin = strings.NewReader(stdin)
 	}
