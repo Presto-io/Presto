@@ -100,9 +100,7 @@ Function .onInit
 
   ReadRegStr $0 HKLM "${UNINST_KEY}" "UninstallString"
   ${If} $0 != ""
-    MessageBox MB_YESNO|MB_ICONQUESTION \
-      "Presto is already installed.$\n$\nDo you want to uninstall the existing version first?" \
-      IDYES uninstall_prev
+    MessageBox MB_YESNO|MB_ICONQUESTION "Presto is already installed.$\n$\nDo you want to uninstall the existing version first?" IDYES uninstall_prev
     Abort
 
     uninstall_prev:
@@ -172,9 +170,7 @@ Section "Download Templates" SEC_TEMPLATES
     Banner::destroy
 
     ${If} $0 != 0
-      MessageBox MB_YESNO|MB_ICONWARNING \
-        "Template download failed. You can download templates later from within the application.$\n$\nContinue installation?" \
-        IDYES continue_install
+      MessageBox MB_YESNO|MB_ICONWARNING "Template download failed. You can download templates later from within the application.$\n$\nContinue installation?" IDYES continue_install
       Abort
 
       continue_install:
@@ -242,9 +238,7 @@ Section "Uninstall"
     Abort
 
   ask_keep_data:
-    MessageBox MB_YESNO \
-      "Keep user data directory?$\n$\nIf you select Yes, your documents, templates, and settings will be preserved.$\n$\nLocation: $PROFILE\.presto" \
-      IDYES keep_data
+    MessageBox MB_YESNO "Keep user data directory?$\n$\nIf you select Yes, your documents, templates, and settings will be preserved.$\n$\nLocation: $PROFILE\.presto" IDYES keep_data
     Goto continue_uninstall
 
   keep_data:
