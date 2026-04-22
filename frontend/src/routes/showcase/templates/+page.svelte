@@ -348,15 +348,6 @@
   }
   .tpl-name { font-size: 0.875rem; font-weight: 500; color: var(--color-text-bright); }
   .tpl-version { font-size: 0.75rem; color: var(--color-muted); font-family: var(--font-mono); }
-  .badge-builtin {
-    font-size: 0.625rem;
-    font-weight: 600;
-    padding: 1px 6px;
-    border-radius: 4px;
-    background: var(--color-accent);
-    color: var(--color-bg);
-    letter-spacing: 0.02em;
-  }
   .tpl-desc {
     margin: 0 0 2px;
     font-size: 0.8125rem;
