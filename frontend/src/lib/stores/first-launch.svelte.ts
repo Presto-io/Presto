@@ -117,6 +117,8 @@ export const firstLaunchStore = {
             getExample(templateToSelect).then(example => {
               if (example) {
                 editor.markdown = example;
+                editor.savedContent = example;
+                editor.exampleContent = example;
                 console.log('[first-launch] loaded example document for:', templateToSelect);
                 // Trigger conversion to show preview
                 convertAndCompile(example, templateToSelect).catch(err => {

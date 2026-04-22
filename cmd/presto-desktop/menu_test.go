@@ -79,12 +79,13 @@ func assertSharedFileMenu(t *testing.T, m *menu.Menu) {
 		t.Fatal("文件 menu not found")
 	}
 
+	// 6 text items + 1 separator + 1 "关闭窗口" = 8 items total
 	expectedLabels := []string{
 		"新建", "打开文件…", "保存", "另存为…", "导出 PDF…", "设置…",
 	}
 
-	if got := len(fileMenu.Items); got != len(expectedLabels) {
-		t.Fatalf("文件 menu: expected %d items, got %d", len(expectedLabels), got)
+	if got := len(fileMenu.Items); got != 8 {
+		t.Fatalf("文件 menu: expected 8 items, got %d", got)
 	}
 
 	for i, expected := range expectedLabels {
@@ -92,6 +93,16 @@ func assertSharedFileMenu(t *testing.T, m *menu.Menu) {
 		if item.Label != expected {
 			t.Errorf("文件 menu[%d]: expected label %q, got %q", i, expected, item.Label)
 		}
+	}
+
+	// Item 6 is a separator
+	if fileMenu.Items[6].Type != menu.SeparatorType {
+		t.Errorf("文件 menu[6]: expected separator, got type=%v", fileMenu.Items[6].Type)
+	}
+
+	// Item 7 is "关闭窗口"
+	if fileMenu.Items[7].Label != "关闭窗口" {
+		t.Errorf("文件 menu[7]: expected label %q, got %q", "关闭窗口", fileMenu.Items[7].Label)
 	}
 
 	tests := []struct {
@@ -104,6 +115,7 @@ func assertSharedFileMenu(t *testing.T, m *menu.Menu) {
 		{"另存为…", keys.Combo("s", keys.CmdOrCtrlKey, keys.ShiftKey)},
 		{"导出 PDF…", keys.CmdOrCtrl("e")},
 		{"设置…", keys.CmdOrCtrl(",")},
+		{"关闭窗口", keys.CmdOrCtrl("w")},
 	}
 
 	for _, tt := range tests {
