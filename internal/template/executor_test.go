@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -11,6 +12,9 @@ func createMockTemplate(t *testing.T, dir string) string {
 	t.Helper()
 	src := filepath.Join(dir, "mock.go")
 	bin := filepath.Join(dir, "mock-template")
+	if runtime.GOOS == "windows" {
+		bin += ".exe"
+	}
 
 	code := `package main
 import (
