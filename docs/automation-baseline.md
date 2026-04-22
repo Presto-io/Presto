@@ -79,8 +79,8 @@ make check-desktop-compile  # 桌面端编译验证（平台相关）
 
 - `Presto/.github/workflows/security-scan.yml`
   - `go-vulncheck`：使用 `go-version-file: go.mod`（当前 Go 1.25.9），升级后 crypto 漏洞已修复
-  - `npm audit`：降级为 informational only（`continue-on-error: true`），当前已知漏洞作为 follow-up 跟踪
-  - 当前已知 npm 漏洞：dompurify（moderate）、picomatch（high）、vite（high）— 详见 Known follow-ups
+  - `npm audit`：降级为 informational only（`continue-on-error: true`）
+  - npm 漏洞已在 Phase 12 通过 `npm audit fix` 修复（dompurify、picomatch、devalue、vite、@sveltejs/kit）
 - `Presto/.github/workflows/build-showcase.yml`
   - 已升级至 Node 22，与所有其他 workflow 一致
 
@@ -97,15 +97,9 @@ Linux 桌面构建 CI 不加入 test.yml 基线。原因：
 
 1. **release.yml Go 版本漂移**：`GO_VERSION: '1.25.8'` 硬编码，而 go.mod 已升级至 1.25.9。CLAUDE.md 禁止修改 release.yml。若限制解除，应更新此环境变量。
 
-2. **npm audit 漏洞**：
-   - `dompurify <=3.3.3` — mutation XSS, prototype pollution（moderate）
-   - `picomatch 4.0.0-4.0.3` — ReDoS, method injection（high）
-   - `vite 7.0.0-7.3.1` — path traversal, file read, fs.deny bypass（high）
-   - 这些需要依赖升级，超出 Phase 11 范围
+2. **Linux 桌面构建 CI**：不包含在 test.yml 基线中。桌面构建验证在 release.yml 的 ubuntu-22.04 runner 上进行。若 ubuntu-22.04 runner 被废弃，需要迁移至 webkit2gtk-4.1。
 
-3. **Linux 桌面构建 CI**：不包含在 test.yml 基线中。桌面构建验证在 release.yml 的 ubuntu-22.04 runner 上进行。若 ubuntu-22.04 runner 被废弃，需要迁移至 webkit2gtk-4.1。
-
-4. **Makefile Docker webkit2gtk**：`dist-linux-amd64` 仍使用 `libwebkit2gtk-4.0-dev`。在 Docker 中可用（基于 Debian），但长期应迁移至 4.1 以兼容 Ubuntu 24.04。
+3. **Makefile Docker webkit2gtk**：`dist-linux-amd64` 仍使用 `libwebkit2gtk-4.0-dev`。在 Docker 中可用（基于 Debian），但长期应迁移至 4.1 以兼容 Ubuntu 24.04。
 
 ## Manual validation
 
@@ -154,4 +148,5 @@ make check-local
 如果你的目标是处理更重的质量面，再按问题类型继续：
 
 - CI workflow / matrix / 安全门禁修复：Phase 11 已完成
-- carry-in 验证结论与里程碑收口：后续 Phase 12
+- npm audit 漏洞修复：Phase 12 已完成（`npm audit fix`，0 vulnerabilities）
+- carry-in 验证结论与里程碑收口：Phase 12 已完成
