@@ -1,4 +1,4 @@
-﻿; Presto Windows installer
+; Presto Windows installer
 ; Standalone NSIS script used by CI and local release builds.
 
 Unicode true
@@ -105,10 +105,7 @@ Function .onInit
   Goto init_done
 
   existing_found:
-  MessageBox MB_YESNO|MB_ICONQUESTION "Presto is already installed.$\n$\nDo you want to uninstall the existing version first?" IDYES do_uninstall
-  Abort
-
-  do_uninstall:
+  MessageBox MB_OK|MB_ICONINFORMATION "Presto is already installed. The existing version will be uninstalled first."
   ExecWait '"$0" /S _?=$INSTDIR'
 
   init_done:
@@ -182,10 +179,7 @@ Section "Download Templates" SEC_TEMPLATES
   Goto template_done
 
   template_download_failed:
-  MessageBox MB_YESNO|MB_ICONWARNING "Template download failed. You can download templates later from within the application.$\n$\nContinue installation?" IDYES skip_abort_templates
-  Abort
-
-  skip_abort_templates:
+  MessageBox MB_OK|MB_ICONWARNING "Template download failed. You can download templates later from within the application."
   template_done:
 SectionEnd
 
