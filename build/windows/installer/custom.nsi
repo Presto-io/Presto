@@ -100,15 +100,8 @@ Function .onInit
 
   ReadRegStr $0 HKLM "${UNINST_KEY}" "UninstallString"
   ${If} $0 != ""
-    Goto existing_found
+    ExecWait '"$0" /S _?=$INSTDIR'
   ${EndIf}
-  Goto init_done
-
-  existing_found:
-  MessageBox MB_OK|MB_ICONINFORMATION "Presto is already installed. The existing version will be uninstalled first."
-  ExecWait '"$0" /S _?=$INSTDIR'
-
-  init_done:
 FunctionEnd
 
 Function OptionsPage
@@ -171,16 +164,7 @@ Section "Download Templates" SEC_TEMPLATES
     Banner::show /set 76 "Downloading Templates" "Please wait while templates are downloaded..."
     ExecWait '"$INSTDIR\${PRODUCT_EXECUTABLE}" --download-templates' $0
     Banner::destroy
-
-    ${If} $0 != 0
-      Goto template_download_failed
-    ${EndIf}
   ${EndIf}
-  Goto template_done
-
-  template_download_failed:
-  MessageBox MB_OK|MB_ICONWARNING "Template download failed. You can download templates later from within the application."
-  template_done:
 SectionEnd
 
 Section "Registry" SEC_REGISTRY
