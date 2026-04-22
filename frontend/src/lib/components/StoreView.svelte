@@ -79,7 +79,8 @@
   let searchQuery = $state('');
   let activeCategory = $state<string | null>(null);
   let activeTrust = $state<string | null>(null);
-  let selectedId = $state<string | null>(initialSelectedId);
+  let selectedId = $state<string | null>(null);
+  $effect(() => { if (initialSelectedId !== null) selectedId = initialSelectedId; });
   let readmeContent = $state('');
   let readmeLoading = $state(false);
   let previewWidth = $state(0);
@@ -90,7 +91,7 @@
   type SortOption = 'latest' | 'stars' | 'downloads';
   let sortBy = $state<SortOption>('latest');
   let sortOpen = $state(false);
-  let sortWrapperEl: HTMLDivElement;
+  let sortWrapperEl = $state<HTMLDivElement>();
   const sortLabels: Record<SortOption, string> = { latest: '最新发布', stars: '最多星标', downloads: '最多下载' };
 
   let statsMap = $state<StatsMap>({});

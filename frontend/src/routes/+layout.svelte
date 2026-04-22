@@ -19,7 +19,7 @@
 	// --- Universal drag-drop (window-level capture phase) ---
 	let dragOver = $state(false);
 	let dragCounter = 0;
-	let confirmDialog: HTMLDialogElement;
+	let confirmDialog = $state<HTMLDialogElement>();
 
 	const ACCEPTED_EXTS = ['.md', '.markdown', '.txt', '.zip'];
 
