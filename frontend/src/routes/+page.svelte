@@ -30,6 +30,20 @@
   let autoDetectedOnce = $state(false);
 
   // React to external content load (drag-drop or file-router)
+
+  let saveFeedbackTimer: ReturnType<typeof setTimeout>;
+
+  /** Check if content has real changes that warrant a save dialog.
+   *  Returns false if: content unchanged since last save, content equals
+   *  example content, or content is empty.
+   */
+  function hasRealChanges(): boolean {
+    const content = editor.markdown;
+    if (!content.trim()) return false;
+    if (content === editor.savedContent) return false;
+    if (editor.exampleContent && content === editor.exampleContent) return false;
+    return true;
+  }
   $effect(() => {
     if (editor.pendingExternalLoad) {
       editor.pendingExternalLoad = false;
@@ -167,7 +181,15 @@
     });
   }
 
-  onDestroy(() => { clearTimeout(hideTimer); });
+  onDestroy(() => { clearTimeout(hideTimer); clearTimeout(saveFeedbackTimer); });
+
+  function showSaveFeedback() {
+    editor.saveFeedback = 'saved';
+    clearTimeout(saveFeedbackTimer);
+    saveFeedbackTimer = setTimeout(() => {
+      editor.saveFeedback = 'idle';
+    }, 1200);
+  }
 
   function onDividerPointerDown(e: PointerEvent) {
     isDragging = true;
@@ -194,6 +216,9 @@
       const example = await getExample(templateId);
       if (example) {
         editor.markdown = example;
+        editor.exampleContent = example;
+        editor.savedContent = example;
+        editor.isDirty = false;
         handleConvert(editor.markdown);
       }
     } catch (e) {
@@ -277,7 +302,7 @@
   }
 
   async function handleNew() {
-    if (editor.isDirty && editor.markdown.trim()) {
+    if (hasRealChanges()) {
       if (window.go?.main?.App?.ConfirmSaveDialog) {
         const filename = editor.currentFilePath?.split(/[/\\]/).pop() || '';
         const result = await window.go.main.App.ConfirmSaveDialog(filename);
@@ -297,6 +322,8 @@
     editor.documentDir = '';
     editor.isDirty = false;
     editor.documentTitle = '';
+    editor.savedContent = '';
+    editor.exampleContent = '';
     clearEditorError('compile-error');
     clearEditorError('editor-action');
     window.go?.main?.App?.SetDirtyState?.(false, '');
@@ -311,6 +338,8 @@
         await window.go.main.App.SaveMarkdown(editor.markdown, editor.currentFilePath);
         editor.isDirty = false;
         window.go?.main?.App?.SetDirtyState?.(false, '');
+        editor.savedContent = editor.markdown;
+        showSaveFeedback();
         clearEditorError('editor-action');
       } else {
         await handleSaveAs();
@@ -331,6 +360,8 @@
         editor.currentFilePath = savedPath;
         editor.isDirty = false;
         window.go?.main?.App?.SetDirtyState?.(false, '');
+        editor.savedContent = editor.markdown;
+        showSaveFeedback();
         clearEditorError('editor-action');
       }
     } catch (e) {
@@ -341,9 +372,11 @@
 
   /** Wrapper: track dirty state + update menu before converting. */
   function handleEditorChange(md: string) {
-    editor.isDirty = true;
+    const reallyDirty = md.trim() !== '' && md !== editor.savedContent &&
+      (!editor.exampleContent || md !== editor.exampleContent);
+    editor.isDirty = reallyDirty;
     const filename = editor.currentFilePath?.split(/[/\\]/).pop() || '';
-    window.go?.main?.App?.SetDirtyState?.(true, filename);
+    window.go?.main?.App?.SetDirtyState?.(reallyDirty, filename);
     window.go?.main?.App?.UpdateMenuState?.(md.trim().length > 0);
     handleConvert(md);
   }
@@ -474,7 +507,7 @@
   onMount(() => {
     // Intercept window close when editor has unsaved changes
     function handleBeforeUnload(e: BeforeUnloadEvent) {
-      if (editor.isDirty && editor.markdown.trim()) {
+      if (hasRealChanges()) {
         e.preventDefault();
         e.returnValue = '';
       }
@@ -508,6 +541,9 @@
       runtime.EventsOn('menu:save', handleSave);
       runtime.EventsOn('menu:saveas', handleSaveAs);
       runtime.EventsOn('menu:store', () => goto('/store-templates'));
+      runtime.EventsOn('menu:close-window', () => {
+        window.runtime?.WindowClose?.();
+      });
 
       runtime.EventsOn('menu:quit', async () => {
         window.go?.main?.App?.QuitApp();
@@ -515,6 +551,7 @@
 
       runtime.EventsOn('app:save-and-close', async () => {
         await handleSave();
+        editor.savedContent = editor.markdown;
         window.go?.main?.App?.SetDirtyState?.(false, '');
         window.go!.main.App.QuitApp();
       });
@@ -571,6 +608,7 @@
         runtime.EventsOff('menu:save');
         runtime.EventsOff('menu:saveas');
         runtime.EventsOff('menu:store');
+        runtime.EventsOff('menu:close-window');
         runtime.EventsOff('menu:quit');
         runtime.EventsOff('app:save-and-close');
       }
@@ -582,7 +620,11 @@
   <div class="toolbar-left">
     <TemplateSelector selected={editor.selectedTemplate} onbeforechange={handleTemplateChange} />
     {#if converting}
-      <div class="status-dot"></div>
+      <div class="status-dot compiling"></div>
+    {:else if editor.isDirty}
+      <div class="status-dot dirty"></div>
+    {:else if editor.saveFeedback === 'saved'}
+      <div class="status-dot saved"></div>
     {/if}
   </div>
   <div
@@ -692,12 +734,32 @@
     width: 6px;
     height: 6px;
     border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .status-dot.compiling {
     background: var(--color-accent);
     animation: pulse 1s ease-in-out infinite;
+  }
+  .status-dot.dirty {
+    background: var(--color-accent-dim, rgba(122, 162, 247, 0.5));
+    animation: breathe-dirty 2.5s ease-in-out infinite;
+  }
+  .status-dot.saved {
+    background: var(--color-success);
+    animation: save-flash 1.2s ease-out forwards;
   }
   @keyframes pulse {
     0%, 100% { opacity: 0.4; }
     50% { opacity: 1; }
+  }
+  @keyframes breathe-dirty {
+    0%, 100% { opacity: 0.35; }
+    50% { opacity: 0.7; }
+  }
+  @keyframes save-flash {
+    0% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.8; transform: scale(1.5); }
+    100% { opacity: 0; transform: scale(1); }
   }
   .error-msg {
     font-size: 12px;

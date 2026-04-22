@@ -56,6 +56,10 @@ func addFileMenu(appMenu *menu.Menu, app *App) {
 	fileMenu.AddText("设置…", keys.CmdOrCtrl(","), func(_ *menu.CallbackData) {
 		wailsRuntime.EventsEmit(app.ctx, "menu:settings")
 	})
+	fileMenu.AddSeparator()
+	fileMenu.AddText("关闭窗口", keys.CmdOrCtrl("w"), func(_ *menu.CallbackData) {
+		wailsRuntime.EventsEmit(app.ctx, "menu:close-window")
+	})
 }
 
 func addTemplateMenu(appMenu *menu.Menu, app *App) {

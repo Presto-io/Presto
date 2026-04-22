@@ -11,6 +11,7 @@
 	--color-text-bright: #e0e4f7;
 	--color-muted: #565f89;
 	--color-accent: #7aa2f7;
+	--color-accent-dim: rgba(122, 162, 247, 0.35);
 	--color-accent-hover: #89b4fa;
 	--color-danger: #f7768e;
 	--color-success: #9ece6a;
@@ -70,6 +71,7 @@
 		--color-text-bright: #1a1e24;
 		--color-muted: #656d76;
 		--color-accent: #2563eb;
+		--color-accent-dim: rgba(37, 99, 235, 0.35);
 		--color-accent-hover: #1d4ed8;
 		--color-danger: #dc2626;
 		--color-success: #16a34a;

@@ -190,6 +190,8 @@ export const fileRouter = {
         editor.documentDir = dir;
         editor.currentFilePath = filePaths?.get(file.name) || '';
         editor.isDirty = false;
+        editor.savedContent = content;
+        editor.exampleContent = '';
         editor.pendingExternalLoad = true;
         if (currentPath !== '/') await goto('/');
       } else {
