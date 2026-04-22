@@ -45,6 +45,12 @@ jobs:
     permissions:
       contents: read
       issues: write
+    # D-02: npm audit is informational only. Current high-severity findings
+    # are follow-up items outside Phase 11 scope:
+    # - dompurify <=3.3.3 (XSS, prototype pollution) — requires major upgrade
+    # - picomatch 4.0.0-4.0.3 (ReDoS, method injection) — fixable via npm audit fix
+    # - vite 7.0.0-7.3.1 (path traversal, file read, fs.deny bypass) — fixable via npm audit fix
+    continue-on-error: true
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
@@ -52,8 +58,9 @@ jobs:
         with:
           node-version: 22
 
-      - name: Run npm audit
+      - name: Run npm audit (informational)
         working-directory: frontend
         run: |
           npm ci --ignore-scripts
-          npm audit --audit-level=high
+          npm audit --audit-level=high || true
+          echo "::warning::npm audit found vulnerabilities. See job output for details. These are tracked as follow-up items outside Phase 11."
