@@ -36,11 +36,6 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      # Desktop / platform-specific packaging belongs to dedicated build or release workflows.
       - name: Run shared automation baseline
         shell: bash
-        run: |
-          go test ./...
-          go vet ./...
-          cd frontend && npm run check
-          cd frontend && npm run build
+        run: make check
