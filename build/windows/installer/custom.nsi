@@ -1,4 +1,4 @@
-; Presto Windows installer
+﻿; Presto Windows installer
 ; Standalone NSIS script used by CI and local release builds.
 
 Unicode true
@@ -37,7 +37,7 @@ Unicode true
 !define INFO_COMPANYNAME "Presto Team"
 !define INFO_PRODUCTNAME "Presto"
 !define INFO_PRODUCTVERSION "${ARG_VERSION}"
-!define INFO_COPYRIGHT "Copyright © 2026 Presto Team"
+!define INFO_COPYRIGHT "Copyright (c) 2026 Presto Team"
 !define INFO_FILEVERSION "${ARG_FILE_VERSION}"
 !define PRODUCT_EXECUTABLE "Presto.exe"
 !define TYPST_EXECUTABLE "typst.exe"
@@ -100,10 +100,18 @@ Function .onInit
 
   ReadRegStr $0 HKLM "${UNINST_KEY}" "UninstallString"
   ${If} $0 != ""
-    MessageBox MB_YESNO|MB_ICONQUESTION "Presto is already installed.$\n$\nDo you want to uninstall the existing version first?" IDYES +2
-    Abort
-    ExecWait '"$0" /S _?=$INSTDIR'
+    Goto existing_found
   ${EndIf}
+  Goto init_done
+
+  existing_found:
+  MessageBox MB_YESNO|MB_ICONQUESTION "Presto is already installed.$\n$\nDo you want to uninstall the existing version first?" IDYES do_uninstall
+  Abort
+
+  do_uninstall:
+  ExecWait '"$0" /S _?=$INSTDIR'
+
+  init_done:
 FunctionEnd
 
 Function OptionsPage
@@ -168,10 +176,17 @@ Section "Download Templates" SEC_TEMPLATES
     Banner::destroy
 
     ${If} $0 != 0
-      MessageBox MB_YESNO|MB_ICONWARNING "Template download failed. You can download templates later from within the application.$\n$\nContinue installation?" IDYES +2
-      Abort
+      Goto template_download_failed
     ${EndIf}
   ${EndIf}
+  Goto template_done
+
+  template_download_failed:
+  MessageBox MB_YESNO|MB_ICONWARNING "Template download failed. You can download templates later from within the application.$\n$\nContinue installation?" IDYES skip_abort_templates
+  Abort
+
+  skip_abort_templates:
+  template_done:
 SectionEnd
 
 Section "Registry" SEC_REGISTRY
