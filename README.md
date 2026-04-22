@@ -68,11 +68,15 @@ make dev
 常用本地命令：
 
 ```bash
-make check             # 推荐的统一质量入口
-make check-go          # Go 测试 + vet
-make check-frontend    # 前端检查 + 构建
+make check             # 必需基线：提交 PR 前必须通过
+make check-go          # Go 测试 + vet（make check 的子集）
+make check-frontend    # 前端检查 + 构建（make check 的子集）
+make check-local       # 开发者本地扩展套件（含 race 检测 + 桌面编译）
 make desktop           # 本地桌面端构建（不属于默认 CI 基线）
 ```
+
+> **提交 PR 前**至少运行 `make check`；高风险变更建议运行 `make check-local`。
+> 扩展目标（`check-go-race`、`check-desktop-compile`）仅供本地使用，CI 对齐由 Phase 11 负责。
 
 ## 开源协议
 

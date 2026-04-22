@@ -1,4 +1,4 @@
-.PHONY: frontend server desktop build dev run-desktop check check-go check-frontend clean \
+.PHONY: frontend server desktop build dev run-desktop check check-go check-frontend check-go-race check-desktop-compile check-local clean \
        _build-macos-arm64 _build-macos-amd64 \
        dist-macos dist-macos-arm64 dist-macos-amd64 dist-macos-universal \
        dist-dmg dist-dmg-arm64 dist-dmg-amd64 dist-dmg-universal \
@@ -50,6 +50,14 @@ check-go:
 check-frontend:
 	cd frontend && npm run check
 	cd frontend && npm run build
+
+check-go-race:
+	go test ./... -race
+
+check-desktop-compile:
+	go build ./cmd/presto-desktop
+
+check-local: check check-go-race check-desktop-compile
 
 dev:
 	go run ./cmd/presto-server/

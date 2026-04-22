@@ -49,9 +49,12 @@ presto/
 所有构建和基础检查都以 `Presto/` 仓库根目录为执行基准：
 
 ```bash
-make check                 # 推荐的统一质量入口
+make check                 # 推荐的统一质量入口（必需基线）
 make check-go              # Go baseline: go test ./... + go vet ./...
 make check-frontend        # Frontend baseline: npm run check + npm run build
+make check-go-race         # Go 扩展检查: go test ./... -race
+make check-desktop-compile # 本地桌面编译验证: go build ./cmd/presto-desktop
+make check-local           # 开发者本地聚合: check + check-go-race + check-desktop-compile
 make frontend              # 构建前端 (cd frontend && npm run build)
 make server                # 构建 HTTP 服务器 → bin/presto-server
 make desktop               # 构建桌面端 → bin/presto-desktop
@@ -63,6 +66,8 @@ make clean                 # 清理构建产物
 说明：
 
 - `make check` 是当前推荐的本地 / CI 共用基础入口。
+- `make check-local` 是开发者本地扩展套件，包含基线 + race 检测 + 桌面编译验证。
+- `make check-go-race` 和 `make check-desktop-compile` 属于扩展本地检查，不应直接复制到 CI 基线作业。
 - `make desktop`、`dist-*` 等桌面或平台特定构建不属于当前默认自动化基线。
 
 ### 跨平台打包
@@ -79,14 +84,15 @@ make dist                  # 全平台打包
 ## 测试
 
 ```bash
-make check                 # 推荐先跑的完整基线
+make check                 # 推荐先跑的完整基线（必需）
 make check-go              # Go baseline
+make check-go-race         # Go race 检测（扩展，较慢）
+make check-desktop-compile # 本地桌面编译验证（平台相关）
+make check-local           # 开发者本地聚合：check + race + desktop compile
 go test ./internal/...     # 运行内部 Go 单元测试
 go test ./internal/template/...  # 模板相关测试
 go test ./internal/typst/...     # Typst 编译器测试
-go test ./... -race        # 扩展检查（较慢，不在默认 make check 中）
 go vet ./...               # Go 静态检查
-go build ./cmd/presto-desktop    # 本地桌面构建验证（平台相关）
 ```
 
 前端检查：
@@ -96,6 +102,13 @@ make check-frontend             # 推荐入口
 cd frontend && npm run check     # svelte-check + TypeScript
 cd frontend && npm run build     # 生产构建验证
 ```
+
+**分类：**
+
+- **必需基线：** `make check`（含 `check-go` + `check-frontend`）
+- **扩展本地：** `make check-go-race`（race 检测）、`make check-desktop-compile`（桌面编译）
+- **开发者聚合：** `make check-local`（基线 + 扩展，仅供本地使用）
+- 扩展本地目标不应直接复制到 CI 基线作业，CI 对齐由 Phase 11 负责
 
 ## 架构要点
 

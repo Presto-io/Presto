@@ -30,9 +30,37 @@ cd frontend && npm run build
 当前口径：
 
 - Go 基线要求通过且退出码为 `0`。
-- 前端基线要求 `0 errors`；现存 warnings 会被记录，但当前不作为 Phase 09 的失败条件。
-- `go test ./... -race` 是已验证的扩展检查，但不在默认 `make check` 内。
-- `go build ./cmd/presto-desktop` 是本地平台相关构建验证，不等于当前共享自动化基线。
+- 前端基线要求 `0 errors and 0 warnings`；Phase 10 已将原有 22 warnings 清零。
+- `make check-go-race` 是已验证的扩展本地检查（`go test ./... -race`），但不在默认 `make check` 内。
+- `make check-desktop-compile` 是本地平台相关构建验证（`go build ./cmd/presto-desktop`），不等于当前共享自动化基线。
+
+### Extended local checks
+
+开发者在提交高风险变更前，可运行扩展本地检查套件：
+
+```bash
+make check-local
+```
+
+它会组合以下三层：
+
+```bash
+make check            # 共享基线（必需）
+make check-go-race    # Go race 检测（扩展）
+make check-desktop-compile  # 桌面端编译验证（平台相关）
+```
+
+各目标分类：
+
+| 目标 | 类型 | 说明 |
+|------|------|------|
+| `make check-go` | 必需基线 | `go test ./...` + `go vet ./...` |
+| `make check-frontend` | 必需基线 | `npm run check` + `npm run build` |
+| `make check-go-race` | 扩展本地 | `go test ./... -race`，更慢但可检测竞态 |
+| `make check-desktop-compile` | 平台相关本地 | `go build ./cmd/presto-desktop`，依赖本地平台条件 |
+| `make check-local` | 开发者聚合 | 上述全部，仅供本地使用，不应直接复制到 CI |
+
+**注意：** 扩展本地目标（`check-go-race`、`check-desktop-compile`、`check-local`）不应被复制到 CI 面向的基线作业中，除非 Phase 11 明确做出此决定。
 
 ## CI gates
 
@@ -72,16 +100,20 @@ cd frontend && npm run build
 - 平台特定桌面体验确认
   - 例如真实设备上的菜单、安装、打包与运行行为
 
-自动化基线的作用是先确保“共享质量入口”明确且可复现，不替代这些人工结论。
+自动化基线的作用是先确保"共享质量入口"明确且可复现，不替代这些人工结论。
 
 ## Known noise / known failures
 
 ### Front-end warnings
 
-- `npm run check` 当前会报告 `0 errors and 22 warnings in 12 files`
-- 主要是 showcase 路由中的 Svelte a11y/static-element warnings，以及少量未使用样式告警
-- `npm run build` 会重复这些 warnings，并附带 chunk-size warnings
-- 这些属于当前已知噪音，不应误写成编译失败
+- `npm run check` 当前报告 `0 errors and 0 warnings`（Phase 10 从 22 warnings 清零）
+- `npm run build` 会输出 Vite chunk-size 提示（大模块 > 500 kB），属于构建优化建议，不是错误或 warning
+- chunk-size 提示可通过 `build.chunkSizeWarningLimit` 配置或代码拆分消除，作为后续优化跟进
+
+### Chunk-size build notes
+
+- 主要来源：`editor-gongwen` 和 `editor-jiaoan` 页面内联了大量模板数据
+- 当前不阻塞任何基线判断，但如果后续需要优化构建产物体积，这些页面是首要拆分目标
 
 ### Security Scan
 
@@ -98,14 +130,19 @@ cd frontend && npm run build
 
 ## Current operating rule
 
-如果你的目标是判断“这个仓库当前是否满足共享自动化基线”，先运行：
+如果你的目标是判断"这个仓库当前是否满足共享自动化基线"，先运行：
 
 ```bash
 make check
 ```
 
+如果你想运行更完整的本地质量套件（含扩展检查），运行：
+
+```bash
+make check-local
+```
+
 如果你的目标是处理更重的质量面，再按问题类型继续：
 
-- 本地扩展检查与 warning 收敛：后续 Phase 10
 - CI workflow / matrix / 安全门禁修复：后续 Phase 11
 - carry-in 验证结论与里程碑收口：后续 Phase 12
