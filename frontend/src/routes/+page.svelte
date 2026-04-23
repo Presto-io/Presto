@@ -542,7 +542,7 @@
       runtime.EventsOn('menu:saveas', handleSaveAs);
       runtime.EventsOn('menu:store', () => goto('/store-templates'));
       runtime.EventsOn('menu:close-window', () => {
-        window.runtime?.WindowClose?.();
+        window.runtime?.Quit?.();
       });
 
       runtime.EventsOn('menu:quit', async () => {
