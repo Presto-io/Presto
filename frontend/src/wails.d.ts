@@ -45,7 +45,6 @@ interface WailsRuntime {
 	WindowMinimise: () => void;
 	WindowToggleMaximise: () => void;
 	WindowSetTitle: (title: string) => void;
-	WindowClose: () => void;
 	Quit: () => void;
 	[key: string]: any;
 }
