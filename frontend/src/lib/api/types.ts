@@ -108,3 +108,21 @@ export interface TemplateStats {
 }
 
 export type StatsMap = Record<string, TemplateStats>;
+
+export interface RegistrySkill {
+  name: string;
+  displayName: string;
+  description: string;
+  version: string;
+  author: string;
+  repo: string;        // "owner/repo" format
+  path: string;        // skill path within the repo, e.g. "presto-gongwen"
+  category: string;
+  keywords: string[];
+  trust: 'official' | 'verified' | 'community' | 'unverified';
+}
+
+export interface SkillRegistry {
+  updatedAt: string;
+  skills: RegistrySkill[];
+}
