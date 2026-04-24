@@ -536,13 +536,11 @@
       runtime.EventsOn('menu:open', handleOpen);
       runtime.EventsOn('menu:export', handleDownload);
       runtime.EventsOn('menu:settings', () => goto('/settings'));
-      runtime.EventsOn('menu:templates', () => goto('/settings?panel=tpl-manage'));
       runtime.EventsOn('menu:new', handleNew);
       runtime.EventsOn('menu:save', handleSave);
       runtime.EventsOn('menu:saveas', handleSaveAs);
       runtime.EventsOn('menu:store', () => goto('/store-templates'));
       runtime.EventsOn('menu:skill-store', () => goto('/store-skills'));
-      runtime.EventsOn('menu:skills', () => goto('/settings?panel=skill-mgmt'));
       runtime.EventsOn('menu:close-window', () => {
         window.runtime?.Quit?.();
       });
@@ -572,7 +570,13 @@
 
       if (e.shiftKey && key === 't') {
         e.preventDefault();
-        goto('/settings?panel=tpl-manage');
+        goto('/store-templates');
+        return;
+      }
+
+      if (e.shiftKey && key === 'k') {
+        e.preventDefault();
+        goto('/store-skills');
         return;
       }
 
@@ -605,13 +609,11 @@
         runtime.EventsOff('menu:open');
         runtime.EventsOff('menu:export');
         runtime.EventsOff('menu:settings');
-        runtime.EventsOff('menu:templates');
         runtime.EventsOff('menu:new');
         runtime.EventsOff('menu:save');
         runtime.EventsOff('menu:saveas');
         runtime.EventsOff('menu:store');
         runtime.EventsOff('menu:skill-store');
-        runtime.EventsOff('menu:skills');
         runtime.EventsOff('menu:close-window');
         runtime.EventsOff('menu:quit');
         runtime.EventsOff('app:save-and-close');

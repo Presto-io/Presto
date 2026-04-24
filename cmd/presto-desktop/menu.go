@@ -65,21 +65,15 @@ func addFileMenu(appMenu *menu.Menu, app *App) {
 
 func addTemplateMenu(appMenu *menu.Menu, app *App) {
 	templateMenu := appMenu.AddSubmenu("模板")
-	templateMenu.AddText("模板商店", nil, func(_ *menu.CallbackData) {
+	templateMenu.AddText("模板商店", keys.Combo("t", keys.CmdOrCtrlKey, keys.ShiftKey), func(_ *menu.CallbackData) {
 		wailsRuntime.EventsEmit(app.ctx, "menu:store")
-	})
-	templateMenu.AddText("模板管理…", keys.Combo("t", keys.CmdOrCtrlKey, keys.ShiftKey), func(_ *menu.CallbackData) {
-		wailsRuntime.EventsEmit(app.ctx, "menu:templates")
 	})
 }
 
 func addSkillMenu(appMenu *menu.Menu, app *App) {
 	skillMenu := appMenu.AddSubmenu("技能")
-	skillMenu.AddText("技能商店", nil, func(_ *menu.CallbackData) {
+	skillMenu.AddText("技能商店", keys.Combo("k", keys.CmdOrCtrlKey, keys.ShiftKey), func(_ *menu.CallbackData) {
 		wailsRuntime.EventsEmit(app.ctx, "menu:skill-store")
-	})
-	skillMenu.AddText("技能管理…", keys.Combo("k", keys.CmdOrCtrlKey, keys.ShiftKey), func(_ *menu.CallbackData) {
-		wailsRuntime.EventsEmit(app.ctx, "menu:skills")
 	})
 }
 
