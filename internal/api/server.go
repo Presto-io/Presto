@@ -74,7 +74,6 @@ func NewServer(opts ServerOptions) http.Handler {
 
 	// Skill management routes
 	s.mux.HandleFunc("GET /api/skills", s.handleListSkills)
-	s.mux.HandleFunc("DELETE /api/skills/{source}/{name}", s.handleDeleteSkill)
 
 	if opts.StaticDir != "" {
 		// SEC-27: Filter hidden files from static file server

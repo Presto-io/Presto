@@ -12,14 +12,6 @@ export async function listSkills(): Promise<InstalledSkill[]> {
   return api('/api/skills');
 }
 
-export async function deleteSkill(source: string, name: string): Promise<void> {
-  const res = await authFetch(
-    `${BASE}/api/skills/${encodeURIComponent(source)}/${encodeURIComponent(name)}`,
-    { method: 'DELETE' }
-  );
-  if (!res.ok) throw new Error(`Failed to delete skill: ${res.status}`);
-}
-
 function authFetch(url: string, init?: RequestInit): Promise<Response> {
   const key = getApiKey();
   if (key) {

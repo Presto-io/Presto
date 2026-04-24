@@ -134,6 +134,5 @@ export interface InstalledSkill {
   version: string;
   author: string;
   source: string;       // "codex" | "claude" | "workbuddy" | "qclaw"
-  sourcePath: string;   // full path on disk
   keywords: string[];
 }
