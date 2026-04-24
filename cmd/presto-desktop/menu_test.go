@@ -135,8 +135,8 @@ func assertSharedFileMenu(t *testing.T, m *menu.Menu) {
 func TestBuildMenu_DarwinStructure(t *testing.T) {
 	m := buildMenuForPlatform(&App{}, "darwin")
 
-	if got := len(m.Items); got != 6 {
-		t.Fatalf("expected 6 top-level items for darwin, got %d", got)
+	if got := len(m.Items); got != 7 {
+		t.Fatalf("expected 7 top-level items for darwin, got %d", got)
 	}
 
 	if m.Items[0].Role != menu.AppMenuRole {
@@ -147,10 +147,11 @@ func TestBuildMenu_DarwinStructure(t *testing.T) {
 		t.Fatalf("expected third top-level item to be EditMenuRole, got role=%v", m.Items[2].Role)
 	}
 	requireTopLevelLabel(t, m.Items[3], "模板")
-	if m.Items[4].Role != menu.WindowMenuRole {
-		t.Fatalf("expected fifth top-level item to be WindowMenuRole, got role=%v", m.Items[4].Role)
+	requireTopLevelLabel(t, m.Items[4], "技能")
+	if m.Items[5].Role != menu.WindowMenuRole {
+		t.Fatalf("expected sixth top-level item to be WindowMenuRole, got role=%v", m.Items[5].Role)
 	}
-	requireTopLevelLabel(t, m.Items[5], "帮助")
+	requireTopLevelLabel(t, m.Items[6], "帮助")
 	assertSharedFileMenu(t, m)
 }
 
@@ -194,8 +195,8 @@ func TestBuildMenu_DarwinHelpMenu_NoAbout(t *testing.T) {
 func TestBuildMenu_WindowsStructure(t *testing.T) {
 	m := buildMenuForPlatform(&App{}, "windows")
 
-	if got := len(m.Items); got != 4 {
-		t.Fatalf("expected 4 top-level items for windows, got %d", got)
+	if got := len(m.Items); got != 5 {
+		t.Fatalf("expected 5 top-level items for windows, got %d", got)
 	}
 
 	requireTopLevelLabel(t, m.Items[0], "文件")
@@ -203,7 +204,8 @@ func TestBuildMenu_WindowsStructure(t *testing.T) {
 		t.Fatalf("expected second top-level item to be EditMenuRole, got role=%v", m.Items[1].Role)
 	}
 	requireTopLevelLabel(t, m.Items[2], "模板")
-	requireTopLevelLabel(t, m.Items[3], "帮助")
+	requireTopLevelLabel(t, m.Items[3], "技能")
+	requireTopLevelLabel(t, m.Items[4], "帮助")
 
 	if hasTopLevelRole(m, menu.AppMenuRole) {
 		t.Fatal("windows menu should not include AppMenuRole")
@@ -245,5 +247,57 @@ func TestBuildMenu_WindowsFileMenu_NoWindowMenuItems(t *testing.T) {
 		if item := findItem(fileMenu, label); item != nil {
 			t.Fatalf("windows 文件 menu should not include %q", label)
 		}
+	}
+}
+
+func TestBuildMenu_TemplateSubmenu(t *testing.T) {
+	m := buildMenuForPlatform(&App{}, "darwin")
+	tplMenu := findSubmenu(m, "模板")
+	if tplMenu == nil {
+		t.Fatal("模板 menu not found")
+	}
+
+	items := textItems(tplMenu)
+	if got := len(items); got != 1 {
+		t.Fatalf("模板 menu: expected 1 item, got %d", got)
+	}
+
+	store := findItem(tplMenu, "模板商店")
+	if store == nil {
+		t.Fatal("模板商店 not found in 模板 menu")
+	}
+	expected := keys.Combo("t", keys.CmdOrCtrlKey, keys.ShiftKey)
+	if !accelEqual(store.Accelerator, expected) {
+		t.Errorf("模板商店: accelerator mismatch, got %+v, want %+v", store.Accelerator, expected)
+	}
+
+	if item := findItem(tplMenu, "模板管理…"); item != nil {
+		t.Fatal("模板管理… should not exist in 模板 menu")
+	}
+}
+
+func TestBuildMenu_SkillSubmenu(t *testing.T) {
+	m := buildMenuForPlatform(&App{}, "darwin")
+	skillMenu := findSubmenu(m, "技能")
+	if skillMenu == nil {
+		t.Fatal("技能 menu not found")
+	}
+
+	items := textItems(skillMenu)
+	if got := len(items); got != 1 {
+		t.Fatalf("技能 menu: expected 1 item, got %d", got)
+	}
+
+	store := findItem(skillMenu, "技能商店")
+	if store == nil {
+		t.Fatal("技能商店 not found in 技能 menu")
+	}
+	expected := keys.Combo("k", keys.CmdOrCtrlKey, keys.ShiftKey)
+	if !accelEqual(store.Accelerator, expected) {
+		t.Errorf("技能商店: accelerator mismatch, got %+v, want %+v", store.Accelerator, expected)
+	}
+
+	if item := findItem(skillMenu, "技能管理…"); item != nil {
+		t.Fatal("技能管理… should not exist in 技能 menu")
 	}
 }

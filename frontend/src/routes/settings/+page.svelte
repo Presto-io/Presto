@@ -1,13 +1,7 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
-  import { fly, fade } from 'svelte/transition';
-  import { cubicOut } from 'svelte/easing';
-  import { ExternalLink, Shield, Info, BookOpen, ArrowLeft, RefreshCw, Search, Package, ShoppingBag, Trash2, Loader, Upload, Pencil, Check, X, AlertTriangle, Settings, Scale, HelpCircle, Zap } from 'lucide-svelte';
+  import { onMount } from 'svelte';
+  import { ExternalLink, Shield, Info, BookOpen, ArrowLeft, RefreshCw, Settings, Scale, HelpCircle } from 'lucide-svelte';
   import { goto } from '$app/navigation';
-  import { listTemplates, deleteTemplate, importTemplateZip, renameTemplate, listSkills } from '$lib/api/client';
-  import type { Template, InstalledSkill } from '$lib/api/types';
-  import { notificationStore } from '$lib/stores/notification.svelte';
-  import { templateStore } from '$lib/stores/templates.svelte';
   import { triggerAction, resetWizard } from '$lib/stores/wizard.svelte';
 
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgent);
@@ -24,37 +18,6 @@
   let updateProgress = $state(0);
   let updateStatus = $state('');
   let activeSection = $state('general');
-  let activePanel = $state<'tpl-manage' | 'skill-mgmt' | null>(null);
-
-  // --- Template state (migrated from /templates) ---
-  let installed: Template[] = $state([]);
-  let tplLoading = $state(false);
-  let tplSearch = $state('');
-  let installedLoaded = $state(false);
-  let selectedKeywords: string[] = $state([]);
-
-  // --- Skill state ---
-  let skills: InstalledSkill[] = $state([]);
-  let skillsLoading = $state(false);
-  let selectedSkill: InstalledSkill | null = $state(null);
-  let skillSearch = $state('');
-
-  let allKeywords = $derived(
-    [...new Set(installed.flatMap(tpl => tpl.keywords ?? []))].sort()
-  );
-
-  let filteredInstalled = $derived(
-    installed.filter(tpl => {
-      const q = tplSearch.toLowerCase();
-      const matchesSearch = !q ||
-        (tpl.displayName || tpl.name).toLowerCase().includes(q) ||
-        tpl.description.toLowerCase().includes(q) ||
-        (tpl.keywords ?? []).some(k => k.toLowerCase().includes(q));
-      const matchesKeywords = selectedKeywords.length === 0 ||
-        selectedKeywords.every(k => (tpl.keywords ?? []).includes(k));
-      return matchesSearch && matchesKeywords;
-    })
-  );
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sections: { id: string; label: string; icon: any }[] = [
@@ -63,13 +26,6 @@
     { id: 'template-dev', label: '模板开发', icon: BookOpen },
     { id: 'about', label: '关于', icon: Info },
     { id: 'licenses', label: '开源协议', icon: Scale },
-  ];
-
-  let panelTabs = [
-    { id: 'tpl-manage' as const, label: '模板管理', icon: Package },
-    { id: 'tpl-store' as const, label: '模板商店', icon: ShoppingBag },
-    { id: 'skill-mgmt' as const, label: '技能管理', icon: Zap },
-    { id: 'skill-store' as const, label: '技能商店', icon: ShoppingBag },
   ];
 
   function openExternal(url: string) {
@@ -132,7 +88,6 @@
     if (content) {
       content.addEventListener('scroll', handleScroll);
     }
-    window.addEventListener('templates-changed', onTemplatesChanged);
 
     // Listen for update progress events from Wails
     const rt = (window as any).runtime;
@@ -141,31 +96,9 @@
       rt.EventsOn('update:status', (msg: string) => { updateStatus = msg; });
     }
 
-    // Handle URL params: ?panel=tpl-manage&focus=templateName
-    const params = new URLSearchParams(window.location.search);
-    const panel = params.get('panel');
-    if (panel === 'tpl-manage') {
-      activePanel = 'tpl-manage';
-      activeSection = '';
-      if (!installedLoaded) loadInstalled();
-      const focus = params.get('focus');
-      if (focus) {
-        tplSearch = focus;
-      }
-    }
-    if (panel === 'skill-mgmt') {
-      activePanel = 'skill-mgmt';
-      activeSection = '';
-      loadSkills();
-    }
-  });
-
-  onDestroy(() => {
-    window.removeEventListener('templates-changed', onTemplatesChanged);
   });
 
   function handleScroll() {
-    if (activePanel) return;
     const content = document.querySelector('.settings-content') as HTMLElement;
     if (!content) return;
     const scrollTop = content.scrollTop;
@@ -180,56 +113,11 @@
   }
 
   function scrollTo(id: string) {
-    activePanel = null;
-    tplSearch = '';
     activeSection = id;
     const content = document.querySelector('.settings-content') as HTMLElement;
     const el = content?.querySelector(`#section-${id}`) as HTMLElement;
     if (el && content) {
       content.scrollTo({ top: el.offsetTop - 16, behavior: 'smooth' });
-    }
-  }
-
-  function togglePanel(id: 'tpl-manage' | 'tpl-store' | 'skill-mgmt' | 'skill-store') {
-    if (id === 'tpl-store') {
-      goto('/store-templates');
-      return;
-    }
-    if (id === 'skill-store') {
-      goto('/store-skills');
-      return;
-    }
-    if (id === 'skill-mgmt') {
-      if (activePanel === 'skill-mgmt') {
-        activePanel = null;
-        skillSearch = '';
-        selectedSkill = null;
-      } else {
-        activePanel = 'skill-mgmt';
-        activeSection = '';
-        skillSearch = '';
-        loadSkills();
-      }
-      return;
-    }
-    if (activePanel === id) {
-      activePanel = null;
-      tplSearch = '';
-      selectedKeywords = [];
-    } else {
-      activePanel = id;
-      activeSection = '';
-      tplSearch = '';
-      selectedKeywords = [];
-      if (id === 'tpl-manage' && !installedLoaded) loadInstalled();
-    }
-  }
-
-  function toggleKeyword(keyword: string) {
-    if (selectedKeywords.includes(keyword)) {
-      selectedKeywords = selectedKeywords.filter(k => k !== keyword);
-    } else {
-      selectedKeywords = [...selectedKeywords, keyword];
     }
   }
 
@@ -239,7 +127,6 @@
       showWarning = true;
     } else {
       communityEnabled = false;
-      tplSearch = '';
       localStorage.setItem('communityTemplates', 'false');
     }
   }
@@ -256,190 +143,6 @@
     showWarning = false;
   }
 
-  // --- Template actions ---
-  async function loadInstalled() {
-    tplLoading = true;
-    try {
-      installed = (await listTemplates()) ?? [];
-      installedLoaded = true;
-    } catch {}
-    finally { tplLoading = false; }
-  }
-
-  async function loadSkills() {
-    skillsLoading = true;
-    try {
-      skills = await listSkills();
-    } catch {
-      skills = [];
-    } finally {
-      skillsLoading = false;
-    }
-  }
-
-  let filteredSkills = $derived(
-    skills.filter(sk => {
-      const q = skillSearch.toLowerCase();
-      return !q ||
-        (sk.displayName || sk.name).toLowerCase().includes(q) ||
-        sk.description.toLowerCase().includes(q) ||
-        (sk.keywords ?? []).some(k => k.toLowerCase().includes(q));
-    })
-  );
-
-  let skillsBySource = $derived(() => {
-    const groups: Record<string, InstalledSkill[]> = {};
-    for (const sk of filteredSkills) {
-      if (!groups[sk.source]) groups[sk.source] = [];
-      groups[sk.source].push(sk);
-    }
-    return groups;
-  });
-
-  const sourceLabels: Record<string, string> = {
-    codex: 'Codex',
-    claude: 'Claude',
-    workbuddy: 'Workbuddy',
-    qclaw: 'Qclaw',
-  };
-
-  let deleteConfirm = $state<string | null>(null);
-
-  function handleDelete(name: string) {
-    deleteConfirm = name;
-  }
-
-  async function confirmDelete() {
-    const name = deleteConfirm;
-    if (!name) return;
-    deleteConfirm = null;
-    try {
-      if (window.go?.main?.App?.DeleteTemplate) {
-        await window.go.main.App.DeleteTemplate(name);
-      } else {
-        await deleteTemplate(name);
-      }
-      installed = (await listTemplates()) ?? [];
-      await templateStore.refresh();
-      notifyTemplateEvent(`模板 "${name}" 已卸载`, 'success');
-    } catch (err) {
-      notifyTemplateEvent(err instanceof Error ? err.message : String(err), 'error');
-    }
-  }
-
-  // --- ZIP import ---
-  let importingZip = $state(false);
-  let zipInput: HTMLInputElement | undefined = $state();
-  let conflictModal = $state<{ file: File; conflicts: string[] } | null>(null);
-
-  function notifyTemplateEvent(message: string, type: 'success' | 'error' | 'warning' | 'info') {
-    notificationStore.show({
-      message,
-      type,
-      source: 'settings-template',
-      durationMs: type === 'success' ? 2800 : 4500,
-    });
-  }
-
-  function handleImportZipClick() {
-    zipInput?.click();
-  }
-
-  function importVerifyInfo(tpls: { verified?: string }[]): { suffix: string; type: 'success' | 'warning' | 'info' } {
-    const hasNotInRegistry = tpls.some(t => t.verified === 'not_in_registry');
-    const hasPending = tpls.some(t => t.verified === 'pending');
-    if (hasNotInRegistry) return { suffix: ' — 未在注册表中，无法验证来源', type: 'warning' };
-    if (hasPending) return { suffix: ' — 待验证，联网后可确认', type: 'info' };
-    return { suffix: ' — 已验证', type: 'success' };
-  }
-
-  async function handleZipFileSelected(e: Event) {
-    const input = e.target as HTMLInputElement;
-    const file = input.files?.[0];
-    if (!file) return;
-    input.value = '';
-    importingZip = true;
-    try {
-      const tpls = await importTemplateZip(file);
-      installed = (await listTemplates()) ?? [];
-      installedLoaded = true;
-      const names = tpls.map(t => t.displayName || t.name).join('、');
-      const verify = importVerifyInfo(tpls);
-      notifyTemplateEvent(`模板 "${names}" 导入成功${verify.suffix}`, verify.type);
-    } catch (err: any) {
-      if (err.conflicts) {
-        conflictModal = { file, conflicts: err.conflicts };
-      } else {
-        notifyTemplateEvent(err instanceof Error ? err.message : String(err), 'error');
-      }
-    } finally {
-      importingZip = false;
-    }
-  }
-
-  async function handleConflictResolve(strategy: 'overwrite' | 'skip' | 'rename') {
-    if (!conflictModal) return;
-    const { file } = conflictModal;
-    conflictModal = null;
-    importingZip = true;
-    try {
-      const tpls = await importTemplateZip(file, strategy);
-      installed = (await listTemplates()) ?? [];
-      installedLoaded = true;
-      const names = tpls.map(t => t.displayName || t.name).join('、');
-      const strategySuffix = strategy === 'rename' ? '（已自动重命名）' : strategy === 'skip' ? '（已跳过重复）' : '（已覆盖）';
-      const verify = importVerifyInfo(tpls);
-      notifyTemplateEvent(`模板 "${names}" 导入成功${strategySuffix}${verify.suffix}`, verify.type);
-    } catch (err) {
-      notifyTemplateEvent(err instanceof Error ? err.message : String(err), 'error');
-    } finally {
-      importingZip = false;
-    }
-  }
-
-  // --- Rename (displayName) ---
-  let renamingTpl = $state('');
-  let renameInput = $state('');
-
-  function startRename(tpl: Template) {
-    renamingTpl = tpl.name;
-    renameInput = tpl.displayName || tpl.name;
-  }
-
-  function cancelRename() {
-    renamingTpl = '';
-    renameInput = '';
-  }
-
-  async function confirmRename() {
-    const tplName = renamingTpl;
-    const newDisplayName = renameInput.trim();
-    if (!newDisplayName) {
-      cancelRename();
-      return;
-    }
-    // Find current displayName to check if actually changed
-    const current = installed.find(t => t.name === tplName);
-    if (current && newDisplayName === (current.displayName || current.name)) {
-      cancelRename();
-      return;
-    }
-    try {
-      await renameTemplate(tplName, newDisplayName);
-      installed = (await listTemplates()) ?? [];
-      installedLoaded = true;
-      notifyTemplateEvent(`模板已重命名为 "${newDisplayName}"`, 'success');
-    } catch (err) {
-      notifyTemplateEvent(err instanceof Error ? err.message : String(err), 'error');
-    } finally {
-      cancelRename();
-    }
-  }
-
-  // --- Listen for external template changes (drag-drop import from layout) ---
-  function onTemplatesChanged() {
-    loadInstalled();
-  }
 </script>
 
 <div class="page">
@@ -457,207 +160,18 @@
         {@const Icon = sec.icon}
         <button
           class="nav-item"
-          class:active={!activePanel && activeSection === sec.id}
+          class:active={activeSection === sec.id}
           onclick={() => scrollTo(sec.id)}
         >
           <Icon size={14} />
           {sec.label}
         </button>
       {/each}
-      {#if panelTabs.length > 0}
-        <div class="nav-divider" transition:fade={{ duration: 200 }}></div>
-        {#each panelTabs as tab (tab.id)}
-          {@const Icon = tab.icon}
-          <button
-            class="nav-item"
-            class:active={activePanel === tab.id}
-            onclick={() => togglePanel(tab.id)}
-            transition:fly={{ x: -12, duration: 300, easing: cubicOut }}
-          >
-            <Icon size={14} />
-            {tab.label}
-          </button>
-        {/each}
-      {/if}
+
     </nav>
 
     <div class="settings-content-wrapper">
-      {#if activePanel}
-        <div class="panel-overlay">
-          {#if activePanel === 'tpl-manage'}
-            <div class="panel-header">
-              <div class="panel-search">
-                <Search size={14} />
-                <input
-                  type="text"
-                  placeholder="搜索已安装模板…"
-                  bind:value={tplSearch}
-                />
-              </div>
-              <button
-                class="btn-import"
-                onclick={handleImportZipClick}
-                disabled={importingZip}
-                title="从 ZIP 文件导入模板"
-              >
-                {#if importingZip}
-                  <Loader size={14} class="spin" />
-                {:else}
-                  <Upload size={14} />
-                {/if}
-                <span>从 ZIP 导入</span>
-              </button>
-              <input
-                bind:this={zipInput}
-                type="file"
-                accept=".zip"
-                onchange={handleZipFileSelected}
-                hidden
-              />
-            </div>
-          {/if}
-
-          {#if activePanel === 'tpl-manage'}
-            {#if allKeywords.length > 0}
-              <div class="keyword-filter-bar">
-                {#each allKeywords as kw (kw)}
-                  <button
-                    class="keyword-chip"
-                    class:active={selectedKeywords.includes(kw)}
-                    onclick={() => toggleKeyword(kw)}
-                  >
-                    {kw}
-                  </button>
-                {/each}
-              </div>
-            {/if}
-            {#if tplLoading && !installedLoaded}
-              <div class="panel-empty">
-                <Loader size={24} class="spin" />
-                <p>加载中...</p>
-              </div>
-            {:else if filteredInstalled.length === 0}
-              <div class="panel-empty">
-                <Package size={32} />
-                <p>{tplSearch ? '没有匹配的模板' : '暂无已安装模板'}</p>
-              </div>
-            {:else}
-              <div class="tpl-list">
-                {#each filteredInstalled as tpl (tpl.name)}
-                  <div class="tpl-row">
-                    <div class="tpl-info">
-                      <div class="tpl-name-row">
-                        {#if renamingTpl === tpl.name}
-                          <input
-                            class="rename-input"
-                            type="text"
-                            bind:value={renameInput}
-                            onkeydown={(e) => { if (e.key === 'Enter') confirmRename(); if (e.key === 'Escape') cancelRename(); }}
-                          />
-                          <button class="btn-rename-action confirm" onclick={confirmRename} aria-label="确认重命名">
-                            <Check size={12} />
-                          </button>
-                          <button class="btn-rename-action cancel" onclick={cancelRename} aria-label="取消重命名">
-                            <X size={12} />
-                          </button>
-                        {:else}
-                          <span class="tpl-name">{tpl.displayName || tpl.name}</span>
-                          <span class="tpl-version">v{tpl.version}</span>
-                        {/if}
-                      </div>
-                      <p class="tpl-desc">{tpl.description}</p>
-                      {#if tpl.keywords && tpl.keywords.length > 0}
-                        <div class="tpl-keywords">
-                          {#each tpl.keywords as kw (kw)}
-                            <span class="keyword-badge">{kw}</span>
-                          {/each}
-                        </div>
-                      {/if}
-                      <span class="tpl-author">{tpl.author}</span>
-                    </div>
-                    <div class="tpl-actions">
-                        {#if renamingTpl !== tpl.name}
-                          <button
-                            class="btn-rename"
-                            onclick={() => startRename(tpl)}
-                            aria-label="重命名 {tpl.displayName || tpl.name}"
-                          >
-                            <Pencil size={12} />
-                          </button>
-                        {/if}
-                        <button
-                          class="btn-uninstall"
-                          onclick={() => handleDelete(tpl.name)}
-                          aria-label="卸载 {tpl.name}"
-                        >
-                          <Trash2 size={14} />
-                          <span>卸载</span>
-                        </button>
-                      </div>
-                  </div>
-                {/each}
-              </div>
-            {/if}
-          {/if}
-
-          {#if activePanel === 'skill-mgmt'}
-            <div class="panel-header">
-              <div class="panel-search">
-                <Search size={14} />
-                <input
-                  type="text"
-                  placeholder="搜索已安装技能…"
-                  bind:value={skillSearch}
-                />
-              </div>
-            </div>
-
-            {#if skillsLoading}
-              <div class="panel-empty">
-                <Loader size={24} class="spin" />
-                <p>加载中...</p>
-              </div>
-            {:else if filteredSkills.length === 0}
-              <div class="panel-empty">
-                <Zap size={32} />
-                <p>{skillSearch ? '没有匹配的技能' : '暂无已安装技能'}</p>
-                <p style="font-size:0.75rem;color:var(--color-muted);">通过 npx skills add 安装技能</p>
-              </div>
-            {:else}
-              <div class="tpl-list">
-                {#each Object.entries(skillsBySource()) as [source, sourceSkills] (source)}
-                  <div class="source-group">
-                    <div class="source-group-header">
-                      <span class="source-badge">{sourceLabels[source] || source}</span>
-                      <span class="source-count">{sourceSkills.length}</span>
-                    </div>
-                    {#each sourceSkills as sk (sk.source + "-" + sk.name)}
-                      <div class="tpl-row">
-                        <div class="tpl-info">
-                          <div class="tpl-name-row">
-                            <span class="tpl-name">{sk.displayName || sk.name}</span>
-                            <span class="tpl-version">v{sk.version}</span>
-                          </div>
-                          <p class="tpl-desc">{sk.description}</p>
-                          {#if sk.keywords && sk.keywords.length > 0}
-                            <div class="tpl-keywords">
-                              {#each sk.keywords as kw (kw)}
-                                <span class="keyword-badge">{kw}</span>
-                              {/each}
-                            </div>
-                          {/if}
-                          <span class="tpl-author">{sk.author}</span>
-                        </div>
-                      </div>
-                    {/each}
-                  </div>
-                {/each}
-              </div>
-            {/if}
-          {/if}
-        </div>
-      {:else}
-        <div class="settings-content">
+      <div class="settings-content">
           <section id="section-general">
             <h3><Settings size={16} /> 通用</h3>
             <div class="setting-row">
@@ -730,8 +244,12 @@
                 <span class="shortcut-keys"><kbd>{mod}</kbd><kbd>,</kbd></span>
               </div>
               <div class="shortcut-row">
-                <span class="shortcut-action">模板管理</span>
+                <span class="shortcut-action">模板商店</span>
                 <span class="shortcut-keys"><kbd>{mod}</kbd><kbd>⇧</kbd><kbd>T</kbd></span>
+              </div>
+              <div class="shortcut-row">
+                <span class="shortcut-action">技能商店</span>
+                <span class="shortcut-keys"><kbd>{mod}</kbd><kbd>⇧</kbd><kbd>K</kbd></span>
               </div>
               <div class="shortcut-row">
                 <span class="shortcut-action">搜索 / 替换</span>
@@ -850,7 +368,6 @@
             </ul>
           </section>
         </div>
-      {/if}
     </div>
   </div>
 </div>
@@ -875,58 +392,6 @@
       <div class="modal-actions">
         <button class="btn-secondary" onclick={cancelCommunity}>取消</button>
         <button class="btn-danger" onclick={confirmCommunity}>我了解风险，启用</button>
-      </div>
-    </div>
-  </div>
-{/if}
-
-{#if conflictModal}
-  <div
-    class="modal-overlay"
-    onclick={() => conflictModal = null}
-    onkeydown={(e) => { if (e.key === 'Escape') conflictModal = null; }}
-    role="dialog"
-    aria-modal="true"
-    aria-label="模板名称冲突"
-    tabindex="-1"
-  >
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="modal" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
-      <div class="modal-icon conflict">
-        <AlertTriangle size={32} />
-      </div>
-      <h3>模板名称冲突</h3>
-      <p>以下模板已存在：{conflictModal.conflicts.join('、')}。请选择处理方式：</p>
-      <div class="modal-actions conflict-actions">
-        <button class="btn-secondary" onclick={() => conflictModal = null}>取消</button>
-        <button class="btn-secondary" onclick={() => handleConflictResolve('skip')}>跳过</button>
-        <button class="btn-secondary" onclick={() => handleConflictResolve('rename')}>自动重命名</button>
-        <button class="btn-danger" onclick={() => handleConflictResolve('overwrite')}>覆盖</button>
-      </div>
-    </div>
-  </div>
-{/if}
-
-{#if deleteConfirm}
-  <div
-    class="modal-overlay"
-    onclick={() => deleteConfirm = null}
-    onkeydown={(e) => { if (e.key === 'Escape') deleteConfirm = null; }}
-    role="dialog"
-    aria-modal="true"
-    aria-label="确认卸载"
-    tabindex="-1"
-  >
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="modal" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
-      <div class="modal-icon">
-        <Trash2 size={32} />
-      </div>
-      <h3>确认卸载</h3>
-      <p>确定卸载模板 "{deleteConfirm}"？此操作不可撤销。</p>
-      <div class="modal-actions">
-        <button class="btn-secondary" onclick={() => deleteConfirm = null}>取消</button>
-        <button class="btn-danger" onclick={confirmDelete}>卸载</button>
       </div>
     </div>
   </div>
@@ -994,12 +459,6 @@
     position: sticky;
     top: 0;
     align-self: flex-start;
-  }
-
-  .nav-divider {
-    height: 1px;
-    background: var(--color-border);
-    margin: var(--space-sm) var(--space-md);
   }
 
   .nav-item {
@@ -1335,172 +794,6 @@
   a.lib-name:hover :global(svg) { opacity: 1; }
   .lib-license { color: var(--color-muted); font-family: var(--font-mono); }
 
-  /* --- Panel overlay (covers settings content) --- */
-  .panel-overlay {
-    position: absolute;
-    inset: 0;
-    background: var(--color-bg);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-  .panel-header {
-    display: flex;
-    gap: var(--space-sm);
-    margin-bottom: var(--space-md);
-    flex-shrink: 0;
-  }
-  .panel-header .panel-search {
-    flex: 1;
-    margin-bottom: 0;
-  }
-  .btn-import {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-xs);
-    padding: var(--space-sm) var(--space-md);
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    color: var(--color-text);
-    font-size: 0.75rem;
-    cursor: pointer;
-    transition: all var(--transition);
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
-  .btn-import:hover { border-color: var(--color-accent); color: var(--color-accent); }
-  .btn-import:disabled { opacity: 0.5; cursor: not-allowed; }
-  .panel-search {
-    display: flex;
-    align-items: center;
-    gap: var(--space-sm);
-    padding: var(--space-sm) var(--space-md);
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    margin-bottom: var(--space-md);
-    color: var(--color-muted);
-    flex-shrink: 0;
-  }
-  .panel-search input {
-    flex: 1;
-    background: none;
-    border: none;
-    color: var(--color-text);
-    font-size: 0.8125rem;
-    font-family: var(--font-ui);
-    outline: none;
-  }
-  .panel-search input::placeholder { color: var(--color-muted); }
-  .panel-empty {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-sm);
-    padding: var(--space-2xl);
-    color: var(--color-muted);
-  }
-  .panel-empty p { margin: 0; }
-  .tpl-list {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-sm);
-    overflow-y: auto;
-    flex: 1;
-    scrollbar-gutter: stable;
-  }
-  .tpl-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-md);
-    padding: var(--space-md) var(--space-lg);
-    background: var(--color-surface);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--color-border);
-    transition: border-color var(--transition);
-  }
-  .tpl-row:hover { border-color: var(--color-surface-hover); }
-  .tpl-info { flex: 1; min-width: 0; }
-  .tpl-name-row {
-    display: flex;
-    align-items: baseline;
-    gap: var(--space-sm);
-    margin-bottom: 2px;
-  }
-  .tpl-name { font-size: 0.875rem; font-weight: 500; color: var(--color-text-bright); }
-  .tpl-version { font-size: 0.75rem; color: var(--color-muted); font-family: var(--font-mono); }
-  .tpl-desc {
-    margin: 0 0 2px;
-    font-size: 0.8125rem;
-    color: var(--color-muted);
-    line-height: 1.4;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .tpl-author { font-size: 0.75rem; color: var(--color-muted); }
-  .keyword-filter-bar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-xs);
-    margin-bottom: var(--space-md);
-    flex-shrink: 0;
-  }
-  .keyword-chip {
-    padding: 2px 8px;
-    border-radius: 10px;
-    border: 1px solid var(--color-border);
-    background: var(--color-surface);
-    color: var(--color-muted);
-    font-size: 0.6875rem;
-    cursor: pointer;
-    transition: all var(--transition);
-  }
-  .keyword-chip:hover {
-    border-color: var(--color-accent);
-    color: var(--color-text);
-  }
-  .keyword-chip.active {
-    background: var(--color-accent);
-    color: var(--color-bg);
-    border-color: var(--color-accent);
-  }
-  .tpl-keywords {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-xs);
-    margin: 2px 0;
-  }
-  .keyword-badge {
-    padding: 1px 6px;
-    border-radius: 8px;
-    background: var(--color-surface-hover);
-    color: var(--color-muted);
-    font-size: 0.625rem;
-  }
-  .btn-uninstall {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-xs);
-    padding: var(--space-xs) var(--space-sm);
-    border-radius: var(--radius-sm);
-    font-size: 0.75rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all var(--transition);
-    white-space: nowrap;
-    flex-shrink: 0;
-    background: transparent;
-    color: var(--color-danger);
-    border: 1px solid var(--color-danger);
-  }
-  .btn-uninstall:hover {
-    background: var(--color-danger);
-    color: var(--color-on-danger);
-  }
-
   /* --- Modal --- */
   .modal-overlay {
     position: fixed;
@@ -1558,98 +851,5 @@
     color: var(--color-on-danger);
   }
   .btn-danger:hover { opacity: 0.9; }
-
-  /* --- Rename --- */
-  .tpl-actions {
-    display: flex;
-    align-items: center;
-    gap: var(--space-xs);
-    flex-shrink: 0;
-  }
-  .rename-input {
-    flex: 1;
-    min-width: 0;
-    padding: 2px var(--space-sm);
-    background: var(--color-bg);
-    border: 1px solid var(--color-accent);
-    border-radius: var(--radius-sm);
-    color: var(--color-text);
-    font-size: 0.875rem;
-    font-family: var(--font-mono);
-    outline: none;
-  }
-  .btn-rename-action {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 20px;
-    height: 20px;
-    border: none;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    transition: all var(--transition);
-    flex-shrink: 0;
-  }
-  .btn-rename-action.confirm {
-    background: var(--color-accent);
-    color: var(--color-bg);
-  }
-  .btn-rename-action.confirm:hover { opacity: 0.85; }
-  .btn-rename-action.cancel {
-    background: var(--color-surface);
-    color: var(--color-muted);
-  }
-  .btn-rename-action.cancel:hover { color: var(--color-danger); }
-  .btn-rename {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    background: none;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    color: var(--color-muted);
-    cursor: pointer;
-    transition: all var(--transition);
-  }
-  .btn-rename:hover {
-    border-color: var(--color-accent);
-    color: var(--color-accent);
-  }
-
-
-  /* --- Skill Management --- */
-  .source-group {
-    margin-bottom: var(--space-md);
-  }
-  .source-group-header {
-    display: flex;
-    align-items: center;
-    gap: var(--space-sm);
-    padding: var(--space-xs) var(--space-sm);
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--color-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-  .source-badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 2px 8px;
-    border-radius: 10px;
-    background: var(--color-surface-hover);
-    color: var(--color-muted);
-    font-size: 0.6875rem;
-    font-weight: 500;
-  }
-  .source-count {
-    font-size: 0.6875rem;
-    color: var(--color-muted);
-  }
-  /* --- Conflict modal --- */
-  .modal-icon.conflict { color: var(--color-warning); }
-  .conflict-actions { flex-wrap: wrap; }
 
 </style>
