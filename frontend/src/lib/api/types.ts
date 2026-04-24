@@ -126,3 +126,14 @@ export interface SkillRegistry {
   updatedAt: string;
   skills: RegistrySkill[];
 }
+
+export interface InstalledSkill {
+  name: string;
+  displayName: string;
+  description: string;
+  version: string;
+  author: string;
+  source: string;       // "codex" | "claude" | "workbuddy" | "qclaw"
+  sourcePath: string;   // full path on disk
+  keywords: string[];
+}

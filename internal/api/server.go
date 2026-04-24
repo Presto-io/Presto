@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mrered/presto/internal/skill"
 	"github.com/mrered/presto/internal/template"
 	"github.com/mrered/presto/internal/typst"
 )
@@ -19,6 +20,7 @@ type Server struct {
 	compiler       *typst.Compiler
 	registry       *template.RegistryCache
 	availableFonts map[string]bool // cached from typst fonts at startup
+	skillManager  *skill.SkillManager
 }
 
 // ServerOptions configures the API server.
@@ -48,6 +50,7 @@ func NewServer(opts ServerOptions) http.Handler {
 		compiler:       compiler,
 		registry:       opts.Registry,
 		availableFonts: compiler.ListFonts(),
+		skillManager:  skill.NewManager(),
 	}
 
 	log.Printf("[presto] starting server, templates=%s static=%s typst=%s root=%s",
@@ -68,6 +71,10 @@ func NewServer(opts ServerOptions) http.Handler {
 	s.mux.HandleFunc("GET /api/templates/{id}/example", s.handleGetExample)
 	s.mux.HandleFunc("POST /api/templates/import", s.handleImportTemplate)
 	s.mux.HandleFunc("POST /api/batch/import-zip", s.handleBatchImportZip)
+
+	// Skill management routes
+	s.mux.HandleFunc("GET /api/skills", s.handleListSkills)
+	s.mux.HandleFunc("DELETE /api/skills/{source}/{name}", s.handleDeleteSkill)
 
 	if opts.StaticDir != "" {
 		// SEC-27: Filter hidden files from static file server

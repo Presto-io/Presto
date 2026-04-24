@@ -2,10 +2,10 @@
   import { onMount, onDestroy } from 'svelte';
   import { fly, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
-  import { ExternalLink, Shield, Info, BookOpen, ArrowLeft, RefreshCw, Search, Package, ShoppingBag, Trash2, Loader, Upload, Pencil, Check, X, AlertTriangle, Settings, Scale, HelpCircle } from 'lucide-svelte';
+  import { ExternalLink, Shield, Info, BookOpen, ArrowLeft, RefreshCw, Search, Package, ShoppingBag, Trash2, Loader, Upload, Pencil, Check, X, AlertTriangle, Settings, Scale, HelpCircle, Zap } from 'lucide-svelte';
   import { goto } from '$app/navigation';
-  import { listTemplates, deleteTemplate, importTemplateZip, renameTemplate } from '$lib/api/client';
-  import type { Template } from '$lib/api/types';
+  import { listTemplates, deleteTemplate, importTemplateZip, renameTemplate, listSkills, deleteSkill } from '$lib/api/client';
+  import type { Template, InstalledSkill } from '$lib/api/types';
   import { notificationStore } from '$lib/stores/notification.svelte';
   import { templateStore } from '$lib/stores/templates.svelte';
   import { triggerAction, resetWizard } from '$lib/stores/wizard.svelte';
@@ -24,7 +24,7 @@
   let updateProgress = $state(0);
   let updateStatus = $state('');
   let activeSection = $state('general');
-  let activePanel = $state<'tpl-manage' | null>(null);
+  let activePanel = $state<'tpl-manage' | 'skill-mgmt' | null>(null);
 
   // --- Template state (migrated from /templates) ---
   let installed: Template[] = $state([]);
@@ -32,6 +32,13 @@
   let tplSearch = $state('');
   let installedLoaded = $state(false);
   let selectedKeywords: string[] = $state([]);
+
+  // --- Skill state ---
+  let skills: InstalledSkill[] = $state([]);
+  let skillsLoading = $state(false);
+  let selectedSkill: InstalledSkill | null = $state(null);
+  let skillSearch = $state('');
+  let deletingSkill: InstalledSkill | null = $state(null);
 
   let allKeywords = $derived(
     [...new Set(installed.flatMap(tpl => tpl.keywords ?? []))].sort()
@@ -55,6 +62,7 @@
     { id: 'general', label: '通用', icon: Settings },
     { id: 'help', label: '帮助', icon: HelpCircle },
     { id: 'template-dev', label: '模板开发', icon: BookOpen },
+    { id: 'skill-mgmt', label: '技能管理', icon: Zap },
     { id: 'about', label: '关于', icon: Info },
     { id: 'licenses', label: '开源协议', icon: Scale },
   ];
@@ -62,6 +70,7 @@
   let panelTabs = [
     { id: 'tpl-manage' as const, label: '模板管理', icon: Package },
     { id: 'tpl-store' as const, label: '模板商店', icon: ShoppingBag },
+    { id: 'skill-mgmt' as const, label: '技能管理', icon: Zap },
   ];
 
   function openExternal(url: string) {
@@ -177,9 +186,22 @@
     }
   }
 
-  function togglePanel(id: 'tpl-manage' | 'tpl-store') {
+  function togglePanel(id: 'tpl-manage' | 'tpl-store' | 'skill-mgmt') {
     if (id === 'tpl-store') {
       goto('/store-templates');
+      return;
+    }
+    if (id === 'skill-mgmt') {
+      if (activePanel === 'skill-mgmt') {
+        activePanel = null;
+        skillSearch = '';
+        selectedSkill = null;
+      } else {
+        activePanel = 'skill-mgmt';
+        activeSection = '';
+        skillSearch = '';
+        loadSkills();
+      }
       return;
     }
     if (activePanel === id) {
@@ -235,6 +257,60 @@
     } catch {}
     finally { tplLoading = false; }
   }
+
+  async function loadSkills() {
+    skillsLoading = true;
+    try {
+      skills = await listSkills();
+    } catch {
+      skills = [];
+    } finally {
+      skillsLoading = false;
+    }
+  }
+
+  function handleDeleteSkill(skill: InstalledSkill) {
+    deletingSkill = skill;
+  }
+
+  async function confirmDeleteSkill() {
+    if (!deletingSkill) return;
+    try {
+      await deleteSkill(deletingSkill.source, deletingSkill.name);
+      await loadSkills();
+      selectedSkill = null;
+    } catch {
+      // Show error notification?
+    } finally {
+      deletingSkill = null;
+    }
+  }
+
+  let filteredSkills = $derived(
+    skills.filter(sk => {
+      const q = skillSearch.toLowerCase();
+      return !q ||
+        (sk.displayName || sk.name).toLowerCase().includes(q) ||
+        sk.description.toLowerCase().includes(q) ||
+        (sk.keywords ?? []).some(k => k.toLowerCase().includes(q));
+    })
+  );
+
+  let skillsBySource = $derived(() => {
+    const groups: Record<string, InstalledSkill[]> = {};
+    for (const sk of filteredSkills) {
+      if (!groups[sk.source]) groups[sk.source] = [];
+      groups[sk.source].push(sk);
+    }
+    return groups;
+  });
+
+  const sourceLabels: Record<string, string> = {
+    codex: 'Codex',
+    claude: 'Claude',
+    workbuddy: 'Workbuddy',
+    qclaw: 'Qclaw',
+  };
 
   let deleteConfirm = $state<string | null>(null);
 
@@ -391,7 +467,7 @@
         <button
           class="nav-item"
           class:active={!activePanel && activeSection === sec.id}
-          onclick={() => scrollTo(sec.id)}
+          onclick={() => sec.id === 'skill-mgmt' ? togglePanel('skill-mgmt') : scrollTo(sec.id)}
         >
           <Icon size={14} />
           {sec.label}
@@ -531,6 +607,107 @@
                 {/each}
               </div>
             {/if}
+          {/if}
+
+          {#if activePanel === 'skill-mgmt'}
+            <div class="panel-header">
+              <div class="panel-search">
+                <Search size={14} />
+                <input
+                  type="text"
+                  placeholder="搜索已安装技能…"
+                  bind:value={skillSearch}
+                />
+              </div>
+            </div>
+
+            {#if skillsLoading}
+              <div class="panel-empty">
+                <Loader size={24} class="spin" />
+                <p>加载中...</p>
+              </div>
+            {:else if skills.length === 0}
+              <div class="panel-empty">
+                <Zap size={32} />
+                <p>暂无已安装技能</p>
+                <p style="font-size:0.75rem;color:var(--color-muted);">通过 npx skills add 安装技能</p>
+              </div>
+            {:else}
+              <div class="tpl-list">
+                {#each Object.entries(skillsBySource()) as [source, sourceSkills] (source)}
+                  <div class="source-group">
+                    <div class="source-group-header">
+                      <span class="source-badge">{sourceLabels[source] || source}</span>
+                      <span class="source-count">{sourceSkills.length}</span>
+                    </div>
+                    {#each sourceSkills as sk (sk.sourcePath)}
+                      <div
+                        class="tpl-row"
+                        class:active={selectedSkill?.sourcePath === sk.sourcePath}
+                        role="button"
+                        tabindex="0"
+                        onclick={() => selectedSkill = sk}
+                        onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') selectedSkill = sk; }}
+                      >
+                        <div class="tpl-info">
+                          <div class="tpl-name-row">
+                            <span class="tpl-name">{sk.displayName || sk.name}</span>
+                            <span class="tpl-version">v{sk.version}</span>
+                          </div>
+                          <p class="tpl-desc">{sk.description}</p>
+                        </div>
+                      </div>
+                    {/each}
+                  </div>
+                {/each}
+              </div>
+
+              {#if selectedSkill}
+                <div class="skill-detail-panel">
+                  <h3>{selectedSkill.displayName || selectedSkill.name}</h3>
+                  <div class="tpl-name-row" style="margin-bottom:8px;">
+                    <span class="tpl-version">v{selectedSkill.version}</span>
+                    <span class="tpl-author">{selectedSkill.author}</span>
+                    <span class="source-badge">{sourceLabels[selectedSkill.source] || selectedSkill.source}</span>
+                  </div>
+                  <p class="tpl-desc" style="white-space:pre-wrap;">{selectedSkill.description}</p>
+                  {#if selectedSkill.keywords && selectedSkill.keywords.length > 0}
+                    <div class="tpl-keywords" style="margin:8px 0;">
+                      {#each selectedSkill.keywords as kw (kw)}
+                        <span class="keyword-badge">{kw}</span>
+                      {/each}
+                    </div>
+                  {/if}
+                  <div style="margin:8px 0;">
+                    <span style="font-size:0.75rem;color:var(--color-muted);font-family:var(--font-mono);">{selectedSkill.sourcePath}</span>
+                  </div>
+                  <button
+                    class="btn-uninstall"
+                    onclick={() => handleDeleteSkill(selectedSkill!)}
+                    aria-label="卸载 {selectedSkill.name}"
+                  >
+                    <Trash2 size={14} />
+                    <span>卸载</span>
+                  </button>
+                </div>
+              {/if}
+            {/if}
+          {/if}
+
+          {#if deletingSkill}
+            <div class="modal-overlay">
+              <div class="modal">
+                <div class="modal-icon">
+                  <AlertTriangle size={24} />
+                </div>
+                <h3>确认卸载技能</h3>
+                <p>确定要卸载「{deletingSkill.displayName || deletingSkill.name}」吗？此操作不可撤销。</p>
+                <div class="modal-actions">
+                  <button class="btn-secondary" onclick={() => deletingSkill = null}>取消</button>
+                  <button class="btn-danger" onclick={confirmDeleteSkill}>卸载</button>
+                </div>
+              </div>
+            </div>
           {/if}
         </div>
       {:else}
@@ -1495,6 +1672,46 @@
     color: var(--color-accent);
   }
 
+
+  /* --- Skill Management --- */
+  .source-group {
+    margin-bottom: var(--space-md);
+  }
+  .source-group-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-xs) var(--space-sm);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .source-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: var(--color-surface-hover);
+    color: var(--color-muted);
+    font-size: 0.6875rem;
+    font-weight: 500;
+  }
+  .source-count {
+    font-size: 0.6875rem;
+    color: var(--color-muted);
+  }
+  .skill-detail-panel {
+    padding: var(--space-lg);
+    border-top: 1px solid var(--color-border);
+    background: var(--color-surface);
+  }
+  .skill-detail-panel h3 {
+    margin: 0 0 var(--space-sm);
+    font-size: 1rem;
+    color: var(--color-text-bright);
+  }
   /* --- Conflict modal --- */
   .modal-icon.conflict { color: var(--color-warning); }
   .conflict-actions { flex-wrap: wrap; }
