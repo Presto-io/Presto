@@ -17,7 +17,7 @@
 
 <SkillStoreView
   mode="web"
-  registryUrl="https://presto.c-1o.top/skills/registry.json"
+  registryUrl="https://presto.c-1o.top/agent-skills/registry.json"
   title="Agent 技能"
   readmeUrl={(skill) => `https://raw.githubusercontent.com/${skill.repo}/main/${skill.path}/SKILL.md`}
 />
