@@ -24,6 +24,7 @@ func buildMenuForPlatform(app *App, platform string) *menu.Menu {
 	addFileMenu(appMenu, app)
 	appMenu.Append(menu.EditMenu())
 	addTemplateMenu(appMenu, app)
+	addSkillMenu(appMenu, app)
 
 	if isDarwin {
 		appMenu.Append(menu.WindowMenu())
@@ -69,6 +70,16 @@ func addTemplateMenu(appMenu *menu.Menu, app *App) {
 	})
 	templateMenu.AddText("模板管理…", keys.Combo("t", keys.CmdOrCtrlKey, keys.ShiftKey), func(_ *menu.CallbackData) {
 		wailsRuntime.EventsEmit(app.ctx, "menu:templates")
+	})
+}
+
+func addSkillMenu(appMenu *menu.Menu, app *App) {
+	skillMenu := appMenu.AddSubmenu("技能")
+	skillMenu.AddText("技能商店", nil, func(_ *menu.CallbackData) {
+		wailsRuntime.EventsEmit(app.ctx, "menu:skill-store")
+	})
+	skillMenu.AddText("技能管理…", keys.Combo("k", keys.CmdOrCtrlKey, keys.ShiftKey), func(_ *menu.CallbackData) {
+		wailsRuntime.EventsEmit(app.ctx, "menu:skills")
 	})
 }
 
