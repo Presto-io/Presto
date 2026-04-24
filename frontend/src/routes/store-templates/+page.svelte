@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import StoreView from '$lib/components/StoreView.svelte';
   import { templateStore } from '$lib/stores/templates.svelte';
-  import { installFromRegistry } from '$lib/api/client';
+  import { installFromRegistry, deleteTemplate } from '$lib/api/client';
   import type { RegistryItem } from '$lib/api/types';
   import { page } from '$app/stores';
 
@@ -21,6 +21,11 @@
       // Fallback for dev/web mode
       await installFromRegistry(tpl);
     }
+    await templateStore.refresh();
+  }
+
+  async function handleUninstall(name: string): Promise<void> {
+    await deleteTemplate(name);
     await templateStore.refresh();
   }
 
@@ -50,4 +55,6 @@
       } catch {}
     }
   }}
+  uninstallFn={handleUninstall}
+  onUninstallSuccess={() => {}}
 />
