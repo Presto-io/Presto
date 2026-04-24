@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { fly } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
-  import { ArrowLeft, Search, X, Loader, ExternalLink, Download, Check, RefreshCw, ShieldCheck, Shield, Users, ShieldOff, Star, Settings, ChevronDown } from 'lucide-svelte';
+  import { ArrowLeft, Search, X, Loader, ExternalLink, Download, Check, RefreshCw, ShieldCheck, Shield, Users, ShieldOff, Star, Trash2, ChevronDown } from 'lucide-svelte';
   import { goto } from '$app/navigation';
   import type { RegistryItem, Registry, RegistryCategory, StatsMap } from '$lib/api/types';
   import { marked } from 'marked';
@@ -26,6 +26,8 @@
     communityEnabled?: boolean;
     statsUrl?: string;
     onInstallSuccess?: (name: string) => void;
+    uninstallFn?: (name: string) => Promise<void>;
+    onUninstallSuccess?: (name: string) => void;
     initialSelectedId?: string | null;
   }
 
@@ -42,6 +44,8 @@
     communityEnabled = true,
     statsUrl,
     onInstallSuccess,
+    uninstallFn,
+    onUninstallSuccess,
     initialSelectedId = null,
   }: Props = $props();
 
@@ -274,9 +278,55 @@
     selectedTemplate ? trustBadge[selectedTemplate.trust] : null
   );
 
+  // --- Swipe-to-delete state ---
+  let pendingDeletions = $state<Set<string>>(new Set());
+  let swipedCard = $state<string | null>(null);
+  let touchStartX = 0;
+
   function isInstalled(name: string): boolean {
-    return installedVersions.has(name);
+    return installedVersions.has(name) && !pendingDeletions.has(name);
   }
+
+  function handleTouchStart(e: TouchEvent, name: string) {
+    touchStartX = e.touches[0].clientX;
+    if (swipedCard && swipedCard !== name) swipedCard = null;
+  }
+
+  function handleTouchMove(e: TouchEvent, name: string) {
+    const delta = touchStartX - e.touches[0].clientX;
+    if (Math.abs(delta) > 10) e.preventDefault();
+  }
+
+  function handleTouchEnd(e: TouchEvent, name: string) {
+    const delta = touchStartX - e.changedTouches[0].clientX;
+    if (delta > 40) {
+      swipedCard = name;
+    } else {
+      if (swipedCard === name) swipedCard = null;
+    }
+  }
+
+  function handleSwipeDelete(name: string) {
+    pendingDeletions.add(name);
+    swipedCard = null;
+    pendingDeletions = new Set(pendingDeletions); // trigger reactivity
+  }
+
+  function handleUndo() {
+    if (pendingDeletions.size === 0) return;
+    const arr = [...pendingDeletions];
+    const last = arr[arr.length - 1];
+    pendingDeletions.delete(last);
+    pendingDeletions = new Set(pendingDeletions); // trigger reactivity
+  }
+
+  onDestroy(async () => {
+    if (pendingDeletions.size === 0 || !uninstallFn) return;
+    const names = [...pendingDeletions];
+    for (const name of names) {
+      try { await uninstallFn(name); } catch { /* skip failed */ }
+    }
+  });
 
   function formatBytes(bytes: number): string {
     if (bytes < 1024) return bytes + ' B';
@@ -586,11 +636,11 @@
               <div class="detail-stats-actions">
                 {#if mode === 'desktop' && isInstalled(selectedTemplate.name)}
                   <button
-                    class="btn-manage"
-                    onclick={() => goto(`/settings?panel=tpl-manage&focus=${selectedTemplate.name}`)}
+                    class="btn-uninstall"
+                    onclick={() => handleSwipeDelete(selectedTemplate.name)}
                   >
-                    <Settings size={13} />
-                    <span>管理</span>
+                    <Trash2 size={13} />
+                    <span>卸载</span>
                   </button>
                 {/if}
                 {#if statsMap[selectedTemplate.name]?.stars != null}
@@ -728,10 +778,10 @@
               {/if}
               {#if mode === 'desktop' && isInstalled(selectedTemplate.name)}
                 <button
-                  class="btn-manage-lg"
-                  onclick={() => goto(`/settings?panel=tpl-manage&focus=${selectedTemplate.name}`)}
+                  class="btn-uninstall-lg"
+                  onclick={() => handleSwipeDelete(selectedTemplate.name)}
                 >
-                  <Settings size={14} /><span>管理</span>
+                  <Trash2 size={14} /><span>卸载</span>
                 </button>
               {/if}
             </div>
@@ -751,34 +801,57 @@
           <p>{searchQuery ? '没有匹配的结果' : '暂无可用内容'}</p>
         </div>
       {:else}
+        {#if pendingDeletions.size > 0}
+          <div class="undo-bar" transition:fly={{ y: -30 }}>
+            <span>已删除 {pendingDeletions.size} 个模板</span>
+            <button class="undo-btn" onclick={handleUndo}>撤销</button>
+          </div>
+        {/if}
         <div class="card-grid" bind:this={cardGridEl}>
           {#each pagedTemplates as tpl (tpl.name)}
             {@const badge = trustBadge[tpl.trust]}
             {@const BadgeIcon = badge.icon}
-            <button class="tpl-card" onclick={() => selectTemplate(tpl.name)}>
-              <div class="card-header">
-                <span class="card-name">{tpl.displayName}</span>
-                <span class="card-trust {badge.cls}" style={badge.color ? `color:${badge.color}` : ''}>
-                  <BadgeIcon size={12} />
-                  {badge.label}
-                </span>
-              </div>
-              <p class="card-desc">{tpl.description}</p>
-              <div class="card-footer">
-                <span class="card-version">v{tpl.version}</span>
-                <span class="card-author">{tpl.author}</span>
-                {#if statsMap[tpl.name]?.stars != null || statsMap[tpl.name]?.downloads != null}
-                  <span class="card-stats">
-                    {#if statsMap[tpl.name]?.stars != null}
-                      <span class="card-stat"><Star size={10} /> {formatCount(statsMap[tpl.name].stars)}</span>
+            {#if !pendingDeletions.has(tpl.name)}
+              <div class="swipe-wrapper">
+                <div class="swipe-actions">
+                  <button class="swipe-delete-btn" onclick={() => handleSwipeDelete(tpl.name)}>
+                    删除
+                  </button>
+                </div>
+                <button
+                  class="tpl-card"
+                  class:swiped={swipedCard === tpl.name}
+                  style={swipedCard === tpl.name ? 'transform: translateX(-80px)' : ''}
+                  ontouchstart={(e) => handleTouchStart(e, tpl.name)}
+                  ontouchmove={(e) => handleTouchMove(e, tpl.name)}
+                  ontouchend={(e) => handleTouchEnd(e, tpl.name)}
+                  onclick={() => { if (swipedCard && swipedCard !== tpl.name) { swipedCard = null; } else if (swipedCard === tpl.name) { swipedCard = null; } else { selectTemplate(tpl.name); } }}
+                >
+                  <div class="card-header">
+                    <span class="card-name">{tpl.displayName}</span>
+                    <span class="card-trust {badge.cls}" style={badge.color ? `color:${badge.color}` : ''}>
+                      <BadgeIcon size={12} />
+                      {badge.label}
+                    </span>
+                  </div>
+                  <p class="card-desc">{tpl.description}</p>
+                  <div class="card-footer">
+                    <span class="card-version">v{tpl.version}</span>
+                    <span class="card-author">{tpl.author}</span>
+                    {#if statsMap[tpl.name]?.stars != null || statsMap[tpl.name]?.downloads != null}
+                      <span class="card-stats">
+                        {#if statsMap[tpl.name]?.stars != null}
+                          <span class="card-stat"><Star size={10} /> {formatCount(statsMap[tpl.name].stars)}</span>
+                        {/if}
+                        {#if statsMap[tpl.name]?.downloads != null}
+                          <span class="card-stat"><Download size={10} /> {formatCount(statsMap[tpl.name].downloads)}</span>
+                        {/if}
+                      </span>
                     {/if}
-                    {#if statsMap[tpl.name]?.downloads != null}
-                      <span class="card-stat"><Download size={10} /> {formatCount(statsMap[tpl.name].downloads)}</span>
-                    {/if}
-                  </span>
-                {/if}
+                  </div>
+                </button>
               </div>
-            </button>
+            {/if}
           {/each}
         </div>
         <!-- Pagination -->
@@ -1452,23 +1525,77 @@
     color: var(--color-text);
     background: var(--color-surface);
   }
-  .btn-manage {
+  .btn-uninstall {
     display: inline-flex;
     align-items: center;
     gap: var(--space-xs);
     padding: 4px 10px;
     background: none;
-    border: 1px solid var(--color-border);
+    border: 1px solid rgba(239, 68, 68, 0.3);
     border-radius: var(--radius-sm);
-    color: var(--color-muted);
+    color: #ef4444;
     font-size: 0.75rem;
     font-family: var(--font-ui);
     cursor: pointer;
     transition: all var(--transition);
   }
-  .btn-manage:hover {
-    color: var(--color-text);
-    border-color: var(--color-accent-border);
+  .btn-uninstall:hover {
+    background: rgba(239, 68, 68, 0.08);
+    border-color: #ef4444;
+  }
+
+  /* Swipe-to-delete */
+  .swipe-wrapper {
+    position: relative;
+    overflow: hidden;
+  }
+  .swipe-actions {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .swipe-delete-btn {
+    background: #ef4444;
+    color: white;
+    height: 100%;
+    width: 80px;
+    border: none;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-family: var(--font-ui);
+  }
+
+  /* Undo bar */
+  .undo-bar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    padding: var(--space-sm) var(--space-md);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-sm);
+    border-radius: var(--radius-md);
+  }
+  .undo-btn {
+    background: none;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 4px 12px;
+    color: var(--color-accent);
+    font-size: 0.8125rem;
+    cursor: pointer;
+    font-family: var(--font-ui);
+  }
+  .undo-btn:hover {
+    background: var(--color-surface-hover);
   }
   .trust-badge {
     display: inline-flex;
@@ -1687,7 +1814,7 @@
     color: var(--color-text);
     border-color: var(--color-accent-border);
   }
-  .btn-manage-lg {
+  .btn-uninstall-lg {
     display: inline-flex;
     align-items: center;
     gap: var(--space-xs);
@@ -1697,13 +1824,13 @@
     font-weight: 500;
     cursor: pointer;
     transition: all var(--transition);
-    border: 1px solid var(--color-border);
+    border: 1px solid rgba(239, 68, 68, 0.3);
     background: var(--color-surface);
-    color: var(--color-muted);
+    color: #ef4444;
   }
-  .btn-manage-lg:hover {
-    color: var(--color-text);
-    border-color: var(--color-accent-border);
+  .btn-uninstall-lg:hover {
+    background: rgba(239, 68, 68, 0.08);
+    border-color: #ef4444;
   }
   .btn-install, .btn-installed, .btn-installing {
     display: inline-flex;
