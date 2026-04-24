@@ -82,7 +82,6 @@ func (m *SkillManager) List() ([]InstalledSkill, error) {
 				Version:     meta.Version,
 				Author:      meta.Author,
 				Source:      dir.Name,
-				SourcePath:  skillDir,
 				Keywords:    meta.Keywords,
 			})
 		}
@@ -97,38 +96,6 @@ func (m *SkillManager) List() ([]InstalledSkill, error) {
 	})
 
 	return skills, nil
-}
-
-// Delete removes a skill directory after validating the path is within a known scan directory.
-// This prevents path traversal attacks.
-func (m *SkillManager) Delete(sourcePath string) error {
-	absSourcePath, err := filepath.Abs(sourcePath)
-	if err != nil {
-		return fmt.Errorf("invalid path")
-	}
-
-	// Validate that sourcePath is within one of the known scan directories
-	valid := false
-	for _, dir := range m.scanDirs {
-		absDir, err := filepath.Abs(dir.Path)
-		if err != nil {
-			continue
-		}
-		if strings.HasPrefix(absSourcePath, absDir+string(filepath.Separator)) {
-			valid = true
-			break
-		}
-	}
-
-	if !valid {
-		return fmt.Errorf("path escapes skill directories")
-	}
-
-	if err := os.RemoveAll(absSourcePath); err != nil {
-		return fmt.Errorf("failed to remove skill directory: %w", err)
-	}
-
-	return nil
 }
 
 // frontmatterMeta holds metadata parsed from SKILL.md YAML frontmatter.
@@ -235,9 +202,4 @@ func parseYamlArray(value string) []string {
 		}
 	}
 	return result
-}
-
-// ScanDirs returns the list of configured scan directories.
-func (m *SkillManager) ScanDirs() []ScanDir {
-	return m.scanDirs
 }

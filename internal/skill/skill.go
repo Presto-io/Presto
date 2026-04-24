@@ -8,7 +8,6 @@ type InstalledSkill struct {
 	Version     string   `json:"version"`
 	Author      string   `json:"author"`
 	Source      string   `json:"source"`      // which AI tool directory, e.g. "codex", "claude"
-	SourcePath  string   `json:"sourcePath"`   // full path to the skill directory (for deletion)
 	Keywords    []string `json:"keywords"`
 }
 

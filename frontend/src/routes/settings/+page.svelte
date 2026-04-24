@@ -4,7 +4,7 @@
   import { cubicOut } from 'svelte/easing';
   import { ExternalLink, Shield, Info, BookOpen, ArrowLeft, RefreshCw, Search, Package, ShoppingBag, Trash2, Loader, Upload, Pencil, Check, X, AlertTriangle, Settings, Scale, HelpCircle, Zap } from 'lucide-svelte';
   import { goto } from '$app/navigation';
-  import { listTemplates, deleteTemplate, importTemplateZip, renameTemplate, listSkills, deleteSkill } from '$lib/api/client';
+  import { listTemplates, deleteTemplate, importTemplateZip, renameTemplate, listSkills } from '$lib/api/client';
   import type { Template, InstalledSkill } from '$lib/api/types';
   import { notificationStore } from '$lib/stores/notification.svelte';
   import { templateStore } from '$lib/stores/templates.svelte';
@@ -38,7 +38,6 @@
   let skillsLoading = $state(false);
   let selectedSkill: InstalledSkill | null = $state(null);
   let skillSearch = $state('');
-  let deletingSkill: InstalledSkill | null = $state(null);
 
   let allKeywords = $derived(
     [...new Set(installed.flatMap(tpl => tpl.keywords ?? []))].sort()
@@ -275,23 +274,6 @@
       skills = [];
     } finally {
       skillsLoading = false;
-    }
-  }
-
-  function handleDeleteSkill(skill: InstalledSkill) {
-    deletingSkill = skill;
-  }
-
-  async function confirmDeleteSkill() {
-    if (!deletingSkill) return;
-    try {
-      await deleteSkill(deletingSkill.source, deletingSkill.name);
-      await loadSkills();
-      selectedSkill = null;
-    } catch {
-      // Show error notification?
-    } finally {
-      deletingSkill = null;
     }
   }
 
@@ -649,7 +631,7 @@
                       <span class="source-badge">{sourceLabels[source] || source}</span>
                       <span class="source-count">{sourceSkills.length}</span>
                     </div>
-                    {#each sourceSkills as sk (sk.sourcePath)}
+                    {#each sourceSkills as sk (sk.source + "-" + sk.name)}
                       <div class="tpl-row">
                         <div class="tpl-info">
                           <div class="tpl-name-row">
@@ -666,38 +648,12 @@
                           {/if}
                           <span class="tpl-author">{sk.author}</span>
                         </div>
-                        <div class="tpl-actions">
-                          <button
-                            class="btn-uninstall"
-                            onclick={() => handleDeleteSkill(sk)}
-                            aria-label="卸载 {sk.name}"
-                          >
-                            <Trash2 size={14} />
-                            <span>卸载</span>
-                          </button>
-                        </div>
                       </div>
                     {/each}
                   </div>
                 {/each}
               </div>
             {/if}
-          {/if}
-
-          {#if deletingSkill}
-            <div class="modal-overlay">
-              <div class="modal">
-                <div class="modal-icon">
-                  <AlertTriangle size={24} />
-                </div>
-                <h3>确认卸载技能</h3>
-                <p>确定要卸载「{deletingSkill.displayName || deletingSkill.name}」吗？此操作不可撤销。</p>
-                <div class="modal-actions">
-                  <button class="btn-secondary" onclick={() => deletingSkill = null}>取消</button>
-                  <button class="btn-danger" onclick={confirmDeleteSkill}>卸载</button>
-                </div>
-              </div>
-            </div>
           {/if}
         </div>
       {:else}
