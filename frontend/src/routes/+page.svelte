@@ -541,6 +541,8 @@
       runtime.EventsOn('menu:save', handleSave);
       runtime.EventsOn('menu:saveas', handleSaveAs);
       runtime.EventsOn('menu:store', () => goto('/store-templates'));
+      runtime.EventsOn('menu:skill-store', () => goto('/store-skills'));
+      runtime.EventsOn('menu:skills', () => goto('/settings?panel=skill-mgmt'));
       runtime.EventsOn('menu:close-window', () => {
         window.runtime?.Quit?.();
       });
@@ -608,6 +610,8 @@
         runtime.EventsOff('menu:save');
         runtime.EventsOff('menu:saveas');
         runtime.EventsOff('menu:store');
+        runtime.EventsOff('menu:skill-store');
+        runtime.EventsOff('menu:skills');
         runtime.EventsOff('menu:close-window');
         runtime.EventsOff('menu:quit');
         runtime.EventsOff('app:save-and-close');

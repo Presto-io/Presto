@@ -62,7 +62,6 @@
     { id: 'general', label: '通用', icon: Settings },
     { id: 'help', label: '帮助', icon: HelpCircle },
     { id: 'template-dev', label: '模板开发', icon: BookOpen },
-    { id: 'skill-mgmt', label: '技能管理', icon: Zap },
     { id: 'about', label: '关于', icon: Info },
     { id: 'licenses', label: '开源协议', icon: Scale },
   ];
@@ -71,6 +70,7 @@
     { id: 'tpl-manage' as const, label: '模板管理', icon: Package },
     { id: 'tpl-store' as const, label: '模板商店', icon: ShoppingBag },
     { id: 'skill-mgmt' as const, label: '技能管理', icon: Zap },
+    { id: 'skill-store' as const, label: '技能商店', icon: ShoppingBag },
   ];
 
   function openExternal(url: string) {
@@ -154,6 +154,11 @@
         tplSearch = focus;
       }
     }
+    if (panel === 'skill-mgmt') {
+      activePanel = 'skill-mgmt';
+      activeSection = '';
+      loadSkills();
+    }
   });
 
   onDestroy(() => {
@@ -186,9 +191,13 @@
     }
   }
 
-  function togglePanel(id: 'tpl-manage' | 'tpl-store' | 'skill-mgmt') {
+  function togglePanel(id: 'tpl-manage' | 'tpl-store' | 'skill-mgmt' | 'skill-store') {
     if (id === 'tpl-store') {
       goto('/store-templates');
+      return;
+    }
+    if (id === 'skill-store') {
+      goto('/store-skills');
       return;
     }
     if (id === 'skill-mgmt') {
@@ -467,7 +476,7 @@
         <button
           class="nav-item"
           class:active={!activePanel && activeSection === sec.id}
-          onclick={() => sec.id === 'skill-mgmt' ? togglePanel('skill-mgmt') : scrollTo(sec.id)}
+          onclick={() => scrollTo(sec.id)}
         >
           <Icon size={14} />
           {sec.label}
@@ -626,10 +635,10 @@
                 <Loader size={24} class="spin" />
                 <p>加载中...</p>
               </div>
-            {:else if skills.length === 0}
+            {:else if filteredSkills.length === 0}
               <div class="panel-empty">
                 <Zap size={32} />
-                <p>暂无已安装技能</p>
+                <p>{skillSearch ? '没有匹配的技能' : '暂无已安装技能'}</p>
                 <p style="font-size:0.75rem;color:var(--color-muted);">通过 npx skills add 安装技能</p>
               </div>
             {:else}
@@ -641,56 +650,37 @@
                       <span class="source-count">{sourceSkills.length}</span>
                     </div>
                     {#each sourceSkills as sk (sk.sourcePath)}
-                      <div
-                        class="tpl-row"
-                        class:active={selectedSkill?.sourcePath === sk.sourcePath}
-                        role="button"
-                        tabindex="0"
-                        onclick={() => selectedSkill = sk}
-                        onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') selectedSkill = sk; }}
-                      >
+                      <div class="tpl-row">
                         <div class="tpl-info">
                           <div class="tpl-name-row">
                             <span class="tpl-name">{sk.displayName || sk.name}</span>
                             <span class="tpl-version">v{sk.version}</span>
                           </div>
                           <p class="tpl-desc">{sk.description}</p>
+                          {#if sk.keywords && sk.keywords.length > 0}
+                            <div class="tpl-keywords">
+                              {#each sk.keywords as kw (kw)}
+                                <span class="keyword-badge">{kw}</span>
+                              {/each}
+                            </div>
+                          {/if}
+                          <span class="tpl-author">{sk.author}</span>
+                        </div>
+                        <div class="tpl-actions">
+                          <button
+                            class="btn-uninstall"
+                            onclick={() => handleDeleteSkill(sk)}
+                            aria-label="卸载 {sk.name}"
+                          >
+                            <Trash2 size={14} />
+                            <span>卸载</span>
+                          </button>
                         </div>
                       </div>
                     {/each}
                   </div>
                 {/each}
               </div>
-
-              {#if selectedSkill}
-                <div class="skill-detail-panel">
-                  <h3>{selectedSkill.displayName || selectedSkill.name}</h3>
-                  <div class="tpl-name-row" style="margin-bottom:8px;">
-                    <span class="tpl-version">v{selectedSkill.version}</span>
-                    <span class="tpl-author">{selectedSkill.author}</span>
-                    <span class="source-badge">{sourceLabels[selectedSkill.source] || selectedSkill.source}</span>
-                  </div>
-                  <p class="tpl-desc" style="white-space:pre-wrap;">{selectedSkill.description}</p>
-                  {#if selectedSkill.keywords && selectedSkill.keywords.length > 0}
-                    <div class="tpl-keywords" style="margin:8px 0;">
-                      {#each selectedSkill.keywords as kw (kw)}
-                        <span class="keyword-badge">{kw}</span>
-                      {/each}
-                    </div>
-                  {/if}
-                  <div style="margin:8px 0;">
-                    <span style="font-size:0.75rem;color:var(--color-muted);font-family:var(--font-mono);">{selectedSkill.sourcePath}</span>
-                  </div>
-                  <button
-                    class="btn-uninstall"
-                    onclick={() => handleDeleteSkill(selectedSkill!)}
-                    aria-label="卸载 {selectedSkill.name}"
-                  >
-                    <Trash2 size={14} />
-                    <span>卸载</span>
-                  </button>
-                </div>
-              {/if}
             {/if}
           {/if}
 
@@ -1701,16 +1691,6 @@
   .source-count {
     font-size: 0.6875rem;
     color: var(--color-muted);
-  }
-  .skill-detail-panel {
-    padding: var(--space-lg);
-    border-top: 1px solid var(--color-border);
-    background: var(--color-surface);
-  }
-  .skill-detail-panel h3 {
-    margin: 0 0 var(--space-sm);
-    font-size: 1rem;
-    color: var(--color-text-bright);
   }
   /* --- Conflict modal --- */
   .modal-icon.conflict { color: var(--color-warning); }
