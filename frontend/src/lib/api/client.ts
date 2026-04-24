@@ -1,4 +1,4 @@
-import type { Template, Manifest, GitHubRepo, BatchImportResult, ImportResult, RegistryTemplate, PlatformInfo, StatsMap } from './types';
+import type { Template, Manifest, GitHubRepo, BatchImportResult, ImportResult, RegistryTemplate, PlatformInfo, StatsMap, InstalledSkill } from './types';
 
 const BASE = import.meta.env.VITE_API_URL || '';
 
@@ -6,6 +6,18 @@ function getApiKey(): string {
   if (typeof document === 'undefined') return '';
   const meta = document.querySelector('meta[name="api-key"]');
   return meta?.getAttribute('content') || '';
+}
+
+export async function listSkills(): Promise<InstalledSkill[]> {
+  return api('/api/skills');
+}
+
+export async function deleteSkill(source: string, name: string): Promise<void> {
+  const res = await authFetch(
+    `${BASE}/api/skills/${encodeURIComponent(source)}/${encodeURIComponent(name)}`,
+    { method: 'DELETE' }
+  );
+  if (!res.ok) throw new Error(`Failed to delete skill: ${res.status}`);
 }
 
 function authFetch(url: string, init?: RequestInit): Promise<Response> {

@@ -13,6 +13,7 @@
     title: string;
     readmeUrl?: (skill: RegistrySkill) => string;
     backRoute?: string;
+    installedNames?: Set<string>;
     initialSelectedId?: string | null;
     locale?: 'zh' | 'en';
   }
@@ -23,6 +24,7 @@
     title,
     readmeUrl,
     backRoute,
+    installedNames,
     initialSelectedId = null,
     locale = 'zh',
   }: Props = $props();
@@ -322,23 +324,34 @@
         <!-- Install Command -->
         <div class="install-section">
           <h4>{t('installCommand')}</h4>
-          <div class="install-cmd-box">
-            <code class="install-cmd">npx skills add --repo {skill.repo} --path {skill.path}</code>
-            <button
-              class="btn-copy"
-              class:copied
-              onclick={() => copyInstallCommand(skill)}
-              aria-label={t('copy')}
-            >
-              {#if copied}
-                <Check size={14} />
-                <span>{t('copied')}</span>
-              {:else}
-                <Copy size={14} />
-                <span>{t('copy')}</span>
-              {/if}
-            </button>
-          </div>
+          {#if mode === 'desktop'}
+            <p class="install-hint">在终端中运行以下命令安装</p>
+            {#if installedNames?.has(skill.name)}
+              <span class="installed-status">✓ 已安装</span>
+            {:else}
+              <div class="install-cmd-box">
+                <code class="install-cmd">npx skills add --repo {skill.repo} --path {skill.path}</code>
+              </div>
+            {/if}
+          {:else}
+            <div class="install-cmd-box">
+              <code class="install-cmd">npx skills add --repo {skill.repo} --path {skill.path}</code>
+              <button
+                class="btn-copy"
+                class:copied
+                onclick={() => copyInstallCommand(skill)}
+                aria-label={t('copy')}
+              >
+                {#if copied}
+                  <Check size={14} />
+                  <span>{t('copied')}</span>
+                {:else}
+                  <Copy size={14} />
+                  <span>{t('copy')}</span>
+                {/if}
+              </button>
+            </div>
+          {/if}
         </div>
 
         <!-- SKILL.md Content -->
@@ -379,6 +392,9 @@
           {@const sb = trustBadge[s.trust]}
           {@const SBadgeIcon = sb.icon}
           <button class="skill-card" onclick={() => selectSkill(s.name)}>
+            {#if mode === 'desktop' && installedNames?.has(s.name)}
+              <span class="installed-badge">已安装</span>
+            {/if}
             <div class="card-header">
               <span class="card-name">{s.displayName}</span>
               <span class="card-trust {sb.cls}" style={sb.color ? `color:${sb.color}` : ''}>
@@ -704,6 +720,7 @@
     flex: 1;
   }
   .skill-card {
+    position: relative;
     display: flex;
     flex-direction: column;
     padding: var(--space-lg);
@@ -1073,5 +1090,33 @@
     .store-detail {
       padding-right: 0;
     }
+  }
+
+  /* Desktop mode enhancements */
+  .install-hint {
+    color: var(--color-muted);
+    font-size: 0.875rem;
+    margin-bottom: var(--space-xs);
+  }
+
+  .installed-status {
+    color: var(--color-success);
+    font-weight: 500;
+    margin-bottom: var(--space-xs);
+    display: inline-block;
+  }
+
+  .installed-badge {
+    position: absolute;
+    top: var(--space-sm);
+    right: var(--space-sm);
+    background: var(--color-success-bg);
+    color: var(--color-success);
+    padding: 0 var(--space-xs);
+    border-radius: var(--radius-full);
+    font-size: 0.75rem;
+    line-height: 1;
+    font-weight: 500;
+    pointer-events: none;
   }
 </style>
