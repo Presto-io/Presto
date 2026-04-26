@@ -2,7 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { fly } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
-  import { ArrowLeft, Search, X, Loader, ExternalLink, Download, Check, RefreshCw, ShieldCheck, Shield, Users, ShieldOff, Star, Trash2, ChevronDown } from 'lucide-svelte';
+  import { ArrowLeft, Search, X, Loader, ExternalLink, Download, Check, RefreshCw, ShieldCheck, Shield, Users, ShieldOff, Star, Trash2, ChevronDown, PackageCheck, Undo2 } from 'lucide-svelte';
   import { goto } from '$app/navigation';
   import type { RegistryItem, Registry, RegistryCategory, StatsMap } from '$lib/api/types';
   import { marked } from 'marked';
@@ -83,6 +83,7 @@
   let searchQuery = $state('');
   let activeCategory = $state<string | null>(null);
   let activeTrust = $state<string | null>(null);
+  let showInstalledOnly = $state(false);
   let selectedId = $state<string | null>(null);
   $effect(() => { if (initialSelectedId !== null) selectedId = initialSelectedId; });
   let readmeContent = $state('');
@@ -229,7 +230,8 @@
       // 社区模板开关关闭时，只显示 official + verified
       const matchesCommunity = communityEnabled ||
         tpl.trust === 'official' || tpl.trust === 'verified';
-      return matchesCategory && matchesTrust && matchesCommunity;
+      const matchesInstalled = !showInstalledOnly || isInstalled(tpl.name);
+      return matchesCategory && matchesTrust && matchesCommunity && matchesInstalled;
     });
   });
 
@@ -252,7 +254,7 @@
 
   // Reset page when filters or page size change
   $effect(() => {
-    searchQuery; activeCategory; activeTrust; pageSize; sortBy;
+    searchQuery; activeCategory; activeTrust; showInstalledOnly; pageSize; sortBy;
     currentPage = 1;
   });
 
@@ -278,37 +280,15 @@
     selectedTemplate ? trustBadge[selectedTemplate.trust] : null
   );
 
-  // --- Swipe-to-delete state ---
+  // --- Uninstall state ---
   let pendingDeletions = $state<Set<string>>(new Set());
-  let swipedCard = $state<string | null>(null);
-  let touchStartX = 0;
 
   function isInstalled(name: string): boolean {
     return installedVersions.has(name) && !pendingDeletions.has(name);
   }
 
-  function handleTouchStart(e: TouchEvent, name: string) {
-    touchStartX = e.touches[0].clientX;
-    if (swipedCard && swipedCard !== name) swipedCard = null;
-  }
-
-  function handleTouchMove(e: TouchEvent, name: string) {
-    const delta = touchStartX - e.touches[0].clientX;
-    if (Math.abs(delta) > 10) e.preventDefault();
-  }
-
-  function handleTouchEnd(e: TouchEvent, name: string) {
-    const delta = touchStartX - e.changedTouches[0].clientX;
-    if (delta > 40) {
-      swipedCard = name;
-    } else {
-      if (swipedCard === name) swipedCard = null;
-    }
-  }
-
-  function handleSwipeDelete(name: string) {
+  function handleUninstall(name: string) {
     pendingDeletions.add(name);
-    swipedCard = null;
     pendingDeletions = new Set(pendingDeletions); // trigger reactivity
   }
 
@@ -317,6 +297,10 @@
     const arr = [...pendingDeletions];
     const last = arr[arr.length - 1];
     pendingDeletions.delete(last);
+    pendingDeletions = new Set(pendingDeletions); // trigger reactivity
+  }
+  function handleUndoOne(name: string) {
+    pendingDeletions.delete(name);
     pendingDeletions = new Set(pendingDeletions); // trigger reactivity
   }
 
@@ -565,28 +549,40 @@
         </div>
       </div>
       <!-- Row 2: Trust Toggles (left) + Categories (right, scrollable) -->
-      <div class="controls-row">
+    <div class="controls-row">
         {#if visibleTrustLevels.size > 1}
-        <div class="trust-toggles">
-          {#each Object.entries(trustBadge) as [key, badge] (key)}
-            {#if visibleTrustLevels.has(key)}
-              {@const BadgeIcon = badge.icon}
-              <button
-                class="trust-toggle"
-                class:active={activeTrust === key}
-                style="--toggle-color:{badge.color || 'var(--color-muted)'}"
-                onclick={() => activeTrust = activeTrust === key ? null : key}
-                title={badge.label}
-              >
-                <span class="trust-dot"></span>
-                <BadgeIcon size={13} />
-                <span class="trust-label">{badge.label}</span>
-              </button>
-            {/if}
-          {/each}
-        </div>
-        <div class="controls-sep"></div>
+          <div class="trust-toggles">
+            {#each Object.entries(trustBadge) as [key, badge] (key)}
+              {#if visibleTrustLevels.has(key)}
+                {@const BadgeIcon = badge.icon}
+                <button
+                  class="trust-toggle"
+                  class:active={activeTrust === key}
+                  style="--toggle-color:{badge.color || 'var(--color-muted)'}"
+                  onclick={() => activeTrust = activeTrust === key ? null : key}
+                  title={badge.label}
+                >
+                  <span class="trust-dot"></span>
+                  <BadgeIcon size={13} />
+                  <span class="trust-label">{badge.label}</span>
+                </button>
+              {/if}
+            {/each}
+          </div>
+          <div class="controls-sep"></div>
         {/if}
+        <button
+          class="trust-toggle installed-toggle"
+          class:active={showInstalledOnly}
+          style="--toggle-color:#22c55e"
+          onclick={() => showInstalledOnly = !showInstalledOnly}
+          title="已安装"
+        >
+          <span class="trust-dot"></span>
+          <PackageCheck size={13} />
+          <span class="trust-label">已安装</span>
+        </button>
+        <div class="controls-sep"></div>
         <div class="category-bar">
           {#if canScrollLeft}
             <button class="scroll-arrow scroll-arrow-left" onclick={() => scrollCategories('left')} aria-label="向左滚动">‹</button>
@@ -600,10 +596,10 @@
           {#if canScrollRight}
             <button class="scroll-arrow scroll-arrow-right" onclick={() => scrollCategories('right')} aria-label="向右滚动">›</button>
           {/if}
-        </div>
       </div>
     </div>
 
+    </div>
     {#if selectedId && selectedTemplate}
       <!-- Master-Detail View -->
       <div class="master-detail">
@@ -634,14 +630,32 @@
                 </span>
               {/if}
               <div class="detail-stats-actions">
-                {#if mode === 'desktop' && isInstalled(selectedTemplate.name)}
-                  <button
-                    class="btn-uninstall"
-                    onclick={() => handleSwipeDelete(selectedTemplate.name)}
-                  >
-                    <Trash2 size={13} />
-                    <span>卸载</span>
-                  </button>
+                {#if mode === 'desktop'}
+                  {#if pendingDeletions.has(selectedTemplate.name)}
+                    <button
+                      class="btn-detail-action btn-detail-undo"
+                      onclick={() => handleUndoOne(selectedTemplate.name)}
+                    >
+                      <Undo2 size={13} />
+                      <span>撤销删除</span>
+                    </button>
+                  {:else if isInstalled(selectedTemplate.name)}
+                    <button
+                      class="btn-detail-action btn-detail-uninstall"
+                      onclick={() => handleUninstall(selectedTemplate.name)}
+                    >
+                      <Trash2 size={13} />
+                      <span>卸载</span>
+                    </button>
+                  {:else if installFn}
+                    <button
+                      class="btn-detail-action btn-detail-install"
+                      onclick={() => handleInstall(selectedTemplate!)}
+                    >
+                      <Download size={13} />
+                      <span>安装</span>
+                    </button>
+                  {/if}
                 {/if}
                 {#if statsMap[selectedTemplate.name]?.stars != null}
                   <button class="stat-item" onclick={() => showExactStats = !showExactStats} title="Stars">
@@ -759,6 +773,10 @@
                   <button class="btn-install" onclick={() => handleInstall(selectedTemplate!)}>
                     <RefreshCw size={14} /><span>更新</span>
                   </button>
+                {:else if pendingDeletions.has(selectedTemplate.name)}
+                  <button class="btn-undo-lg" onclick={() => handleUndoOne(selectedTemplate.name)}>
+                    <Undo2 size={14} /><span>撤销删除</span>
+                  </button>
                 {:else if !isInstalled(selectedTemplate.name)}
                   <button class="btn-install" onclick={() => handleInstall(selectedTemplate!)}>
                     <Download size={14} /><span>安装</span>
@@ -776,14 +794,7 @@
                   <Download size={14} /><span>在 Presto 中打开</span>
                 </button>
               {/if}
-              {#if mode === 'desktop' && isInstalled(selectedTemplate.name)}
-                <button
-                  class="btn-uninstall-lg"
-                  onclick={() => handleSwipeDelete(selectedTemplate.name)}
-                >
-                  <Trash2 size={14} /><span>卸载</span>
-                </button>
-              {/if}
+
             </div>
             {#if mode === 'desktop' && showScrollTop}
               <button class="btn-scroll-top" onclick={scrollToTop} aria-label="回到顶部">
@@ -811,24 +822,41 @@
           {#each pagedTemplates as tpl (tpl.name)}
             {@const badge = trustBadge[tpl.trust]}
             {@const BadgeIcon = badge.icon}
-            {#if !pendingDeletions.has(tpl.name)}
-              <div class="swipe-wrapper">
-                <div class="swipe-actions">
-                  <button class="swipe-delete-btn" onclick={() => handleSwipeDelete(tpl.name)}>
-                    删除
-                  </button>
-                </div>
-                <button
+            {@const pending = pendingDeletions.has(tpl.name)}
+            {@const installed = isInstalled(tpl.name)}
+              <div class="card-item" class:pending-delete={pending}>
+                <div
                   class="tpl-card"
-                  class:swiped={swipedCard === tpl.name}
-                  style={swipedCard === tpl.name ? 'transform: translateX(-80px)' : ''}
-                  ontouchstart={(e) => handleTouchStart(e, tpl.name)}
-                  ontouchmove={(e) => handleTouchMove(e, tpl.name)}
-                  ontouchend={(e) => handleTouchEnd(e, tpl.name)}
-                  onclick={() => { if (swipedCard && swipedCard !== tpl.name) { swipedCard = null; } else if (swipedCard === tpl.name) { swipedCard = null; } else { selectTemplate(tpl.name); } }}
+                  role="button"
+                  tabindex="0"
+                  onclick={() => selectTemplate(tpl.name)}
+                  onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectTemplate(tpl.name); } }}
                 >
+                  {#if mode === 'desktop'}
+                    {#if pending}
+                      <button class="card-action-btn card-undo-btn" onclick={(e) => { e.stopPropagation(); handleUndoOne(tpl.name); }} title="撤销删除">
+                        <Undo2 size={13} />
+                      </button>
+                    {:else if installed}
+                      <button class="card-action-btn card-uninstall-btn" onclick={(e) => { e.stopPropagation(); handleUninstall(tpl.name); }} title="卸载">
+                        <Trash2 size={13} />
+                      </button>
+                    {:else}
+                      <button class="card-action-btn card-install-btn" onclick={(e) => { e.stopPropagation(); handleInstall(tpl); }} title="安装">
+                        <Download size={13} />
+                      </button>
+                    {/if}
+                  {/if}
                   <div class="card-header">
-                    <span class="card-name">{tpl.displayName}</span>
+                    <span class="card-name">
+                      {tpl.displayName}
+                      {#if installed && !pending}
+                        <span class="card-installed-badge">已安装</span>
+                      {/if}
+                      {#if pending}
+                        <span class="card-pending-badge">待删除</span>
+                      {/if}
+                    </span>
                     <span class="card-trust {badge.cls}" style={badge.color ? `color:${badge.color}` : ''}>
                       <BadgeIcon size={12} />
                       {badge.label}
@@ -849,11 +877,11 @@
                       </span>
                     {/if}
                   </div>
-                </button>
+                </div>
               </div>
-            {/if}
           {/each}
         </div>
+
         <!-- Pagination -->
         {#if mode !== 'web'}
         <div class="pagination">
@@ -1193,6 +1221,9 @@
   .trust-label {
     transition: opacity 150ms ease;
   }
+  .installed-toggle {
+    flex-shrink: 0;
+  }
 
   /* Empty / Loading */
   .store-empty {
@@ -1525,49 +1556,121 @@
     color: var(--color-text);
     background: var(--color-surface);
   }
-  .btn-uninstall {
+  /* Detail header action buttons (uniform size) */
+  .btn-detail-action {
     display: inline-flex;
     align-items: center;
     gap: var(--space-xs);
     padding: 4px 10px;
     background: none;
-    border: 1px solid rgba(239, 68, 68, 0.3);
     border-radius: var(--radius-sm);
-    color: #ef4444;
     font-size: 0.75rem;
     font-family: var(--font-ui);
     cursor: pointer;
     transition: all var(--transition);
   }
-  .btn-uninstall:hover {
+  .btn-detail-uninstall {
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #ef4444;
+  }
+  .btn-detail-uninstall:hover {
     background: rgba(239, 68, 68, 0.08);
     border-color: #ef4444;
   }
-
-  /* Swipe-to-delete */
-  .swipe-wrapper {
-    position: relative;
-    overflow: hidden;
+  .btn-detail-install {
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    color: #22c55e;
   }
-  .swipe-actions {
+  .btn-detail-install:hover {
+    background: rgba(34, 197, 94, 0.08);
+    border-color: #22c55e;
+  }
+  .btn-detail-undo {
+    border: 1px solid rgba(122, 162, 247, 0.3);
+    color: var(--color-accent);
+  }
+  .btn-detail-undo:hover {
+    background: rgba(122, 162, 247, 0.08);
+    border-color: var(--color-accent);
+  }
+
+  /* Card item wrapper */
+  .card-item {
+    position: relative;
+  }
+  .card-item.pending-delete {
+    opacity: 0.55;
+  }
+  .card-item.pending-delete .tpl-card {
+    border-style: dashed;
+  }
+  .card-installed-badge {
+    font-size: 0.5625rem;
+    padding: 0px 5px;
+    border-radius: 999px;
+    background: rgba(34, 197, 94, 0.12);
+    color: #22c55e;
+    font-weight: 500;
+    margin-left: 6px;
+    vertical-align: middle;
+    display: inline-block;
+    line-height: 1.6;
+  }
+  .card-pending-badge {
+    font-size: 0.5625rem;
+    padding: 0px 5px;
+    border-radius: 999px;
+    background: rgba(239, 68, 68, 0.10);
+    color: #ef4444;
+    font-weight: 500;
+    margin-left: 6px;
+    vertical-align: middle;
+    display: inline-block;
+    line-height: 1.6;
+  }
+  /* Card action buttons (hover) */
+  .card-action-btn {
     position: absolute;
-    right: 0;
-    top: 0;
-    bottom: 0;
-    width: 80px;
-    display: flex;
+    top: 6px;
+    right: 6px;
+    width: 26px;
+    height: 26px;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-  }
-  .swipe-delete-btn {
-    background: #ef4444;
-    color: white;
-    height: 100%;
-    width: 80px;
-    border: none;
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
     cursor: pointer;
-    font-size: 0.875rem;
-    font-family: var(--font-ui);
+    opacity: 0;
+    transition: opacity 150ms ease, background 150ms ease, border-color 150ms ease;
+    z-index: 3;
+  }
+  .card-item:hover .card-action-btn {
+    opacity: 1;
+  }
+  .card-uninstall-btn {
+    border: 1px solid rgba(239, 68, 68, 0.25);
+    color: #ef4444;
+  }
+  .card-uninstall-btn:hover {
+    background: rgba(239, 68, 68, 0.08);
+    border-color: #ef4444;
+  }
+  .card-install-btn {
+    border: 1px solid rgba(34, 197, 94, 0.25);
+    color: #22c55e;
+  }
+  .card-install-btn:hover {
+    background: rgba(34, 197, 94, 0.08);
+    border-color: #22c55e;
+  }
+  .card-undo-btn {
+    border: 1px solid rgba(122, 162, 247, 0.25);
+    color: var(--color-accent);
+  }
+  .card-undo-btn:hover {
+    background: rgba(122, 162, 247, 0.08);
+    border-color: var(--color-accent);
   }
 
   /* Undo bar */
@@ -1831,6 +1934,24 @@
   .btn-uninstall-lg:hover {
     background: rgba(239, 68, 68, 0.08);
     border-color: #ef4444;
+  }
+  .btn-undo-lg {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-sm) var(--space-lg);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition);
+    border: 1px solid rgba(122, 162, 247, 0.3);
+    background: var(--color-surface);
+    color: var(--color-accent);
+  }
+  .btn-undo-lg:hover {
+    background: rgba(122, 162, 247, 0.08);
+    border-color: var(--color-accent);
   }
   .btn-install, .btn-installed, .btn-installing {
     display: inline-flex;
