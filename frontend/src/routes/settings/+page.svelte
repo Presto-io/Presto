@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { ExternalLink, Shield, Info, BookOpen, ArrowLeft, RefreshCw, Settings, Scale, HelpCircle } from 'lucide-svelte';
+  import { ExternalLink, Shield, Info, BookOpen, ArrowLeft, RefreshCw, Settings, Scale, HelpCircle, Store, Puzzle } from 'lucide-svelte';
   import { goto } from '$app/navigation';
   import { triggerAction, resetWizard } from '$lib/stores/wizard.svelte';
 
@@ -20,12 +20,17 @@
   let activeSection = $state('general');
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sections: { id: string; label: string; icon: any }[] = [
+  type Section = { id: string; label: string; icon: any };
+  const settingsSections: Section[] = [
     { id: 'general', label: '通用', icon: Settings },
     { id: 'help', label: '帮助', icon: HelpCircle },
     { id: 'template-dev', label: '模板开发', icon: BookOpen },
     { id: 'about', label: '关于', icon: Info },
     { id: 'licenses', label: '开源协议', icon: Scale },
+  ];
+  const storeSections: Section[] = [
+    { id: 'store-skills', label: '技能商店', icon: Puzzle },
+    { id: 'store-templates', label: '模板商店', icon: Store },
   ];
 
   function openExternal(url: string) {
@@ -102,17 +107,20 @@
     const content = document.querySelector('.settings-content') as HTMLElement;
     if (!content) return;
     const scrollTop = content.scrollTop;
-    for (let i = sections.length - 1; i >= 0; i--) {
-      const el = content.querySelector(`#section-${sections[i].id}`) as HTMLElement;
+    for (let i = settingsSections.length - 1; i >= 0; i--) {
+      const el = content.querySelector(`#section-${settingsSections[i].id}`) as HTMLElement;
       if (el && el.offsetTop - 24 <= scrollTop) {
-        activeSection = sections[i].id;
+        activeSection = settingsSections[i].id;
         return;
       }
     }
-    activeSection = sections[0].id;
+    activeSection = settingsSections[0].id;
   }
 
   function scrollTo(id: string) {
+    // Route-based sections navigate to a separate page
+    if (id === 'store-skills') { goto('/store-skills'); return; }
+    if (id === 'store-templates') { goto('/store-templates'); return; }
     activeSection = id;
     const content = document.querySelector('.settings-content') as HTMLElement;
     const el = content?.querySelector(`#section-${id}`) as HTMLElement;
@@ -156,7 +164,7 @@
 
   <div class="settings-layout">
     <nav class="settings-nav">
-      {#each sections as sec (sec.id)}
+      {#each settingsSections as sec (sec.id)}
         {@const Icon = sec.icon}
         <button
           class="nav-item"
@@ -167,7 +175,18 @@
           {sec.label}
         </button>
       {/each}
-
+      <div class="nav-sep"></div>
+      {#each storeSections as sec (sec.id)}
+        {@const Icon = sec.icon}
+        <button
+          class="nav-item nav-item-store"
+          class:active={activeSection === sec.id}
+          onclick={() => scrollTo(sec.id)}
+        >
+          <Icon size={14} />
+          {sec.label}
+        </button>
+      {/each}
     </nav>
 
     <div class="settings-content-wrapper">
@@ -484,6 +503,19 @@
   .nav-item.active {
     color: var(--color-accent);
     background: var(--color-surface);
+  }
+  .nav-sep {
+    height: 1px;
+    background: var(--color-border);
+    margin: var(--space-xs) var(--space-sm);
+  }
+  .nav-item-store {
+    font-size: 0.75rem;
+    color: var(--color-muted);
+    opacity: 0.85;
+  }
+  .nav-item-store:hover {
+    opacity: 1;
   }
 
   .settings-content-wrapper {
