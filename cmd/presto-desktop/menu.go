@@ -22,7 +22,11 @@ func buildMenuForPlatform(app *App, platform string) *menu.Menu {
 	}
 
 	addFileMenu(appMenu, app)
-	appMenu.Append(menu.EditMenu())
+	if isDarwin {
+		appMenu.Append(menu.EditMenu())
+	} else {
+		addEditMenu(appMenu, app)
+	}
 	addTemplateMenu(appMenu, app)
 	addSkillMenu(appMenu, app)
 
@@ -35,7 +39,33 @@ func buildMenuForPlatform(app *App, platform string) *menu.Menu {
 	return appMenu
 }
 
+
+func addEditMenu(appMenu *menu.Menu, app *App) {
+	editMenu := appMenu.AddSubmenu("编辑")
+	editMenu.AddText("撤销", keys.CmdOrCtrl("z"), func(_ *menu.CallbackData) {
+		wailsRuntime.EventsEmit(app.ctx, "menu:undo")
+	})
+	editMenu.AddText("重做", keys.Combo("z", keys.CmdOrCtrlKey, keys.ShiftKey), func(_ *menu.CallbackData) {
+		wailsRuntime.EventsEmit(app.ctx, "menu:redo")
+	})
+	editMenu.AddSeparator()
+	editMenu.AddText("剪切", keys.CmdOrCtrl("x"), func(_ *menu.CallbackData) {
+		wailsRuntime.EventsEmit(app.ctx, "menu:cut")
+	})
+	editMenu.AddText("复制", keys.CmdOrCtrl("c"), func(_ *menu.CallbackData) {
+		wailsRuntime.EventsEmit(app.ctx, "menu:copy")
+	})
+	editMenu.AddText("粘贴", keys.CmdOrCtrl("v"), func(_ *menu.CallbackData) {
+		wailsRuntime.EventsEmit(app.ctx, "menu:paste")
+	})
+	editMenu.AddSeparator()
+	editMenu.AddText("全选", keys.CmdOrCtrl("a"), func(_ *menu.CallbackData) {
+		wailsRuntime.EventsEmit(app.ctx, "menu:selectall")
+	})
+}
+
 func addFileMenu(appMenu *menu.Menu, app *App) {
+
 	fileMenu := appMenu.AddSubmenu("文件")
 	fileMenu.AddText("新建", keys.CmdOrCtrl("n"), func(_ *menu.CallbackData) {
 		wailsRuntime.EventsEmit(app.ctx, "menu:new")

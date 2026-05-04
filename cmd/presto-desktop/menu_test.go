@@ -200,8 +200,9 @@ func TestBuildMenu_WindowsStructure(t *testing.T) {
 	}
 
 	requireTopLevelLabel(t, m.Items[0], "文件")
-	if m.Items[1].Role != menu.EditMenuRole {
-		t.Fatalf("expected second top-level item to be EditMenuRole, got role=%v", m.Items[1].Role)
+	requireTopLevelLabel(t, m.Items[1], "编辑")
+	if m.Items[1].Role == menu.EditMenuRole {
+		t.Fatalf("expected second top-level item NOT to be EditMenuRole on windows")
 	}
 	requireTopLevelLabel(t, m.Items[2], "模板")
 	requireTopLevelLabel(t, m.Items[3], "技能")
@@ -215,6 +216,64 @@ func TestBuildMenu_WindowsStructure(t *testing.T) {
 	}
 
 	assertSharedFileMenu(t, m)
+}
+
+func TestBuildMenu_WindowsEditMenu(t *testing.T) {
+	m := buildMenuForPlatform(&App{}, "windows")
+	editMenu := findSubmenu(m, "编辑")
+	if editMenu == nil {
+		t.Fatal("编辑 menu not found")
+	}
+
+	// 8 items: 6 text + 2 separators
+	if got := len(editMenu.Items); got != 8 {
+		t.Fatalf("编辑 menu: expected 8 items, got %d", got)
+	}
+
+	expectedLabels := []string{"撤销", "重做", "剪切", "复制", "粘贴", "全选"}
+	textOnly := textItems(editMenu)
+	if got := len(textOnly); got != len(expectedLabels) {
+		t.Fatalf("编辑 menu text items: expected %d, got %d", len(expectedLabels), got)
+	}
+	for i, expected := range expectedLabels {
+		if textOnly[i].Label != expected {
+			t.Errorf("编辑 menu text item[%d]: expected %q, got %q", i, expected, textOnly[i].Label)
+		}
+	}
+
+	// Check expected accelerators
+	accelTests := []struct {
+		label string
+		accel *keys.Accelerator
+	}{
+		{"撤销", keys.CmdOrCtrl("z")},
+		{"重做", keys.Combo("z", keys.CmdOrCtrlKey, keys.ShiftKey)},
+		{"剪切", keys.CmdOrCtrl("x")},
+		{"复制", keys.CmdOrCtrl("c")},
+		{"粘贴", keys.CmdOrCtrl("v")},
+		{"全选", keys.CmdOrCtrl("a")},
+	}
+
+	for _, tt := range accelTests {
+		t.Run(tt.label, func(t *testing.T) {
+			item := findItem(editMenu, tt.label)
+			if item == nil {
+				t.Fatalf("item %q not found in 编辑 menu", tt.label)
+			}
+			if !accelEqual(item.Accelerator, tt.accel) {
+				t.Errorf("item %q: accelerator mismatch\n  got:  %+v\n  want: %+v",
+					tt.label, item.Accelerator, tt.accel)
+			}
+		})
+	}
+
+	// Verify separators at positions 2 and 7
+	if editMenu.Items[2].Type != menu.SeparatorType {
+		t.Errorf("编辑 menu[2]: expected separator, got type=%v", editMenu.Items[2].Type)
+	}
+	if editMenu.Items[6].Type != menu.SeparatorType {
+		t.Errorf("编辑 menu[6]: expected separator, got type=%v", editMenu.Items[6].Type)
+	}
 }
 
 func TestBuildMenu_WindowsHelpMenu_HasAbout(t *testing.T) {

@@ -173,6 +173,14 @@
 				console.error('[url-scheme] GetStartupURL failed:', e);
 			}
 
+			// Edit menu event listeners (from Go custom edit menu on Windows)
+			window.runtime.EventsOn('menu:undo', () => document.execCommand('undo'));
+			window.runtime.EventsOn('menu:redo', () => document.execCommand('redo'));
+			window.runtime.EventsOn('menu:cut', () => document.execCommand('cut'));
+			window.runtime.EventsOn('menu:copy', () => document.execCommand('copy'));
+			window.runtime.EventsOn('menu:paste', () => document.execCommand('paste'));
+			window.runtime.EventsOn('menu:selectall', () => document.execCommand('selectAll'));
+
 			const handleNativeEvent = async (...args: any[]) => {
 				const items: any[] = Array.isArray(args[0]) ? args[0] : args;
 				await handleNativeItems(items, 'open');
