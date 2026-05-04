@@ -46,3 +46,12 @@ jobs:
           name: showcase-static
           path: showcase-output
           retention-days: 30
+
+      - name: Dispatch showcase-ready event
+        if: success()
+        run: |
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.PRESTO_PAT }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/Presto-io/Presto-Homepage/dispatches \
+            -d '{"event_type":"showcase-ready"}'
