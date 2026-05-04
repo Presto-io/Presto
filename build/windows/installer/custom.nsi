@@ -1,4 +1,4 @@
-; Presto Windows installer
+﻿; Presto Windows installer
 ; Standalone NSIS script used by CI and local release builds.
 
 Unicode true
