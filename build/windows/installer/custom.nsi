@@ -227,7 +227,7 @@ Section "卸载"
     Abort
 
   ask_keep_data:
-    MessageBox MB_YESNO "保留用户数据目录？$\n$\n如果您选择"是"，您的文档、模板和设置将被保留。$\n$\n位置：$PROFILE\.presto" IDYES keep_data
+    MessageBox MB_YESNO "保留用户数据目录？$\n$\n如果您选择'是'，您的文档、模板和设置将被保留。$\n$\n位置：$PROFILE\.presto" IDYES keep_data
     Goto continue_uninstall
 
   keep_data:
