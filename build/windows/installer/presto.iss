@@ -84,7 +84,7 @@ VersionInfoProductVersion={#INFO_PRODUCTVERSION}
 VersionInfoCopyright={#INFO_COPYRIGHT}
 
 [Languages]
-Name: "zh"; MessagesFile: "compiler:Languages\Unofficial\ChineseSimplified.isl"
+Name: "zh"; MessagesFile: "{#SourcePath}\languages\ChineseSimplified.isl"
 
 [CustomMessages]
 zh.TaskGroup=附加选项：

@@ -2,7 +2,7 @@
        _build-macos-arm64 _build-macos-amd64 \
        dist-macos dist-macos-arm64 dist-macos-amd64 dist-macos-universal \
        dist-dmg dist-dmg-arm64 dist-dmg-amd64 dist-dmg-universal \
-       dist-windows dist-linux dist notarize inno windows-installer
+       dist-windows dist-linux dist notarize inno windows-installer _inno-language
 
 # ─── Config ──────────────────────────────────────────────
 APP_NAME     := Presto
@@ -17,6 +17,10 @@ DESKTOP_SRC  := ./cmd/presto-desktop
 DESKTOP_EMBED:= cmd/presto-desktop/build
 MACOSX_DEPLOYMENT_TARGET := 11.0
 INNO_COMPILER ?= ISCC.exe
+INNO_LANG_DIR := build/windows/installer/languages
+INNO_ZH_FILE := $(INNO_LANG_DIR)/ChineseSimplified.isl
+INNO_ZH_URL := https://raw.githubusercontent.com/jrsoftware/issrc/main/Files/Languages/Unofficial/ChineseSimplified.isl
+INNO_ZH_SHA256 := 7d544b9bb1d142cfa11f2e5d3cc8abe2e55f8e066c5124e3772675aa236e1278
 
 # Typst download URL patterns
 TYPST_BASE   := https://github.com/typst/typst/releases/download/v$(TYPST_VERSION)
@@ -308,7 +312,26 @@ clean:
 .PHONY: inno windows-installer
 windows-installer: inno
 
-inno: dist-windows-amd64
+.PHONY: _inno-language
+_inno-language:
+	@mkdir -p "$(INNO_LANG_DIR)"
+	@if [ ! -f "$(INNO_ZH_FILE)" ]; then \
+		echo "==> Downloading Inno Setup Simplified Chinese language file..."; \
+		curl -fsSL "$(INNO_ZH_URL)" -o "$(INNO_ZH_FILE).tmp"; \
+		if command -v sha256sum >/dev/null 2>&1; then \
+			echo "$(INNO_ZH_SHA256)  $(INNO_ZH_FILE).tmp" | sha256sum -c -; \
+		else \
+			echo "$(INNO_ZH_SHA256)  $(INNO_ZH_FILE).tmp" | shasum -a 256 -c -; \
+		fi; \
+		mv "$(INNO_ZH_FILE).tmp" "$(INNO_ZH_FILE)"; \
+	fi
+	@if command -v sha256sum >/dev/null 2>&1; then \
+		echo "$(INNO_ZH_SHA256)  $(INNO_ZH_FILE)" | sha256sum -c -; \
+	else \
+		echo "$(INNO_ZH_SHA256)  $(INNO_ZH_FILE)" | shasum -a 256 -c -; \
+	fi
+
+inno: dist-windows-amd64 _inno-language
 	@echo "==> Building Inno Setup installer..."
 	@BINARY_PATH="$$(command -v cygpath >/dev/null 2>&1 && cygpath -w "$(PWD)/$(DIST)/$(APP_NAME)-$(VERSION)-windows.exe" || printf '%s' "$(PWD)/$(DIST)/$(APP_NAME)-$(VERSION)-windows.exe")"; \
 	TYPST_PATH="$$(command -v cygpath >/dev/null 2>&1 && cygpath -w "$(PWD)/$(DIST)/typst.exe" || printf '%s' "$(PWD)/$(DIST)/typst.exe")"; \

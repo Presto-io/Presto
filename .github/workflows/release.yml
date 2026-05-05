@@ -212,6 +212,22 @@ jobs:
           choco install innosetup -y --no-progress
           "C:\Program Files (x86)\Inno Setup 6" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
+      - name: Prepare Inno Setup Simplified Chinese locale
+        shell: powershell
+        run: |
+          $langDir = "build/windows/installer/languages"
+          $langPath = Join-Path $langDir "ChineseSimplified.isl"
+          $langUrl = "https://raw.githubusercontent.com/jrsoftware/issrc/main/Files/Languages/Unofficial/ChineseSimplified.isl"
+          $expectedHash = "7d544b9bb1d142cfa11f2e5d3cc8abe2e55f8e066c5124e3772675aa236e1278"
+
+          New-Item -ItemType Directory -Force -Path $langDir | Out-Null
+          Invoke-WebRequest -Uri $langUrl -OutFile $langPath
+
+          $actualHash = (Get-FileHash $langPath -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actualHash -ne $expectedHash) {
+            throw "ChineseSimplified.isl SHA256 mismatch: expected $expectedHash, got $actualHash"
+          }
+
       - name: Cache llvm-mingw toolchain
         if: matrix.goarch == 'arm64'
         id: cache-llvm-mingw
