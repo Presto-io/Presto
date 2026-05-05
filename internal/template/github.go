@@ -435,7 +435,12 @@ func (m *Manager) completeInstall(owner, repo string, data []byte, expectedHash 
 	}
 
 	// Step 3: 验证通过后才执行二进制
-	tmpFile, err := os.CreateTemp("", "presto-template-*")
+	// FIX: Windows requires .exe suffix for executable files
+	tmpPattern := "presto-template-*"
+	if runtime.GOOS == "windows" {
+		tmpPattern = "presto-template-*.exe"
+	}
+	tmpFile, err := os.CreateTemp("", tmpPattern)
 	if err != nil {
 		return &InstallError{
 			Type:    ErrServer,
