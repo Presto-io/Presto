@@ -88,7 +88,7 @@ VersionInfoVersion={#INFO_FILEVERSION}
 VersionInfoCompany={#INFO_COMPANYNAME}
 VersionInfoDescription={#INFO_PRODUCTNAME} Installer
 VersionInfoProductName={#INFO_PRODUCTNAME}
-VersionInfoProductVersion={#INFO_PRODUCTVERSION}
+VersionInfoProductVersion={#INFO_FILEVERSION}
 VersionInfoCopyright={#INFO_COPYRIGHT}
 
 [Languages]
