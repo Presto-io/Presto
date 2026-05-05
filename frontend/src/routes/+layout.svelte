@@ -1,7 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import { onMount, onDestroy } from 'svelte';
-	import { FileText } from 'lucide-svelte';
+	import { FileText, Maximize2, Minus, X } from 'lucide-svelte';
 	import WizardOverlay from '$lib/components/wizard/WizardOverlay.svelte';
 	import DownloadProgressBar from '$lib/components/DownloadProgressBar.svelte';
 	import FirstLaunchBanner from '$lib/components/FirstLaunchBanner.svelte';
@@ -15,6 +15,152 @@
 	let { children } = $props();
 
 	let isShowcase = $derived($page.url.pathname.startsWith('/showcase'));
+	let showEmbeddedMenu = $state(false);
+	let isWindowsDesktop = $state(false);
+
+	type MenuAction =
+		| 'new'
+		| 'open'
+		| 'save'
+		| 'saveas'
+		| 'export'
+		| 'close-window'
+		| 'quit'
+		| 'undo'
+		| 'redo'
+		| 'cut'
+		| 'copy'
+		| 'paste'
+		| 'selectall';
+
+	const menuGroups: {
+		label: string;
+		items: { label: string; action?: MenuAction; href?: string; shortcut?: string; separator?: boolean }[];
+	}[] = [
+		{
+			label: '文件',
+			items: [
+				{ label: '新建', action: 'new', shortcut: 'Ctrl+N' },
+				{ label: '打开文件...', action: 'open', shortcut: 'Ctrl+O' },
+				{ label: '保存', action: 'save', shortcut: 'Ctrl+S' },
+				{ label: '另存为...', action: 'saveas', shortcut: 'Ctrl+Shift+S' },
+				{ label: '导出 PDF...', action: 'export', shortcut: 'Ctrl+E' },
+				{ separator: true, label: '' },
+				{ label: '设置...', href: '/settings', shortcut: 'Ctrl+,' },
+				{ separator: true, label: '' },
+				{ label: '关闭窗口', action: 'close-window', shortcut: 'Ctrl+W' },
+				{ label: '退出 Presto', action: 'quit', shortcut: 'Ctrl+Q' },
+			],
+		},
+		{
+			label: '编辑',
+			items: [
+				{ label: '撤销', action: 'undo', shortcut: 'Ctrl+Z' },
+				{ label: '重做', action: 'redo', shortcut: 'Ctrl+Shift+Z' },
+				{ separator: true, label: '' },
+				{ label: '剪切', action: 'cut', shortcut: 'Ctrl+X' },
+				{ label: '复制', action: 'copy', shortcut: 'Ctrl+C' },
+				{ label: '粘贴', action: 'paste', shortcut: 'Ctrl+V' },
+				{ separator: true, label: '' },
+				{ label: '全选', action: 'selectall', shortcut: 'Ctrl+A' },
+			],
+		},
+		{
+			label: '模板',
+			items: [{ label: '模板商店', href: '/store-templates', shortcut: 'Ctrl+Shift+T' }],
+		},
+		{
+			label: '技能',
+			items: [{ label: '技能商店', href: '/store-skills', shortcut: 'Ctrl+Shift+K' }],
+		},
+		{
+			label: '帮助',
+			items: [
+				{ label: '文档', href: 'https://presto.io/docs' },
+				{ label: '关于 Presto', href: 'about:presto' },
+				{ label: '检查更新', href: 'update:presto' },
+			],
+		},
+	];
+
+	async function resolveEmbeddedMenuMode() {
+		if (isShowcase) {
+			showEmbeddedMenu = false;
+			isWindowsDesktop = false;
+			return;
+		}
+
+		if (!window.go?.main?.App?.GetPlatform) {
+			showEmbeddedMenu = true;
+			isWindowsDesktop = false;
+			return;
+		}
+
+		try {
+			const platform = await window.go.main.App.GetPlatform();
+			isWindowsDesktop = platform === 'windows';
+			showEmbeddedMenu = isWindowsDesktop;
+		} catch {
+			showEmbeddedMenu = true;
+			isWindowsDesktop = false;
+		}
+	}
+
+	function emitPageMenuAction(action: MenuAction) {
+		const event = new CustomEvent<MenuAction>('presto:menu-action', {
+			detail: action,
+			cancelable: true,
+		});
+		window.dispatchEvent(event);
+		return event.defaultPrevented;
+	}
+
+	function handleMenuItem(item: { action?: MenuAction; href?: string }) {
+		if (item.action) {
+			if (['undo', 'redo', 'cut', 'copy', 'paste', 'selectall'].includes(item.action)) {
+				const command = item.action === 'selectall' ? 'selectAll' : item.action;
+				document.execCommand(command);
+				return;
+			}
+			const handled = emitPageMenuAction(item.action);
+			if (!handled && (item.action === 'close-window' || item.action === 'quit')) {
+				void window.go?.main?.App?.QuitApp?.();
+				window.runtime?.Quit?.();
+			}
+			return;
+		}
+
+		if (!item.href) return;
+		if (item.href === 'about:presto') {
+			void window.go?.main?.App?.ShowAboutDialog?.();
+			return;
+		}
+		if (item.href === 'update:presto') {
+			void window.go?.main?.App?.CheckAndNotifyUpdate?.();
+			return;
+		}
+		if (item.href.startsWith('http')) {
+			if (window.runtime?.BrowserOpenURL) {
+				window.runtime.BrowserOpenURL(item.href);
+			} else {
+				window.open(item.href, '_blank', 'noopener,noreferrer');
+			}
+			return;
+		}
+		goto(item.href);
+	}
+
+	function handleWindowClose() {
+		const handled = emitPageMenuAction('close-window');
+		if (!handled) {
+			void window.go?.main?.App?.QuitApp?.();
+			window.runtime?.Quit?.();
+		}
+	}
+
+	$effect(() => {
+		void resolveEmbeddedMenuMode();
+	});
 
 	// --- Universal drag-drop (window-level capture phase) ---
 	let dragOver = $state(false);
@@ -220,7 +366,44 @@
 	});
 </script>
 
-<div class="app">
+<div class="app" class:with-embedded-menu={showEmbeddedMenu}>
+	{#if showEmbeddedMenu}
+		<nav class="embedded-menu" aria-label="应用菜单" style="--wails-draggable:drag">
+			<div class="embedded-menu-left">
+				<span class="embedded-menu-title">Presto</span>
+				{#each menuGroups as group}
+					<div class="menu-group">
+						<button class="menu-trigger" type="button">{group.label}</button>
+						<div class="menu-popover">
+							{#each group.items as item}
+								{#if item.separator}
+									<div class="menu-separator"></div>
+								{:else}
+									<button class="menu-item" type="button" onclick={() => handleMenuItem(item)}>
+										<span>{item.label}</span>
+										{#if item.shortcut}<kbd>{item.shortcut}</kbd>{/if}
+									</button>
+								{/if}
+							{/each}
+						</div>
+					</div>
+				{/each}
+			</div>
+			{#if isWindowsDesktop}
+				<div class="window-controls">
+					<button type="button" class="window-control" aria-label="最小化" title="最小化" onclick={() => window.runtime?.WindowMinimise?.()}>
+						<Minus size={13} />
+					</button>
+					<button type="button" class="window-control" aria-label="最大化" title="最大化" onclick={() => window.runtime?.WindowToggleMaximise?.()}>
+						<Maximize2 size={12} />
+					</button>
+					<button type="button" class="window-control close" aria-label="关闭" title="关闭" onclick={handleWindowClose}>
+						<X size={14} />
+					</button>
+				</div>
+			{/if}
+		</nav>
+	{/if}
 	<main id="main-content">
 		{@render children()}
 	</main>
@@ -269,6 +452,127 @@
 		overflow: hidden;
 		display: flex;
 		flex-direction: column;
+	}
+	.embedded-menu {
+		display: flex;
+		align-items: stretch;
+		justify-content: space-between;
+		height: 34px;
+		background: var(--color-bg);
+		border-bottom: 1px solid var(--color-border);
+		color: var(--color-text);
+		flex-shrink: 0;
+		position: relative;
+		z-index: 9500;
+	}
+	.embedded-menu-left {
+		display: flex;
+		align-items: center;
+		min-width: 0;
+	}
+	.embedded-menu-title {
+		display: inline-flex;
+		align-items: center;
+		height: 100%;
+		padding: 0 13px;
+		color: var(--color-text-bright);
+		font-size: 12px;
+		font-weight: 600;
+	}
+	.menu-group {
+		position: relative;
+		height: 100%;
+		--wails-draggable: no-drag;
+	}
+	.menu-trigger {
+		height: 100%;
+		padding: 0 10px;
+		background: transparent;
+		color: var(--color-text);
+		font-size: 12px;
+		border-radius: 0;
+	}
+	.menu-trigger:hover,
+	.menu-group:focus-within .menu-trigger {
+		background: var(--color-hover-overlay);
+		color: var(--color-text-bright);
+	}
+	.menu-popover {
+		position: absolute;
+		left: 0;
+		top: 100%;
+		min-width: 188px;
+		padding: 5px;
+		background: var(--color-bg-elevated);
+		border: 1px solid var(--color-border);
+		box-shadow: var(--shadow-md);
+		opacity: 0;
+		transform: translateY(-4px);
+		pointer-events: none;
+		transition: opacity var(--transition), transform var(--transition);
+	}
+	.menu-group:hover .menu-popover,
+	.menu-group:focus-within .menu-popover {
+		opacity: 1;
+		transform: translateY(0);
+		pointer-events: auto;
+	}
+	.menu-item {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 22px;
+		width: 100%;
+		min-height: 28px;
+		padding: 0 9px;
+		border-radius: var(--radius-sm);
+		background: transparent;
+		color: var(--color-text);
+		font-size: 12px;
+		text-align: left;
+		white-space: nowrap;
+	}
+	.menu-item:hover,
+	.menu-item:focus-visible {
+		background: var(--color-surface-hover);
+		color: var(--color-text-bright);
+	}
+	.menu-item kbd {
+		color: var(--color-muted);
+		font-family: var(--font-ui);
+		font-size: 11px;
+		font-weight: 400;
+	}
+	.menu-separator {
+		height: 1px;
+		margin: 5px 4px;
+		background: var(--color-border);
+	}
+	.window-controls {
+		display: flex;
+		align-items: stretch;
+		--wails-draggable: no-drag;
+	}
+	.window-control {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 46px;
+		height: 100%;
+		border-radius: 0;
+		background: transparent;
+		color: var(--color-text);
+	}
+	.window-control:hover {
+		background: var(--color-hover-overlay);
+		color: var(--color-text-bright);
+	}
+	.window-control.close:hover {
+		background: var(--color-danger);
+		color: var(--color-on-danger);
+	}
+	.app.with-embedded-menu :global(.toolbar) {
+		padding-top: var(--space-sm);
 	}
 	.bottom-status {
 		position: fixed;

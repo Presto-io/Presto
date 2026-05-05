@@ -566,6 +566,15 @@
   onMount(() => {
     const runtime = window.runtime;
     const hasDesktopRuntime = Boolean(runtime?.EventsOn);
+    let usesEmbeddedMenu = !hasDesktopRuntime;
+
+    void window.go?.main?.App?.GetPlatform?.()
+      .then((platform) => {
+        usesEmbeddedMenu = platform === 'windows';
+      })
+      .catch(() => {
+        usesEmbeddedMenu = !hasDesktopRuntime;
+      });
 
     // Intercept window close when editor has unsaved changes
     function handleBeforeUnload(e: BeforeUnloadEvent) {
@@ -618,9 +627,37 @@
         void handleCloseRequest();
       });
     }
-    // Browser-only menu compatibility shortcuts. Desktop keeps using native menus.
+
+    function handleEmbeddedMenuAction(e: Event) {
+      const action = (e as CustomEvent<string>).detail;
+      e.preventDefault();
+      switch (action) {
+        case 'new':
+          void handleNew();
+          break;
+        case 'open':
+          void handleOpen();
+          break;
+        case 'save':
+          void handleSave();
+          break;
+        case 'saveas':
+          void handleSaveAs();
+          break;
+        case 'export':
+          void handleDownload();
+          break;
+        case 'close-window':
+        case 'quit':
+          void handleCloseRequest();
+          break;
+      }
+    }
+    window.addEventListener('presto:menu-action', handleEmbeddedMenuAction);
+
+    // Embedded menu shortcuts for browser and frameless Windows desktop.
     function handleKeydown(e: KeyboardEvent) {
-      if (hasDesktopRuntime || (!e.metaKey && !e.ctrlKey)) return;
+      if (!usesEmbeddedMenu || (!e.metaKey && !e.ctrlKey)) return;
 
       const key = e.key.toLowerCase();
 
@@ -657,15 +694,30 @@
       if (key === 'n') {
         e.preventDefault();
         void handleNew();
+        return;
+      }
+
+      if (key === 's' && e.shiftKey) {
+        e.preventDefault();
+        void handleSaveAs();
+        return;
+      }
+
+      if (key === 's') {
+        e.preventDefault();
+        void handleSave();
+        return;
+      }
+
+      if (key === 'w' || key === 'q') {
+        e.preventDefault();
+        void handleCloseRequest();
       }
     }
-    if (!hasDesktopRuntime) {
-      document.addEventListener('keydown', handleKeydown);
-    }
+    document.addEventListener('keydown', handleKeydown);
     return () => {
-      if (!hasDesktopRuntime) {
-        document.removeEventListener('keydown', handleKeydown);
-      }
+      document.removeEventListener('keydown', handleKeydown);
+      window.removeEventListener('presto:menu-action', handleEmbeddedMenuAction);
       if (!hasDesktopRuntime) {
         window.removeEventListener('beforeunload', handleBeforeUnload);
       }

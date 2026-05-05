@@ -11,6 +11,7 @@ interface WailsApp {
 	SaveFile: (b64Data: string, defaultFilename: string) => Promise<void>;
 	GetVersion: () => Promise<string>;
 	GetPlatform: () => Promise<string>;
+	ShowAboutDialog: () => Promise<void>;
 	IsVerbose: () => Promise<boolean>;
 	CopyText: (text: string) => Promise<void>;
 	SetWindowTitle: (title: string) => Promise<void>;
