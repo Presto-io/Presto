@@ -253,7 +253,7 @@ func (a *App) installWindowsInstaller(installerPath, tmpDir string) error {
 	}
 
 	wailsRuntime.EventsEmit(a.ctx, "update:status", "正在启动安装程序…")
-	exec.Command("cmd", "/c", "start", "/b", scriptPath).Start()
+	execCommand("cmd", "/c", "start", "/b", scriptPath).Start()
 	wailsRuntime.Quit(a.ctx)
 	return nil
 }
@@ -300,7 +300,7 @@ func (a *App) installWindowsZip(zipPath, tmpDir string) error {
 	}
 
 	wailsRuntime.EventsEmit(a.ctx, "update:status", "更新完成，正在重启…")
-	exec.Command("cmd", "/c", "start", "/b", scriptPath).Start()
+	execCommand("cmd", "/c", "start", "/b", scriptPath).Start()
 	wailsRuntime.Quit(a.ctx)
 	return nil
 }
