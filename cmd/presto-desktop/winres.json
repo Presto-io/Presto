@@ -1,26 +1,28 @@
 {
   "RT_GROUP_ICON": {
-    "0": "../../build/windows/installer/resources/icon.ico"
+    "APP": {
+      "0000": [
+        "../../build/windows/installer/resources/icon.png"
+      ]
+    }
   },
   "RT_VERSION": {
-    "0": {
-      "file": {
-        "flags": 0,
-        "os": 4,
-        "type": 1,
-        "version": "${VERSION}.0"
-      },
-      "product": {
-        "flags": 0,
-        "os": 4,
-        "type": 1,
-        "version": "${VERSION}.0"
-      },
-      "string": {
-        "CompanyName": "Presto-io",
-        "ProductName": "Presto",
-        "ProductVersion": "${VERSION}",
-        "LegalCopyright": "© 2024-2026 Presto-io"
+    "#1": {
+      "0000": {
+        "fixed": {
+          "file_version": "${VERSION}.0",
+          "product_version": "${VERSION}.0"
+        },
+        "info": {
+          "0409": {
+            "CompanyName": "Presto-io",
+            "ProductName": "Presto",
+            "ProductVersion": "${VERSION}",
+            "FileDescription": "Presto - Markdown to PDF",
+            "LegalCopyright": "© 2024-2026 Presto-io",
+            "OriginalFilename": "Presto.exe"
+          }
+        }
       }
     }
   }
