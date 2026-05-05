@@ -23,6 +23,7 @@ Thumbs.db
 
 # Presto data
 .presto/
+.presto-data/
 cache/
 _fonts/
 
