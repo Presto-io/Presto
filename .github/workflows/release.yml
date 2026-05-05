@@ -248,6 +248,10 @@ jobs:
           echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
           echo "FILE_VERSION=${FILE_VERSION}" >> "$GITHUB_ENV"
 
+      - name: Generate Windows resources (icon + version info)
+        working-directory: cmd/presto-desktop
+        run: go run github.com/tc-hib/go-winres@latest make
+
       - name: Build Windows binary
         env:
           CGO_ENABLED: '1'
