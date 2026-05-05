@@ -22,7 +22,9 @@ func NewExecutor(binaryPath string) *Executor {
 	return &Executor{BinaryPath: binaryPath}
 }
 
-// SEC-10: Minimal environment for template execution
+// SEC-10: Minimal PATH for template execution while preserving essential system variables.
+// On Windows, SYSTEMROOT is required for DLL resolution; overriding the entire
+// environment caused template binary execution to fail.
 // SEC-12: Timeout via context
 func (e *Executor) run(args []string, stdin string) ([]byte, error) {
 	var pathEnv string
@@ -36,7 +38,7 @@ func (e *Executor) run(args []string, stdin string) ([]byte, error) {
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, e.BinaryPath, args...)
-	cmd.Env = []string{"PATH=" + pathEnv}
+	cmd.Env = setEnv(os.Environ(), "PATH", pathEnv)
 	if stdin != "" {
 		cmd.Stdin = strings.NewReader(stdin)
 	}
@@ -76,4 +78,16 @@ func (e *Executor) GetExample() (string, error) {
 		return "", fmt.Errorf("get example: %w", err)
 	}
 	return string(out), nil
+}
+
+// setEnv overwrites the first matching key in the env slice, or appends if not found.
+func setEnv(env []string, key, value string) []string {
+	prefix := key + "="
+	for i, e := range env {
+		if strings.HasPrefix(e, prefix) {
+			env[i] = prefix + value
+			return env
+		}
+	}
+	return append(env, prefix+value)
 }
