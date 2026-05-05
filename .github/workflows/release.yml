@@ -186,10 +186,12 @@ jobs:
             cc: gcc
             typst_archive: typst-x86_64-pc-windows-msvc.zip
             typst_sha256: "51353994ac83218c3497052e89b2c432c53b9d4439cdc1b361e2ea4798ebfc13"
+            vc_redist_url: https://aka.ms/vc14/vc_redist.x64.exe
           - goarch: arm64
             cc: aarch64-w64-mingw32-gcc
             typst_archive: typst-aarch64-pc-windows-msvc.zip
             typst_sha256: "1c4aaa0de000ab1787dda354c34f4fa1fe3c2525d3d038e692a3d7daa333d551"
+            vc_redist_url: https://aka.ms/vc14/vc_redist.arm64.exe
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
@@ -294,11 +296,17 @@ jobs:
           unzip -qo typst.zip -d typst-tmp
           find typst-tmp -name 'typst.exe' | head -1 | xargs -I{} cp {} dist/typst.exe
 
+      - name: Download Visual C++ Redistributable
+        shell: powershell
+        run: |
+          Invoke-WebRequest -Uri "${{ matrix.vc_redist_url }}" -OutFile "dist/vc_redist.exe"
+
       - name: Package Inno Setup installer
         shell: powershell
         run: |
           $binaryPath = (Resolve-Path "dist/Presto.exe").Path
           $typstPath = (Resolve-Path "dist/typst.exe").Path
+          $vcRedistPath = (Resolve-Path "dist/vc_redist.exe").Path
           $outputDir = (Resolve-Path "dist").Path
           $outputBaseName = "Presto-${env:VERSION}-windows-${{ matrix.goarch }}-installer"
 
@@ -308,6 +316,7 @@ jobs:
             "/DARG_ARCH=""${{ matrix.goarch }}""" `
             "/DARG_BINARY=""$binaryPath""" `
             "/DARG_TYPST_BINARY=""$typstPath""" `
+            "/DARG_VC_REDIST=""$vcRedistPath""" `
             "/DARG_OUTPUT_DIR=""$outputDir""" `
             "/DARG_OUTPUT_BASENAME=""$outputBaseName""" `
             "build/windows/installer/presto.iss"

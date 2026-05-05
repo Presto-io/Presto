@@ -21,6 +21,10 @@
   #error ARG_TYPST_BINARY is required
 #endif
 
+#ifndef ARG_VC_REDIST
+  #error ARG_VC_REDIST is required
+#endif
+
 #ifndef ARG_OUTPUT_DIR
   #define ARG_OUTPUT_DIR "."
 #endif
@@ -92,6 +96,7 @@ zh.CreateDesktopShortcut=创建桌面快捷方式
 zh.CreateStartMenuShortcut=创建开始菜单快捷方式
 zh.DownloadTemplates=下载官方模板（推荐）
 zh.DownloadingTemplates=正在下载官方模板...
+zh.InstallingVCRuntime=正在安装 Microsoft Visual C++ 运行库...
 zh.LaunchPresto=安装完成后启动 Presto
 
 [Tasks]
@@ -102,6 +107,7 @@ Name: "downloadtemplates"; Description: "{cm:DownloadTemplates}"; GroupDescripti
 [Files]
 Source: "{#ARG_BINARY}"; DestDir: "{app}"; DestName: "{#PRODUCT_EXECUTABLE}"; Flags: ignoreversion
 Source: "{#ARG_TYPST_BINARY}"; DestDir: "{app}"; DestName: "{#TYPST_EXECUTABLE}"; Flags: ignoreversion
+Source: "{#ARG_VC_REDIST}"; DestDir: "{tmp}"; DestName: "vc_redist.exe"; Flags: deleteafterinstall
 
 [Icons]
 Name: "{autodesktop}\Presto"; Filename: "{app}\{#PRODUCT_EXECUTABLE}"; WorkingDir: "{app}"; IconFilename: "{app}\{#PRODUCT_EXECUTABLE}"; Tasks: desktopicon
@@ -109,6 +115,7 @@ Name: "{group}\Presto"; Filename: "{app}\{#PRODUCT_EXECUTABLE}"; WorkingDir: "{a
 Name: "{group}\卸载 Presto"; Filename: "{uninstallexe}"; Tasks: startmenuicon
 
 [Run]
+Filename: "{tmp}\vc_redist.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "{cm:InstallingVCRuntime}"; Flags: runhidden waituntilterminated
 Filename: "{app}\{#PRODUCT_EXECUTABLE}"; Parameters: "--download-templates"; StatusMsg: "{cm:DownloadingTemplates}"; Flags: runhidden waituntilterminated skipifsilent; Tasks: downloadtemplates
 Filename: "{app}\{#PRODUCT_EXECUTABLE}"; Description: "{cm:LaunchPresto}"; Flags: nowait postinstall skipifsilent
 
