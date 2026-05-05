@@ -33,7 +33,8 @@
         },
         "windows-amd64": {
           "url": "https://github.com/Presto-io/presto-official-templates/releases/download/v1.0.0/presto-template-gongwen-windows-amd64.exe",
-          "sha256": "mock-sha256-gongwen-windows-amd64"
+          "sha256": "mock-sha256-gongwen-windows-amd64",
+          "cdn_url": "https://presto.c-1o.top/templates/gongwen/binaries/presto-template-gongwen-windows-amd64.exe"
         }
       },
       "minPrestoVersion": "0.1.0"
@@ -69,7 +70,8 @@
         },
         "windows-amd64": {
           "url": "https://github.com/Presto-io/presto-official-templates/releases/download/v1.0.0/presto-template-jiaoan-shicao-windows-amd64.exe",
-          "sha256": "mock-sha256-jiaoan-shicao-windows-amd64"
+          "sha256": "mock-sha256-jiaoan-shicao-windows-amd64",
+          "cdn_url": "https://presto.c-1o.top/templates/jiaoan-shicao/binaries/presto-template-jiaoan-shicao-windows-amd64.exe"
         }
       },
       "minPrestoVersion": "0.1.0"
