@@ -2,7 +2,7 @@
        _build-macos-arm64 _build-macos-amd64 \
        dist-macos dist-macos-arm64 dist-macos-amd64 dist-macos-universal \
        dist-dmg dist-dmg-arm64 dist-dmg-amd64 dist-dmg-universal \
-       dist-windows dist-linux dist notarize inno windows-installer _inno-language _download-vc-redist
+       dist-windows dist-linux dist notarize inno windows-installer _inno-language _prepare-windows-official-templates _download-vc-redist
 
 # ─── Config ──────────────────────────────────────────────
 APP_NAME     := Presto
@@ -21,6 +21,9 @@ INNO_LANG_DIR := build/windows/installer/languages
 INNO_ZH_FILE := $(INNO_LANG_DIR)/ChineseSimplified.isl
 INNO_ZH_URL := https://raw.githubusercontent.com/jrsoftware/issrc/main/Files/Languages/Unofficial/ChineseSimplified.isl
 INNO_ZH_SHA256 := 7d544b9bb1d142cfa11f2e5d3cc8abe2e55f8e066c5124e3772675aa236e1278
+TEMPLATE_REGISTRY_URL ?= https://presto.c-1o.top/templates/registry.json
+WINDOWS_TEMPLATE_ARCH ?= amd64
+WINDOWS_TEMPLATES_DIR := $(DIST)/windows-templates/$(WINDOWS_TEMPLATE_ARCH)
 
 # Typst download URL patterns
 TYPST_BASE   := https://github.com/typst/typst/releases/download/v$(TYPST_VERSION)
@@ -347,11 +350,12 @@ _inno-language:
 		echo "$(INNO_ZH_SHA256)  $(INNO_ZH_FILE)" | shasum -a 256 -c -; \
 	fi
 
-inno: dist-windows-amd64 _inno-language
+inno: dist-windows-amd64 _inno-language _prepare-windows-official-templates
 	@echo "==> Building Inno Setup installer..."
 	@BINARY_PATH="$$(command -v cygpath >/dev/null 2>&1 && cygpath -w "$(PWD)/$(DIST)/$(APP_NAME)-$(VERSION)-windows.exe" || printf '%s' "$(PWD)/$(DIST)/$(APP_NAME)-$(VERSION)-windows.exe")"; \
 	TYPST_PATH="$$(command -v cygpath >/dev/null 2>&1 && cygpath -w "$(PWD)/$(DIST)/typst.exe" || printf '%s' "$(PWD)/$(DIST)/typst.exe")"; \
 	VC_REDIST_PATH="$$(command -v cygpath >/dev/null 2>&1 && cygpath -w "$(PWD)/$(DIST)/vc_redist.x64.exe" || printf '%s' "$(PWD)/$(DIST)/vc_redist.x64.exe")"; \
+	TEMPLATE_DIR="$$(command -v cygpath >/dev/null 2>&1 && cygpath -w "$(PWD)/$(WINDOWS_TEMPLATES_DIR)" || printf '%s' "$(PWD)/$(WINDOWS_TEMPLATES_DIR)")"; \
 	OUTPUT_DIR="$$(command -v cygpath >/dev/null 2>&1 && cygpath -w "$(PWD)/$(DIST)" || printf '%s' "$(PWD)/$(DIST)")"; \
 	$(INNO_COMPILER) \
 		"/DARG_VERSION=\"$(VERSION)\"" \
@@ -360,7 +364,14 @@ inno: dist-windows-amd64 _inno-language
 		"/DARG_BINARY=\"$$BINARY_PATH\"" \
 		"/DARG_TYPST_BINARY=\"$$TYPST_PATH\"" \
 		"/DARG_VC_REDIST=\"$$VC_REDIST_PATH\"" \
+		"/DARG_TEMPLATE_DIR=\"$$TEMPLATE_DIR\"" \
 		"/DARG_OUTPUT_DIR=\"$$OUTPUT_DIR\"" \
 		"/DARG_OUTPUT_BASENAME=\"$(APP_NAME)-$(VERSION)-windows-amd64-installer\"" \
 		build/windows/installer/presto.iss
 	@echo "==> Installer created: $(DIST)/$(APP_NAME)-$(VERSION)-windows-amd64-installer.exe"
+
+_prepare-windows-official-templates:
+	@node scripts/prepare-windows-official-templates.mjs \
+		--registry-url "$(TEMPLATE_REGISTRY_URL)" \
+		--arch "$(WINDOWS_TEMPLATE_ARCH)" \
+		--out "$(WINDOWS_TEMPLATES_DIR)"
