@@ -10,16 +10,12 @@
   import heroFrame2 from '$lib/showcase/hero-frames/hero-frame-2.svg?raw';
   import heroFrame3 from '$lib/showcase/hero-frames/hero-frame-3.svg?raw';
 
-  const frames = [heroFrame0, heroFrame1, heroFrame2, heroFrame3];
+  const REGISTRY_BASE = 'https://presto.c-1o.top/templates/gongwen';
+  const fallbackFrames = [heroFrame0, heroFrame1, heroFrame2, heroFrame3];
 
-  // Sections: each section appears as a whole block, then triggers a frame switch
-  // Boundaries match SVG generation: head -7, head -11, head -22, full
-  const SECTIONS = [
-    { end: 114, frame: 0, delay: 800 },   // lines 1-7: frontmatter → frame-0
-    { end: 207, frame: 1, delay: 600 },   // lines 8-11: 各部门、各单位 + 正文第一段 → frame-1
-    { end: 312, frame: 2, delay: 600 },   // lines 12-22: 工作目标 + 检查范围 → frame-2
-    { end: gongwenExample.length, frame: 3, delay: 0 },  // 剩余全部 → frame-3
-  ];
+  let frames = $state(fallbackFrames);
+  let sourceExample = $state(gongwenExample);
+  let sections = $state(buildSections(gongwenExample));
 
   let typedText = $state('');
   let currentFrame = $state(-1);  // -1 = no SVG shown
@@ -34,8 +30,95 @@
     });
   }
 
+  function textFromLines(lines: string[]): string {
+    return `${lines.join('\n')}\n`;
+  }
+
+  function buildSections(example: string) {
+    const lines = example.split('\n');
+    let fmStart = -1;
+    let fmEnd = -1;
+
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].trim() === '---') {
+        if (fmStart < 0) {
+          fmStart = i;
+        } else {
+          fmEnd = i;
+          break;
+        }
+      }
+    }
+
+    if (fmEnd < 0) {
+      return [{ end: example.length, frame: 0, delay: 0 }];
+    }
+
+    const head = lines.slice(0, fmEnd + 1);
+    const bodyLines = lines.slice(fmEnd + 1);
+    let titleEnd = 0;
+    let firstParaEnd = 0;
+    let foundContent = false;
+
+    for (let i = 0; i < bodyLines.length; i++) {
+      const stripped = bodyLines[i].trim();
+      if (!stripped) {
+        if (foundContent && firstParaEnd === 0) {
+          firstParaEnd = i;
+        }
+        continue;
+      }
+      foundContent = true;
+      if (titleEnd === 0) {
+        titleEnd = i + 1;
+      }
+    }
+
+    if (firstParaEnd === 0) {
+      firstParaEnd = bodyLines.length;
+    }
+
+    const frame0 = textFromLines(head);
+    const frame1 = textFromLines([...head, ...bodyLines.slice(0, Math.max(titleEnd, 1))]);
+    const frame2 = textFromLines([...head, ...bodyLines.slice(0, Math.min(firstParaEnd + 2, bodyLines.length))]);
+
+    return [
+      { end: frame0.length, frame: 0, delay: 800 },
+      { end: frame1.length, frame: 1, delay: 600 },
+      { end: frame2.length, frame: 2, delay: 600 },
+      { end: example.length, frame: 3, delay: 0 },
+    ];
+  }
+
+  async function loadRemoteAssets() {
+    const cacheToken = `?t=${Date.now()}`;
+
+    try {
+      const exampleRes = await fetch(`${REGISTRY_BASE}/example.md${cacheToken}`, { cache: 'no-store' });
+      if (exampleRes.ok) {
+        sourceExample = await exampleRes.text();
+        sections = buildSections(sourceExample);
+      }
+    } catch (err) {
+      console.warn('[showcase hero] failed to load remote example:', err);
+    }
+
+    const nextFrames = [...fallbackFrames];
+    await Promise.all(nextFrames.map(async (_, i) => {
+      try {
+        const frameRes = await fetch(`${REGISTRY_BASE}/hero-frame-${i}.svg${cacheToken}`, { cache: 'no-store' });
+        if (frameRes.ok) {
+          nextFrames[i] = await frameRes.text();
+        }
+      } catch (err) {
+        console.warn(`[showcase hero] failed to load remote hero frame ${i}:`, err);
+      }
+    }));
+    frames = nextFrames;
+  }
+
   function showNextSection() {
-    if (sectionIndex >= SECTIONS.length) {
+    if (sectionIndex >= sections.length) {
       // All done, wait then restart
       animTimer = setTimeout(() => {
         sectionIndex = 0;
@@ -46,8 +129,8 @@
       return;
     }
 
-    const section = SECTIONS[sectionIndex];
-    typedText = gongwenExample.slice(0, section.end);
+    const section = sections[sectionIndex];
+    typedText = sourceExample.slice(0, section.end);
     currentFrame = section.frame;
     sectionIndex++;
 
@@ -55,6 +138,7 @@
   }
 
   onMount(() => {
+    loadRemoteAssets();
     animTimer = setTimeout(showNextSection, 500);
   });
 
