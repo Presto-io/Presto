@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"runtime"
 	"strings"
 	"time"
@@ -37,7 +36,7 @@ func (e *Executor) run(args []string, stdin string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), executorTimeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, e.BinaryPath, args...)
+	cmd := execCommandContext(ctx, e.BinaryPath, args...)
 	cmd.Env = setEnv(os.Environ(), "PATH", pathEnv)
 	if stdin != "" {
 		cmd.Stdin = strings.NewReader(stdin)
