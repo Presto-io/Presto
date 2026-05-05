@@ -250,7 +250,7 @@ jobs:
 
       - name: Generate Windows resources (icon + version info)
         working-directory: cmd/presto-desktop
-        run: go run github.com/tc-hib/go-winres@latest make
+        run: go run github.com/tc-hib/go-winres@latest make --in winres.json
 
       - name: Build Windows binary
         env:

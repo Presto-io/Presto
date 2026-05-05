@@ -248,7 +248,7 @@ notarize:
 
 dist-windows-amd64: _frontend-embed
 	@mkdir -p $(DIST) $(DIST)/_bin
-	@cd $(DESKTOP_SRC) && go run github.com/tc-hib/go-winres@latest make
+	@cd $(DESKTOP_SRC) && go run github.com/tc-hib/go-winres@latest make --in winres.json
 	@command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1 || \
 		{ echo "Error: mingw-w64 not found. Install with: brew install mingw-w64"; exit 1; }
 	@( GOOS=windows GOARCH=amd64 CGO_ENABLED=1 \
