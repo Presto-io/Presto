@@ -25,11 +25,36 @@ func NewManager(templatesDir string) *Manager {
 }
 
 func templateBinaryName(name string) string {
+	return templateBinaryNameForOS(name, runtime.GOOS)
+}
+
+func templateBinaryNameForOS(name string, goos string) string {
 	bin := "presto-template-" + name
-	if runtime.GOOS == "windows" {
+	if goos == "windows" {
 		bin += ".exe"
 	}
 	return bin
+}
+
+func installArtifactLayout(goos string, manifestName string, downloadedFilename string) (binaryName string, writeManifest bool, err error) {
+	if goos != "windows" {
+		return templateBinaryNameForOS(manifestName, goos), true, nil
+	}
+
+	if downloadedFilename == "" {
+		return "", false, fmt.Errorf("downloaded filename is required on Windows")
+	}
+	if strings.ContainsAny(downloadedFilename, `/\`) {
+		return "", false, fmt.Errorf("downloaded filename must not contain path separators: %q", downloadedFilename)
+	}
+	if !strings.HasSuffix(strings.ToLower(downloadedFilename), ".exe") {
+		return "", false, fmt.Errorf("downloaded Windows template must be an .exe: %q", downloadedFilename)
+	}
+	if err := validateName(downloadedFilename); err != nil {
+		return "", false, fmt.Errorf("invalid downloaded filename: %w", err)
+	}
+
+	return downloadedFilename, false, nil
 }
 
 func (m *Manager) List() ([]InstalledTemplate, error) {
@@ -47,53 +72,119 @@ func (m *Manager) List() ([]InstalledTemplate, error) {
 			continue
 		}
 		tplDir := filepath.Join(m.TemplatesDir, entry.Name())
-		manifestPath := filepath.Join(tplDir, "manifest.json")
-
-		data, err := os.ReadFile(manifestPath)
+		tpl, err := loadTemplateFromDir(tplDir)
 		if err != nil {
-			continue
-		}
-
-		manifest, err := ParseManifest(data)
-		if err != nil {
-			continue
-		}
-
-		binaryPath := filepath.Join(tplDir, templateBinaryName(manifest.Name))
-
-		if _, err := os.Stat(binaryPath); err != nil {
-			continue
-		}
-
-		templates = append(templates, InstalledTemplate{
-			Manifest:   manifest,
-			BinaryPath: binaryPath,
-			Dir:        tplDir,
-		})
-	}
-
-	// Auto-deduplicate: if multiple templates share the same manifest name,
-	// rename duplicates on disk to avoid conflicts.
-	seen := make(map[string]bool)
-	for i := range templates {
-		name := templates[i].Manifest.Name
-		if !seen[name] {
-			seen[name] = true
-			continue
-		}
-		newName := uniqueNameInSet(name, seen)
-		slog.Info("[templates] auto-renaming duplicate",
-			"old_name", name,
-			"new_name", newName)
-		if err := renameDiskTemplate(m.TemplatesDir, &templates[i], newName); err != nil {
-			slog.Warn("[templates] auto-rename failed",
+			slog.Debug("[templates] skipping invalid template",
+				"dir", tplDir,
 				"error", err.Error())
 			continue
 		}
-		seen[newName] = true
+		templates = append(templates, tpl)
 	}
 
-	return templates, nil
+	// Keep names stable. If duplicates exist, keep the first discovered template
+	// and skip later entries instead of renaming files on disk.
+	seen := make(map[string]bool)
+	deduped := templates[:0]
+	for _, tpl := range templates {
+		name := tpl.Manifest.Name
+		if seen[name] {
+			slog.Warn("[templates] duplicate template skipped",
+				"name", name,
+				"dir", tpl.Dir)
+			continue
+		}
+		seen[name] = true
+		deduped = append(deduped, tpl)
+	}
+
+	return deduped, nil
+}
+
+func loadTemplateFromDir(tplDir string) (InstalledTemplate, error) {
+	manifestPath := filepath.Join(tplDir, "manifest.json")
+
+	data, err := os.ReadFile(manifestPath)
+	if err == nil {
+		manifest, err := ParseManifest(data)
+		if err != nil {
+			return InstalledTemplate{}, fmt.Errorf("parse manifest: %w", err)
+		}
+
+		binaryPath := filepath.Join(tplDir, templateBinaryName(manifest.Name))
+		if _, err := os.Stat(binaryPath); err != nil {
+			binaryPath, err = findTemplateBinary(tplDir)
+			if err != nil {
+				return InstalledTemplate{}, err
+			}
+		}
+
+		return InstalledTemplate{
+			Manifest:   manifest,
+			BinaryPath: binaryPath,
+			Dir:        tplDir,
+		}, nil
+	}
+	if !os.IsNotExist(err) {
+		return InstalledTemplate{}, fmt.Errorf("read manifest: %w", err)
+	}
+
+	return loadTemplateFromBinary(tplDir)
+}
+
+func loadTemplateFromBinary(tplDir string) (InstalledTemplate, error) {
+	binaryPath, err := findTemplateBinary(tplDir)
+	if err != nil {
+		return InstalledTemplate{}, err
+	}
+
+	manifestBytes, err := NewExecutor(binaryPath).GetManifest()
+	if err != nil {
+		return InstalledTemplate{}, fmt.Errorf("get manifest from binary: %w", err)
+	}
+
+	manifest, err := ParseManifest(manifestBytes)
+	if err != nil {
+		return InstalledTemplate{}, fmt.Errorf("parse manifest from binary: %w", err)
+	}
+	if err := validateName(manifest.Name); err != nil {
+		return InstalledTemplate{}, fmt.Errorf("invalid template name from binary: %w", err)
+	}
+
+	return InstalledTemplate{
+		Manifest:   manifest,
+		BinaryPath: binaryPath,
+		Dir:        tplDir,
+	}, nil
+}
+
+func findTemplateBinary(tplDir string) (string, error) {
+	entries, err := os.ReadDir(tplDir)
+	if err != nil {
+		return "", fmt.Errorf("read template dir: %w", err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if !strings.HasPrefix(name, "presto-template-") {
+			continue
+		}
+		if runtime.GOOS == "windows" && !strings.HasSuffix(strings.ToLower(name), ".exe") {
+			continue
+		}
+
+		path := filepath.Join(tplDir, name)
+		info, err := os.Stat(path)
+		if err != nil || !info.Mode().IsRegular() {
+			continue
+		}
+		return path, nil
+	}
+
+	return "", fmt.Errorf("template binary not found")
 }
 
 func (m *Manager) Get(name string) (*InstalledTemplate, error) {
@@ -114,10 +205,19 @@ func (m *Manager) Executor(t *InstalledTemplate) *Executor {
 }
 
 func (m *Manager) Exists(name string) bool {
+	name = filepath.Base(name)
+	if err := validateName(name); err != nil {
+		return false
+	}
 	tplDir := filepath.Join(m.TemplatesDir, name)
 	manifestPath := filepath.Join(tplDir, "manifest.json")
 	_, err := os.Stat(manifestPath)
-	return err == nil
+	if err == nil {
+		return true
+	}
+
+	tpl, err := loadTemplateFromDir(tplDir)
+	return err == nil && tpl.Manifest.Name == name
 }
 
 func (m *Manager) UniqueTemplateName(name string) string {
