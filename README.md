@@ -37,10 +37,24 @@ brew install --cask brewforge/more/presto
 ### Docker 部署（Web 端）
 
 ```bash
-docker run -d -p 8080:8080 -v presto-data:/home/presto/.presto ghcr.io/presto-io/presto
+docker compose up -d
 ```
 
-浏览器打开 `http://localhost:8080`。
+浏览器打开 `http://localhost:38080`。
+
+默认的 `docker-compose.yml` 使用一个持久化卷：
+
+- `presto-data` 挂载到 `/home/presto/.presto`，保存模板、缓存等用户数据。
+- 字体文件放在该卷内的 `fonts` 目录，对应容器内路径 `/home/presto/.presto/fonts`。
+
+Presto 服务端默认从 `/home/presto/.presto/fonts` 加载字体；本机直接运行 `presto-server` 时，对应路径是当前用户的 `~/.presto/fonts`。如果需要加载其他目录，可以通过 `FONT_PATHS` 环境变量覆盖，多个目录用冒号分隔，例如：
+
+```yaml
+services:
+    presto:
+        environment:
+            FONT_PATHS: /home/presto/.presto/fonts:/usr/share/fonts
+```
 
 ## 平台支持
 

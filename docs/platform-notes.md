@@ -76,6 +76,21 @@ path := filepath.Join(".presto", "templates", "official")
 path := ".presto/templates/official"  // Windows 会失败
 ```
 
+## 字体加载位置
+
+Presto 在转换和预览 PDF 时会把字体目录传给 Typst。默认字体目录如下：
+
+- **本机服务端**: 当前用户的 `~/.presto/fonts`
+- **Docker Web 端**: 容器内的 `/home/presto/.presto/fonts`
+
+Docker Compose 部署默认把 `presto-data` 持久化卷挂载到 `/home/presto/.presto`，字体文件保存在该卷内的 `fonts` 子目录，即容器内的 `/home/presto/.presto/fonts`。需要安装模板依赖字体时，把 `.ttf`、`.otf`、`.ttc` 或 `.otc` 字体文件放进该目录，然后重启 Presto 服务让字体列表重新扫描。桌面端当前主要依赖 Typst 自身可发现的系统字体目录。
+
+如果需要加载额外目录，可以设置 `FONT_PATHS` 环境变量覆盖默认值，多个目录用冒号分隔：
+
+```bash
+FONT_PATHS="$HOME/.presto/fonts:/usr/share/fonts" presto-server
+```
+
 ## 日志文件位置
 
 默认日志输出到 stderr，使用 `--log-file` 参数指定日志文件：
