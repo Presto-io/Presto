@@ -12,6 +12,7 @@ interface TemplateProgress {
   name: string;
   status: 'pending' | 'downloading' | 'success' | 'error';
   error?: string;
+  manualDownloadUrl?: string;
 }
 
 interface FirstLaunchState {
@@ -32,9 +33,6 @@ let _state = $state<FirstLaunchState>({
   templates: new Map(),
 });
 
-// CDN zip download URLs (per user decision)
-const CDN_ZIP_BASE = 'https://presto.c-1o.top/templates/packages/presto-template-{name}.zip';
-
 export const firstLaunchStore = {
   get state() { return _state; },
 
@@ -45,8 +43,8 @@ export const firstLaunchStore = {
   get templates() { return _state.templates; },
   get errorMessage() { return _state.errorMessage; },
 
-  getManualDownloadUrl(templateName: string): string {
-    return CDN_ZIP_BASE.replace('{name}', templateName);
+  getManualDownloadUrl(templateName: string): string | undefined {
+    return _state.templates.get(templateName)?.manualDownloadUrl;
   },
 
   async init() {
@@ -84,8 +82,8 @@ export const firstLaunchStore = {
 
     rt.EventsOn('first-launch:progress', (data: any) => {
       console.log('[first-launch] received progress event:', data);
-      const { name, status, error } = data;
-      _state.templates.set(name, { name, status, error });
+      const { name, status, error, manualDownloadUrl } = data;
+      _state.templates.set(name, { name, status, error, manualDownloadUrl });
 
       if (status === 'success') {
         _state.downloaded++;

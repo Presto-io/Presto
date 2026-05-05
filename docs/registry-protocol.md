@@ -228,22 +228,22 @@
 
 ## 6. 下载优先级策略
 
-### 6.1 GitHub-first 下载顺序
+### 6.1 CDN-first 下载顺序
 
 ```
-1. 探测 GitHub 可达性 (3s timeout)
+1. registry 提供 cdn_url?
    ↓
-2. [GitHub 可达?]
+2. [cdn_url 可用?]
    ↓        ↓
   是        否
    ↓        ↓
-GitHub下载  CDN下载
+CDN下载   GitHub URL下载
    ↓        ↓
 3. [下载成功?]
    ↓    ↓
   是    否
    ↓    ↓
-验证SHA256  尝试CDN
+验证SHA256  尝试GitHub URL
    ↓
 安装成功
 ```

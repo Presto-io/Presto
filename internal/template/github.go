@@ -23,10 +23,10 @@ import (
 type InstallErrorType string
 
 const (
-	ErrNetwork         InstallErrorType = "network_error"
-	ErrNotFound        InstallErrorType = "not_found"
+	ErrNetwork          InstallErrorType = "network_error"
+	ErrNotFound         InstallErrorType = "not_found"
 	ErrChecksumMismatch InstallErrorType = "checksum_mismatch"
-	ErrServer          InstallErrorType = "server_error"
+	ErrServer           InstallErrorType = "server_error"
 )
 
 // InstallError wraps installation errors with type classification
@@ -100,15 +100,15 @@ var (
 
 // SEC-07: Domain whitelist for download URLs
 var allowedDownloadHosts = map[string]bool{
-	"github.com":                              true,
-	"api.github.com":                          true,
-	"objects.githubusercontent.com":           true,
-	"github-releases.githubusercontent.com":   true,
-	"github.githubassets.com":                 true,
-	"codeload.github.com":                     true,
-	"release-assets.githubusercontent.com":    true,
-	"presto.c-1o.top":                         true,
-	"cdn.presto.c-1o.top":                     true,
+	"github.com":                            true,
+	"api.github.com":                        true,
+	"objects.githubusercontent.com":         true,
+	"github-releases.githubusercontent.com": true,
+	"github.githubassets.com":               true,
+	"codeload.github.com":                   true,
+	"release-assets.githubusercontent.com":  true,
+	"presto.c-1o.top":                       true,
+	"cdn.presto.c-1o.top":                   true,
 }
 
 func isAllowedDownloadHost(host string) bool {
@@ -187,7 +187,7 @@ func DiscoverTemplates() ([]GitHubRepo, error) {
 // instead of from the same GitHub release (untrusted same-source).
 type InstallOpts struct {
 	// DownloadURL is the direct binary download URL from registry.
-	// If set, skips GitHub release API lookup.
+	// If set with CdnURL, it is used as a fallback after the CDN.
 	DownloadURL string
 	// CdnURL is the CDN mirror URL for the binary (bypasses GitHub).
 	// If set, tried first before DownloadURL.
@@ -200,6 +200,26 @@ type InstallOpts struct {
 	// OnProgress is an optional callback for download progress updates.
 	// If set, called periodically with bytes downloaded and total bytes.
 	OnProgress ProgressCallback
+}
+
+type downloadCandidate struct {
+	source string
+	url    string
+}
+
+func downloadCandidates(opts *InstallOpts) []downloadCandidate {
+	if opts == nil {
+		return nil
+	}
+
+	var candidates []downloadCandidate
+	if opts.CdnURL != "" {
+		candidates = append(candidates, downloadCandidate{source: "cdn", url: opts.CdnURL})
+	}
+	if opts.DownloadURL != "" {
+		candidates = append(candidates, downloadCandidate{source: "github", url: opts.DownloadURL})
+	}
+	return candidates
 }
 
 func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
@@ -232,69 +252,46 @@ func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
 	var downloadURL string
 	var expectedHash string
 
-	if opts != nil && opts.DownloadURL != "" {
+	if opts != nil && (opts.DownloadURL != "" || opts.CdnURL != "") {
 		// SEC-01: Registry-based install — URL and SHA256 from trusted registry
 		expectedHash = strings.ToLower(opts.ExpectedSHA256)
 
-		// GitHub-first logic with 3s probe
-		gitHubReachable := isGitHubReachable()
-
-		if gitHubReachable {
-			// Try GitHub first
+		candidates := downloadCandidates(opts)
+		var lastErr error
+		for i, candidate := range candidates {
 			slog.Info("[templates] starting download",
 				"owner", owner,
 				"repo", repo,
-				"source", "github",
-				"url", SanitizeURL(opts.DownloadURL))
+				"source", candidate.source,
+				"url", SanitizeURL(candidate.url))
 
-			data, err := downloadWithResume(opts.DownloadURL, 3, opts.OnProgress)
-			if err != nil {
-				// GitHub failed, try CDN fallback
-				if opts.CdnURL != "" {
-					slog.Warn("[templates] GitHub failed, falling back to CDN",
-						"error", err.Error(),
-						"cdn_url", SanitizeURL(opts.CdnURL))
-					downloadURL = opts.CdnURL
-					data, err = downloadWithResume(downloadURL, 3, opts.OnProgress)
-					if err != nil {
-						return err
-					}
-				} else {
-					return err
-				}
+			data, err := downloadWithResume(candidate.url, 3, opts.OnProgress)
+			if err == nil {
+				return m.completeInstall(owner, repo, data, expectedHash, opts, startTime)
 			}
 
-			// Continue with installation using downloaded data
-			return m.completeInstall(owner, repo, data, expectedHash, opts, startTime)
-		} else {
-			// GitHub probe failed, go directly to CDN
-			if opts.CdnURL != "" {
-				slog.Info("[templates] GitHub unreachable, using CDN",
-					"owner", owner,
-					"repo", repo,
-					"cdn_url", SanitizeURL(opts.CdnURL))
-				downloadURL = opts.CdnURL
-			} else {
-				slog.Info("[templates] GitHub unreachable, using GitHub URL",
-					"owner", owner,
-					"repo", repo,
-					"url", SanitizeURL(opts.DownloadURL))
-				downloadURL = opts.DownloadURL
+			lastErr = err
+			if i+1 < len(candidates) {
+				slog.Warn("[templates] download failed, falling back",
+					"source", candidate.source,
+					"error", err.Error(),
+					"next_source", candidates[i+1].source)
 			}
+		}
 
-			data, err := downloadWithResume(downloadURL, 3, opts.OnProgress)
-			if err != nil {
-				return err
-			}
-
-			// Continue with installation using downloaded data
-			return m.completeInstall(owner, repo, data, expectedHash, opts, startTime)
+		if lastErr != nil {
+			return lastErr
+		}
+		return &InstallError{
+			Type:    ErrNotFound,
+			Message: "no download URL available",
+			Err:     fmt.Errorf("no download URL available"),
 		}
 	} else {
 		// Discovery install path (no opts)
 		slog.Info("[templates] discovery install",
-		"owner", owner,
-		"repo", repo)
+			"owner", owner,
+			"repo", repo)
 
 		apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", owner, repo)
 		resp, err := httpClient.Get(apiURL)

@@ -43,39 +43,6 @@ RUN apk add --no-cache curl && \
     tar -xJ --strip-components=1 -C /usr/local/bin/ < /tmp/typst.tar.xz && \
     rm /tmp/typst.tar.xz
 
-# Stage 3b: Download official template binaries for target arch
-FROM --platform=$BUILDPLATFORM alpine:3.21 AS template-downloader
-ARG TARGETARCH
-ARG TPL_VERSION=v1.0.0
-# SEC-29: SHA256 checksums for template binaries (update when TPL_VERSION changes)
-ARG TPL_GONGWEN_SHA256_AMD64=""
-ARG TPL_GONGWEN_SHA256_ARM64=""
-ARG TPL_JIAOAN_SHICAO_SHA256_AMD64=""
-ARG TPL_JIAOAN_SHICAO_SHA256_ARM64=""
-RUN apk add --no-cache curl && \
-    TEMPLATES="gongwen jiaoan-shicao" && \
-    SUFFIX="linux-${TARGETARCH}" && \
-    for tpl in $TEMPLATES; do \
-      mkdir -p "/templates/$tpl" && \
-      echo "Downloading presto-template-${tpl}-${SUFFIX}..." && \
-      curl -sSL -o "/templates/$tpl/presto-template-$tpl" \
-        "https://github.com/Presto-io/presto-official-templates/releases/download/${TPL_VERSION}/presto-template-${tpl}-${SUFFIX}" && \
-      # SEC-29: Verify SHA256 before executing binary \
-      TPL_VAR=$(echo "$tpl" | tr '-' '_' | tr '[:lower:]' '[:upper:]') && \
-      if [ "$TARGETARCH" = "arm64" ]; then \
-        eval "EXPECTED_SHA=\${TPL_${TPL_VAR}_SHA256_ARM64}"; \
-      else \
-        eval "EXPECTED_SHA=\${TPL_${TPL_VAR}_SHA256_AMD64}"; \
-      fi && \
-      if [ -n "$EXPECTED_SHA" ]; then \
-        echo "${EXPECTED_SHA}  /templates/$tpl/presto-template-$tpl" | sha256sum -c - || exit 1; \
-      else \
-        echo "WARNING: No SHA256 checksum provided for template $tpl ($TARGETARCH)"; \
-      fi && \
-      chmod +x "/templates/$tpl/presto-template-$tpl" && \
-      "/templates/$tpl/presto-template-$tpl" --manifest > "/templates/$tpl/manifest.json"; \
-    done
-
 # Stage 4: Final image (target platform)
 FROM alpine:3.21
 
@@ -85,10 +52,7 @@ RUN addgroup -S presto && adduser -S -G presto presto
 COPY --from=typst-downloader /usr/local/bin/typst /usr/local/bin/typst
 COPY --from=go-builder /bin/presto-server /usr/local/bin/
 
-# Bundle templates next to server binary (server syncs them to user dir on startup)
-COPY --from=template-downloader /templates/ /usr/local/bin/templates/
-
-# Create user data dir (will be overlaid by volume mount, server populates on startup)
+# Create user data dir (overlaid by volume; server downloads templates at runtime)
 RUN mkdir -p /home/presto/.presto/fonts && chown -R presto:presto /home/presto/.presto
 
 COPY --from=frontend-builder /app/build /srv/frontend

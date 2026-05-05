@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"runtime"
 	"strings"
 	"sync"
 
@@ -38,10 +37,19 @@ func (a *App) downloadDefaultTemplates() {
 		return
 	}
 
-	var officialTemplates []string
+	type officialTemplate struct {
+		name              string
+		manualDownloadURL string
+	}
+
+	var officialTemplates []officialTemplate
 	for _, entry := range reg.Templates {
 		if entry.Trust == "official" {
-			officialTemplates = append(officialTemplates, entry.Name)
+			manualDownloadURL, _ := entry.DownloadURLForPlatform(template.Platform())
+			officialTemplates = append(officialTemplates, officialTemplate{
+				name:              entry.Name,
+				manualDownloadURL: manualDownloadURL,
+			})
 		}
 	}
 
@@ -52,7 +60,11 @@ func (a *App) downloadDefaultTemplates() {
 
 	logger.Info("[first-launch] downloading official templates", "count", len(officialTemplates))
 
-	a.emitFirstLaunchStart(officialTemplates)
+	templateNames := make([]string, 0, len(officialTemplates))
+	for _, tpl := range officialTemplates {
+		templateNames = append(templateNames, tpl.name)
+	}
+	a.emitFirstLaunchStart(templateNames)
 
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, 3)
@@ -60,9 +72,9 @@ func (a *App) downloadDefaultTemplates() {
 	var failureCount int
 	var mu sync.Mutex
 
-	for _, name := range officialTemplates {
+	for _, tpl := range officialTemplates {
 		wg.Add(1)
-		go func(templateName string) {
+		go func(templateName string, manualDownloadURL string) {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
@@ -74,14 +86,14 @@ func (a *App) downloadDefaultTemplates() {
 			if err != nil {
 				failureCount++
 				logger.Error("[first-launch] failed to download template", "name", templateName, "error", err)
-				a.emitFirstLaunchProgress(templateName, "error", err.Error())
+				a.emitFirstLaunchProgress(templateName, "error", err.Error(), manualDownloadURL)
 			} else {
 				successCount++
 				logger.Info("[first-launch] successfully downloaded template", "name", templateName)
-				a.emitFirstLaunchProgress(templateName, "success", "")
+				a.emitFirstLaunchProgress(templateName, "success", "", "")
 			}
 			mu.Unlock()
-		}(name)
+		}(tpl.name, tpl.manualDownloadURL)
 	}
 
 	wg.Wait()
@@ -97,12 +109,16 @@ func (a *App) emitFirstLaunchStart(templateNames []string) {
 	})
 }
 
-func (a *App) emitFirstLaunchProgress(name string, status string, errorMsg string) {
-	wailsRuntime.EventsEmit(a.ctx, "first-launch:progress", map[string]interface{}{
+func (a *App) emitFirstLaunchProgress(name string, status string, errorMsg string, manualDownloadURL string) {
+	payload := map[string]interface{}{
 		"name":   name,
 		"status": status,
 		"error":  errorMsg,
-	})
+	}
+	if manualDownloadURL != "" {
+		payload["manualDownloadUrl"] = manualDownloadURL
+	}
+	wailsRuntime.EventsEmit(a.ctx, "first-launch:progress", payload)
 }
 
 func (a *App) emitFirstLaunchComplete(success int, failed int) {
@@ -228,25 +244,20 @@ func (a *App) InstallTemplate(templateName string) error {
 	}
 	owner, repo := parts[0], parts[1]
 
-	platform := runtime.GOOS + "-" + runtime.GOARCH
+	platform := template.Platform()
 	var opts *template.InstallOpts
-	if info, ok := entry.Platforms[platform]; ok && info.URL != "" {
-		opts = &template.InstallOpts{
-			DownloadURL:    info.URL,
-			CdnURL:         info.CdnURL,
-			ExpectedSHA256: info.SHA256,
-			Trust:          entry.Trust,
-			OnProgress: func(downloaded, total int64) {
-				if total > 0 {
-					percent := float64(downloaded) / float64(total) * 100
-					wailsRuntime.EventsEmit(a.ctx, "template-download:progress", map[string]interface{}{
-						"template":   templateName,
-						"downloaded": downloaded,
-						"total":      total,
-						"percent":    percent,
-					})
-				}
-			},
+	if platformOpts, ok := entry.InstallOptsForPlatform(platform); ok {
+		opts = platformOpts
+		opts.OnProgress = func(downloaded, total int64) {
+			if total > 0 {
+				percent := float64(downloaded) / float64(total) * 100
+				wailsRuntime.EventsEmit(a.ctx, "template-download:progress", map[string]interface{}{
+					"template":   templateName,
+					"downloaded": downloaded,
+					"total":      total,
+					"percent":    percent,
+				})
+			}
 		}
 		logger.Info("[templates] Wails install", "name", templateName, "trust", entry.Trust, "platform", platform)
 	}

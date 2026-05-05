@@ -13,13 +13,16 @@
       {#if launchState.failed > 0}
         {#each [...launchState.templates.values()] as tpl (tpl.name)}
           {#if tpl.status === 'error'}
-            <a
-              href={getManualDownloadUrl(tpl.name)}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              下载 {tpl.name}
-            </a>
+            {@const manualDownloadUrl = getManualDownloadUrl(tpl.name)}
+            {#if manualDownloadUrl}
+              <a
+                href={manualDownloadUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                下载 {tpl.name}
+              </a>
+            {/if}
           {/if}
         {/each}
       {/if}

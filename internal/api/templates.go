@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"regexp"
-	"runtime"
 	"strings"
 
 	"github.com/mrered/presto/internal/template"
@@ -131,14 +130,9 @@ func (s *Server) handleInstallTemplate(w http.ResponseWriter, r *http.Request) {
 	if s.registry != nil {
 		ownerRepo := req.Owner + "/" + req.Repo
 		if entry := s.registry.LookupByRepo(ownerRepo); entry != nil {
-			platform := runtime.GOOS + "-" + runtime.GOARCH
-			if info, ok := entry.Platforms[platform]; ok && info.URL != "" {
-				opts = &template.InstallOpts{
-					DownloadURL:    info.URL,
-					CdnURL:         info.CdnURL,
-					ExpectedSHA256: info.SHA256,
-					Trust:          entry.Trust,
-				}
+			platform := template.Platform()
+			if platformOpts, ok := entry.InstallOptsForPlatform(platform); ok {
+				opts = platformOpts
 				log.Printf("[templates] registry lookup for %s: trust=%s, platform=%s", ownerRepo, entry.Trust, platform)
 			}
 		}
