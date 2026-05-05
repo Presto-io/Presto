@@ -210,6 +210,11 @@
   // Template switching confirmation
   let pendingTemplate = $state('');
   let confirmDialog: HTMLDialogElement;
+  type CloseDecision = 'Save' | 'Discard' | 'Cancel';
+  let closeConfirmDialog: HTMLDialogElement;
+  let closeConfirmFilename = $state('');
+  let closeDecisionPromise: Promise<CloseDecision> | null = null;
+  let resolveCloseDecision: ((decision: CloseDecision) => void) | null = null;
 
   async function loadExample(templateId: string) {
     try {
@@ -259,6 +264,35 @@
     pendingTemplate = '';
   }
 
+  function currentDocumentFilename(): string {
+    return editor.currentFilePath?.split(/[/\\]/).pop() || '';
+  }
+
+  function askUnsavedCloseDecision(): Promise<CloseDecision> {
+    if (!hasRealChanges()) return Promise.resolve('Discard');
+    if (closeDecisionPromise) return closeDecisionPromise;
+
+    closeConfirmFilename = currentDocumentFilename();
+    closeDecisionPromise = new Promise((resolve) => {
+      resolveCloseDecision = resolve;
+      closeConfirmDialog?.showModal();
+    });
+    return closeDecisionPromise;
+  }
+
+  function completeCloseDecision(decision: CloseDecision) {
+    closeConfirmDialog?.close();
+    const resolve = resolveCloseDecision;
+    resolveCloseDecision = null;
+    closeDecisionPromise = null;
+    resolve?.(decision);
+  }
+
+  function handleCloseDialogCancel(event: Event) {
+    event.preventDefault();
+    completeCloseDecision('Cancel');
+  }
+
   /** Auto-detect template from frontmatter (called once on file open/paste). */
   function tryAutoDetectTemplate(md: string) {
     if (autoDetectedOnce) return;
@@ -303,16 +337,12 @@
 
   async function handleNew() {
     if (hasRealChanges()) {
-      if (window.go?.main?.App?.ConfirmSaveDialog) {
-        const filename = editor.currentFilePath?.split(/[/\\]/).pop() || '';
-        const result = await window.go.main.App.ConfirmSaveDialog(filename);
-        if (result === 'Save') {
-          await handleSave();
-        } else if (result === 'Cancel') {
-          return;
-        }
-      } else {
-        if (!confirm('当前文档未保存，是否继续？')) return;
+      const decision = await askUnsavedCloseDecision();
+      if (decision === 'Save') {
+        const saved = await handleSave();
+        if (!saved) return;
+      } else if (decision === 'Cancel') {
+        return;
       }
     }
     editor.markdown = '';
@@ -330,9 +360,9 @@
     window.go?.main?.App?.UpdateMenuState?.(false);
   }
 
-  async function handleSave() {
-    if (!editor.markdown.trim()) return;
-    if (!window.go?.main?.App?.SaveMarkdown) return;
+  async function handleSave(): Promise<boolean> {
+    if (!editor.markdown.trim()) return false;
+    if (!window.go?.main?.App?.SaveMarkdown) return false;
     try {
       if (editor.currentFilePath) {
         await window.go.main.App.SaveMarkdown(editor.markdown, editor.currentFilePath);
@@ -341,18 +371,20 @@
         editor.savedContent = editor.markdown;
         showSaveFeedback();
         clearEditorError('editor-action');
+        return true;
       } else {
-        await handleSaveAs();
+        return await handleSaveAs();
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       showEditorError(msg, { groupKey: 'editor-action', durationMs: 4500 });
+      return false;
     }
   }
 
-  async function handleSaveAs() {
-    if (!editor.markdown.trim()) return;
-    if (!window.go?.main?.App?.SaveMarkdownAs) return;
+  async function handleSaveAs(): Promise<boolean> {
+    if (!editor.markdown.trim()) return false;
+    if (!window.go?.main?.App?.SaveMarkdownAs) return false;
     try {
       const defaultName = (editor.documentTitle || 'untitled') + '.md';
       const savedPath = await window.go.main.App.SaveMarkdownAs(editor.markdown, defaultName);
@@ -363,11 +395,38 @@
         editor.savedContent = editor.markdown;
         showSaveFeedback();
         clearEditorError('editor-action');
+        return true;
       }
+      return false;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       showEditorError(msg, { groupKey: 'editor-action', durationMs: 4500 });
+      return false;
     }
+  }
+
+  async function closeWindowWithoutPrompt() {
+    editor.isDirty = false;
+    editor.savedContent = editor.markdown;
+    await window.go?.main?.App?.SetDirtyState?.(false, '');
+
+    if (window.go?.main?.App?.QuitApp) {
+      await window.go.main.App.QuitApp();
+    } else {
+      window.runtime?.Quit?.();
+    }
+  }
+
+  async function handleCloseRequest() {
+    const decision = await askUnsavedCloseDecision();
+    if (decision === 'Cancel') return;
+
+    if (decision === 'Save') {
+      const saved = await handleSave();
+      if (!saved) return;
+    }
+
+    await closeWindowWithoutPrompt();
   }
 
   /** Wrapper: track dirty state + update menu before converting. */
@@ -505,6 +564,9 @@
   }
 
   onMount(() => {
+    const runtime = window.runtime;
+    const hasDesktopRuntime = Boolean(runtime?.EventsOn);
+
     // Intercept window close when editor has unsaved changes
     function handleBeforeUnload(e: BeforeUnloadEvent) {
       if (hasRealChanges()) {
@@ -512,7 +574,9 @@
         e.returnValue = '';
       }
     }
-    window.addEventListener('beforeunload', handleBeforeUnload);
+    if (!hasDesktopRuntime) {
+      window.addEventListener('beforeunload', handleBeforeUnload);
+    }
 
     if (window.go?.main?.App?.IsVerbose) {
       void window.go.main.App.IsVerbose()
@@ -529,9 +593,6 @@
     }
 
     // Listen for Wails menu events
-    const runtime = window.runtime;
-    const hasDesktopRuntime = Boolean(runtime?.EventsOn);
-
     if (runtime?.EventsOn) {
       runtime.EventsOn('menu:open', handleOpen);
       runtime.EventsOn('menu:export', handleDownload);
@@ -542,18 +603,19 @@
       runtime.EventsOn('menu:store', () => goto('/store-templates'));
       runtime.EventsOn('menu:skill-store', () => goto('/store-skills'));
       runtime.EventsOn('menu:close-window', () => {
-        window.runtime?.Quit?.();
+        void handleCloseRequest();
       });
 
       runtime.EventsOn('menu:quit', async () => {
-        window.go?.main?.App?.QuitApp();
+        await handleCloseRequest();
       });
 
       runtime.EventsOn('app:save-and-close', async () => {
-        await handleSave();
-        editor.savedContent = editor.markdown;
-        window.go?.main?.App?.SetDirtyState?.(false, '');
-        window.go!.main.App.QuitApp();
+        const saved = await handleSave();
+        if (saved) await closeWindowWithoutPrompt();
+      });
+      runtime.EventsOn('app:request-close', () => {
+        void handleCloseRequest();
       });
     }
     // Browser-only menu compatibility shortcuts. Desktop keeps using native menus.
@@ -604,7 +666,9 @@
       if (!hasDesktopRuntime) {
         document.removeEventListener('keydown', handleKeydown);
       }
-      window.removeEventListener('beforeunload', handleBeforeUnload);
+      if (!hasDesktopRuntime) {
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+      }
       if (runtime?.EventsOff) {
         runtime.EventsOff('menu:open');
         runtime.EventsOff('menu:export');
@@ -617,6 +681,7 @@
         runtime.EventsOff('menu:close-window');
         runtime.EventsOff('menu:quit');
         runtime.EventsOff('app:save-and-close');
+        runtime.EventsOff('app:request-close');
       }
     };
   });
@@ -716,6 +781,22 @@
     <button class="dialog-btn primary" onclick={handleUseExample}>使用示例内容</button>
     <button class="dialog-btn" onclick={handleKeepContent}>保留当前内容</button>
     <button class="dialog-btn" onclick={handleCancelSwitch}>取消</button>
+  </div>
+</dialog>
+
+<dialog bind:this={closeConfirmDialog} class="confirm-dialog" oncancel={handleCloseDialogCancel}>
+  <h3>保存更改？</h3>
+  <p>
+    {#if closeConfirmFilename}
+      是否保存对 “{closeConfirmFilename}” 的更改？
+    {:else}
+      是否保存对文档的更改？
+    {/if}
+  </p>
+  <div class="dialog-actions">
+    <button type="button" class="dialog-btn primary" onclick={() => completeCloseDecision('Save')}>保存</button>
+    <button type="button" class="dialog-btn" onclick={() => completeCloseDecision('Discard')}>不保存</button>
+    <button type="button" class="dialog-btn" onclick={() => completeCloseDecision('Cancel')}>取消</button>
   </div>
 </dialog>
 

@@ -181,19 +181,8 @@ func main() {
 			if !app.hasDirtyContent {
 				return false
 			}
-			result, err := app.ConfirmSaveDialog(app.currentFilename)
-			if err != nil {
-				return false
-			}
-			switch result {
-			case "Save":
-				wailsRuntime.EventsEmit(ctx, "app:save-and-close")
-				return true
-			case "Don't Save":
-				return false
-			default:
-				return true
-			}
+			wailsRuntime.EventsEmit(ctx, "app:request-close")
+			return true
 		},
 		Bind: []interface{}{app},
 		SingleInstanceLock: &options.SingleInstanceLock{
