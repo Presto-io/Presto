@@ -99,8 +99,9 @@ Function .onInit
   !endif
 
   ReadRegStr $0 HKLM "${UNINST_KEY}" "UninstallString"
+  ReadRegStr $1 HKLM "${UNINST_KEY}" "InstallLocation"
   ${If} $0 != ""
-    ExecWait '"$0" /S'
+    ExecWait '"$0" /S _?=$1'
   ${EndIf}
 FunctionEnd
 
