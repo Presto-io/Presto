@@ -27,5 +27,5 @@ shortcuts can select an exact bitmap instead of scaling a nearby size:
 `cmd/presto-desktop/winres.json` must define the application icon as resource
 `#3`. Wails v2 loads the Windows window icon from that resource ID at runtime.
 go-winres reads the matching PNG size set from `winres/` to build the exe
-resource; NSIS uses `icon.ico` for the installer, desktop shortcut, and start
-menu shortcut.
+resource; Inno Setup uses `icon.ico` for the installer, desktop shortcut, and
+start menu shortcut.

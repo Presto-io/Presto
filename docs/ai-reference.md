@@ -77,6 +77,7 @@ make dist-macos-arm64      # Apple Silicon .app
 make dist-macos-universal  # Universal .app
 make dist-dmg-arm64        # Apple Silicon DMG
 make dist-windows-amd64    # Windows EXE
+make inno                  # Windows 安装器（Inno Setup）
 make dist-linux-amd64      # Linux 二进制
 make dist                  # 全平台打包
 ```
