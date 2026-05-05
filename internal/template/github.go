@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -203,8 +204,9 @@ type InstallOpts struct {
 }
 
 type downloadCandidate struct {
-	source string
-	url    string
+	source   string
+	url      string
+	filename string
 }
 
 func downloadCandidates(opts *InstallOpts) []downloadCandidate {
@@ -214,12 +216,24 @@ func downloadCandidates(opts *InstallOpts) []downloadCandidate {
 
 	var candidates []downloadCandidate
 	if opts.CdnURL != "" {
-		candidates = append(candidates, downloadCandidate{source: "cdn", url: opts.CdnURL})
+		candidates = append(candidates, downloadCandidate{source: "cdn", url: opts.CdnURL, filename: downloadFilename(opts.CdnURL)})
 	}
 	if opts.DownloadURL != "" {
-		candidates = append(candidates, downloadCandidate{source: "github", url: opts.DownloadURL})
+		candidates = append(candidates, downloadCandidate{source: "github", url: opts.DownloadURL, filename: downloadFilename(opts.DownloadURL)})
 	}
 	return candidates
+}
+
+func downloadFilename(downloadURL string) string {
+	parsed, err := url.Parse(downloadURL)
+	if err != nil {
+		return ""
+	}
+	name := path.Base(parsed.Path)
+	if name == "." || name == "/" {
+		return ""
+	}
+	return name
 }
 
 func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
@@ -267,7 +281,7 @@ func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
 
 			data, err := downloadWithResume(candidate.url, 3, opts.OnProgress)
 			if err == nil {
-				return m.completeInstall(owner, repo, data, expectedHash, opts, startTime)
+				return m.completeInstall(owner, repo, data, expectedHash, opts, startTime, candidate.filename)
 			}
 
 			lastErr = err
@@ -381,12 +395,12 @@ func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
 		}
 
 		// Continue with installation using downloaded data
-		return m.completeInstall(owner, repo, data, expectedHash, nil, startTime)
+		return m.completeInstall(owner, repo, data, expectedHash, nil, startTime, assetName)
 	}
 }
 
-// completeInstall finishes the installation process after download
-func (m *Manager) completeInstall(owner, repo string, data []byte, expectedHash string, opts *InstallOpts, startTime time.Time) error {
+// completeInstall finishes the installation process after download.
+func (m *Manager) completeInstall(owner, repo string, data []byte, expectedHash string, opts *InstallOpts, startTime time.Time, downloadedFilename string) error {
 	// SEC-30: 下载→验证→执行 三步流程
 	// Step 1: 下载已完成（data 已获取）
 	// Step 2: 验证 SHA256
@@ -542,7 +556,14 @@ func (m *Manager) completeInstall(owner, repo string, data []byte, expectedHash 
 		}
 	}
 
-	binaryName := templateBinaryName(manifest.Name)
+	binaryName, writeManifest, err := installArtifactLayout(runtime.GOOS, manifest.Name, downloadedFilename)
+	if err != nil {
+		return &InstallError{
+			Type:    ErrServer,
+			Message: fmt.Sprintf("resolve install artifact layout: %v", err),
+			Err:     err,
+		}
+	}
 
 	binPath := filepath.Join(tplDir, binaryName)
 	if err := os.WriteFile(binPath, data, 0700); err != nil {
@@ -566,27 +587,49 @@ func (m *Manager) completeInstall(owner, repo string, data []byte, expectedHash 
 		}
 	}
 
-	// Write manifest.json
-	// SEC-45: Restrictive file permissions
-	manifestPath := filepath.Join(tplDir, "manifest.json")
-	if err := os.WriteFile(manifestPath, manifestBytes, 0600); err != nil {
-		slog.Error("[templates] failed to write manifest",
-			"path", manifestPath,
-			"error", err.Error())
+	if writeManifest {
+		// Write manifest.json
+		// SEC-45: Restrictive file permissions
+		manifestPath := filepath.Join(tplDir, "manifest.json")
+		if err := os.WriteFile(manifestPath, manifestBytes, 0600); err != nil {
+			slog.Error("[templates] failed to write manifest",
+				"path", manifestPath,
+				"error", err.Error())
 
-		// DOWN-02: Windows-specific permission error detection
-		if runtime.GOOS == "windows" && isWindowsPermissionError(err) {
+			// DOWN-02: Windows-specific permission error detection
+			if runtime.GOOS == "windows" && isWindowsPermissionError(err) {
+				return &InstallError{
+					Type:    ErrServer,
+					Message: windowsPermissionErrorMsg(manifestPath),
+					Err:     err,
+				}
+			}
+
 			return &InstallError{
 				Type:    ErrServer,
-				Message: windowsPermissionErrorMsg(manifestPath),
+				Message: fmt.Sprintf("write manifest: %v", err),
+				Err:     err,
+			}
+		}
+	} else {
+		legacyManifestPath := filepath.Join(tplDir, "manifest.json")
+		if err := os.Remove(legacyManifestPath); err != nil && !os.IsNotExist(err) {
+			return &InstallError{
+				Type:    ErrServer,
+				Message: fmt.Sprintf("remove legacy manifest: %v", err),
 				Err:     err,
 			}
 		}
 
-		return &InstallError{
-			Type:    ErrServer,
-			Message: fmt.Sprintf("write manifest: %v", err),
-			Err:     err,
+		legacyBinaryPath := filepath.Join(tplDir, templateBinaryName(manifest.Name))
+		if legacyBinaryPath != binPath {
+			if err := os.Remove(legacyBinaryPath); err != nil && !os.IsNotExist(err) {
+				return &InstallError{
+					Type:    ErrServer,
+					Message: fmt.Sprintf("remove legacy binary: %v", err),
+					Err:     err,
+				}
+			}
 		}
 	}
 

@@ -90,7 +90,13 @@ func TestDownloadCandidatesPreferCDN(t *testing.T) {
 	if candidates[0].source != "cdn" || candidates[0].url != "https://presto.c-1o.top/templates/example" {
 		t.Fatalf("first candidate = %#v, want CDN first", candidates[0])
 	}
+	if candidates[0].filename != "example" {
+		t.Fatalf("first candidate filename = %q", candidates[0].filename)
+	}
 	if candidates[1].source != "github" || candidates[1].url != "https://github.com/example/template" {
 		t.Fatalf("second candidate = %#v, want GitHub fallback", candidates[1])
+	}
+	if candidates[1].filename != "template" {
+		t.Fatalf("second candidate filename = %q", candidates[1].filename)
 	}
 }
