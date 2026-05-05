@@ -2,13 +2,30 @@
 
 ## icon.ico
 
-Copied from `frontend/static/favicon.ico`. Contains 16x16 and 32x32 sizes.
+Generated from `frontend/static/icon-512x512.png` with transparent rounded
+corners for Windows app surfaces.
 
-TODO: Before release, regenerate icon.ico with additional sizes (48x48, 64x64, 128x128, 256x256)
-from the source PNG files in `frontend/static/` (icon-192x192.png, icon-512x512.png) for better
-display quality in Windows Explorer, taskbar, and desktop shortcuts.
+The ICO contains common Windows sizes so Explorer, the taskbar, title bar, and
+shortcuts can select an exact bitmap instead of scaling a nearby size:
 
-Use ImageMagick or similar tool:
-```bash
-magick frontend/static/icon-512x512.png -define icon:auto-resize=256,128,64,48,32,16 build/windows/installer/resources/icon.ico
-```
+- 16x16
+- 20x20
+- 24x24
+- 30x30
+- 32x32
+- 36x36
+- 40x40
+- 48x48
+- 60x60
+- 64x64
+- 72x72
+- 80x80
+- 96x96
+- 128x128
+- 256x256
+
+`cmd/presto-desktop/winres.json` must define the application icon as resource
+`#3`. Wails v2 loads the Windows window icon from that resource ID at runtime.
+go-winres reads the matching PNG size set from `winres/` to build the exe
+resource; NSIS uses `icon.ico` for the installer, desktop shortcut, and start
+menu shortcut.
