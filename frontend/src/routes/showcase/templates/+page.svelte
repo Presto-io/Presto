@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { ArrowLeft, Search, Package, Trash2, Upload, Pencil } from 'lucide-svelte';
+  import { ArrowLeft, Search, Package } from 'lucide-svelte';
   import { mockTemplates } from '$lib/showcase/presets';
 
-  // Build template data with additional fields to mimic real template management
+  // Build template data with additional fields to mimic template store browsing.
   interface ShowcaseTemplate {
     name: string;
     displayName: string;
@@ -74,7 +74,7 @@
       <div class="nav-divider"></div>
       <button class="nav-item active">
         <Package size={14} />
-        模板管理
+        模板商店
       </button>
     </nav>
 
@@ -85,13 +85,13 @@
             <Search size={14} />
             <input
               type="text"
-              placeholder="搜索已安装模板…"
+              placeholder="搜索模板…"
               bind:value={tplSearch}
             />
           </div>
           <button class="btn-import">
-            <Upload size={14} />
-            <span>从 ZIP 导入</span>
+            <Package size={14} />
+            <span>浏览社区模板</span>
           </button>
         </div>
 
@@ -112,7 +112,7 @@
         {#if filteredTemplates.length === 0}
           <div class="panel-empty">
             <Package size={32} />
-            <p>{tplSearch ? '没有匹配的模板' : '暂无已安装模板'}</p>
+            <p>{tplSearch ? '没有匹配的模板' : '暂无模板'}</p>
           </div>
         {:else}
           <div class="tpl-list">
@@ -133,15 +133,6 @@
                   {/if}
                   <span class="tpl-author">{tpl.author}</span>
                 </div>
-                <div class="tpl-actions">
-                    <button class="btn-rename" aria-label="重命名">
-                      <Pencil size={12} />
-                    </button>
-                    <button class="btn-uninstall" aria-label="卸载">
-                      <Trash2 size={14} />
-                      <span>卸载</span>
-                    </button>
-                  </div>
               </div>
             {/each}
           </div>
@@ -371,41 +362,4 @@
     color: var(--color-muted);
     font-size: 0.625rem;
   }
-  .tpl-actions {
-    display: flex;
-    align-items: center;
-    gap: var(--space-xs);
-    flex-shrink: 0;
-  }
-  .btn-rename {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    background: none;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    color: var(--color-muted);
-    cursor: pointer;
-    transition: all var(--transition);
-  }
-  .btn-rename:hover { border-color: var(--color-accent); color: var(--color-accent); }
-  .btn-uninstall {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-xs);
-    padding: var(--space-xs) var(--space-sm);
-    border-radius: var(--radius-sm);
-    font-size: 0.75rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all var(--transition);
-    white-space: nowrap;
-    flex-shrink: 0;
-    background: transparent;
-    color: var(--color-danger);
-    border: 1px solid var(--color-danger);
-  }
-  .btn-uninstall:hover { background: var(--color-danger); color: var(--color-on-danger); }
 </style>

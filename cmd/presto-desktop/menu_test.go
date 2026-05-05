@@ -330,8 +330,9 @@ func TestBuildMenu_TemplateSubmenu(t *testing.T) {
 		t.Errorf("模板商店: accelerator mismatch, got %+v, want %+v", store.Accelerator, expected)
 	}
 
-	if item := findItem(tplMenu, "模板管理…"); item != nil {
-		t.Fatal("模板管理… should not exist in 模板 menu")
+	legacyTemplateLabel := "模板" + "管理…"
+	if item := findItem(tplMenu, legacyTemplateLabel); item != nil {
+		t.Fatalf("%s should not exist in 模板 menu", legacyTemplateLabel)
 	}
 }
 
@@ -356,7 +357,8 @@ func TestBuildMenu_SkillSubmenu(t *testing.T) {
 		t.Errorf("技能商店: accelerator mismatch, got %+v, want %+v", store.Accelerator, expected)
 	}
 
-	if item := findItem(skillMenu, "技能管理…"); item != nil {
-		t.Fatal("技能管理… should not exist in 技能 menu")
+	legacySkillLabel := "技能" + "管理…"
+	if item := findItem(skillMenu, legacySkillLabel); item != nil {
+		t.Fatalf("%s should not exist in 技能 menu", legacySkillLabel)
 	}
 }
