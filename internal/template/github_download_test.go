@@ -93,9 +93,9 @@ func TestIsGitHubReachable(t *testing.T) {
 	})
 }
 
-// TestInstallGitHubFirst tests Install() tries GitHub URL first when GitHub is reachable
-func TestInstallGitHubFirst(t *testing.T) {
-	t.Run("tries GitHub first when GitHub is reachable", func(t *testing.T) {
+// TestInstallCDNFirst documents the registry install download order.
+func TestInstallCDNFirst(t *testing.T) {
+	t.Run("tries CDN before GitHub fallback", func(t *testing.T) {
 		gitHubCalled := false
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if strings.Contains(r.URL.Path, "zen") {
@@ -116,29 +116,26 @@ func TestInstallGitHubFirst(t *testing.T) {
 		allowedDownloadHosts[mockHost] = true
 		defer func() { delete(allowedDownloadHosts, mockHost) }()
 
-		// This test verifies the GitHub-first logic
-		// In real implementation, Install() should call isGitHubReachable() first
-		// and if true, try opts.DownloadURL before opts.CdnURL
-		t.Log("Install should try GitHub first when isGitHubReachable() returns true")
-		t.Log("When GitHub download succeeds, CDN should not be attempted")
+		t.Log("Install should try opts.CdnURL before opts.DownloadURL")
+		t.Log("When CDN download succeeds, GitHub should not be attempted")
 
 		// Placeholder assertion - actual implementation in github.go
 		if !gitHubCalled {
-			t.Log("GitHub URL was called first (expected behavior)")
+			t.Log("GitHub URL was not called before CDN (expected behavior)")
 		}
 	})
 
-	t.Run("falls back to CDN on GitHub failure", func(t *testing.T) {
-		t.Log("When GitHub download fails AND opts.CdnURL != '', fallback to CDN via downloadWithRetry")
-		t.Log("Fallback should be silent (no user-visible indication)")
+	t.Run("falls back to GitHub on CDN failure", func(t *testing.T) {
+		t.Log("When CDN download fails AND opts.DownloadURL != '', fallback to GitHub via downloadWithResume")
+		t.Log("Fallback should be logged without requiring user action")
 	})
 }
 
-// TestInstallCDNWhenGitHubProbeFails tests Install() goes directly to CDN when GitHub probe fails
-func TestInstallCDNWhenGitHubProbeFails(t *testing.T) {
-	t.Run("skips GitHub download when probe fails", func(t *testing.T) {
-		t.Log("If isGitHubReachable() returns false, go directly to CDN (skip GitHub entirely)")
-		t.Log("This optimizes for China users who can't reach GitHub")
+// TestInstallCDNFirstNoProbe documents that registry installs do not probe GitHub.
+func TestInstallCDNFirstNoProbe(t *testing.T) {
+	t.Run("skips GitHub probe for registry installs", func(t *testing.T) {
+		t.Log("Registry installs go directly to CDN first instead of probing GitHub")
+		t.Log("This avoids delaying China users before trying the CDN")
 	})
 }
 
@@ -192,11 +189,10 @@ func TestDownloadWithRetry(t *testing.T) {
 // TestInstallThreeLayerDegradation tests GitHub → CDN → error flow
 func TestInstallThreeLayerDegradation(t *testing.T) {
 	t.Run("falls back GitHub → CDN → error", func(t *testing.T) {
-		t.Log("Three-layer degradation path:")
-		t.Log("1. Try GitHub if isGitHubReachable() returns true")
-		t.Log("2. If GitHub fails and CdnURL available, try CDN")
+		t.Log("Degradation path:")
+		t.Log("1. Try CDN when CdnURL is available")
+		t.Log("2. If CDN fails and DownloadURL is available, try GitHub")
 		t.Log("3. If both fail, return error")
-		t.Log("4. If GitHub probe fails, go directly to CDN")
 	})
 }
 

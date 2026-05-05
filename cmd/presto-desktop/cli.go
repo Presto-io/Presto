@@ -4,7 +4,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/mrered/presto/internal/template"
@@ -57,7 +56,7 @@ func downloadTemplatesAndExit() {
 
 	logger.Info("[Installer] Found official templates to download", "count", len(officialTemplates))
 
-	platform := runtime.GOOS + "-" + runtime.GOARCH
+	platform := template.Platform()
 	var failCount int
 	for _, entry := range officialTemplates {
 		if manager.Exists(entry.Name) {
@@ -74,13 +73,8 @@ func downloadTemplatesAndExit() {
 		owner, repo := parts[0], parts[1]
 
 		var opts *template.InstallOpts
-		if info, ok := entry.Platforms[platform]; ok && info.URL != "" {
-			opts = &template.InstallOpts{
-				DownloadURL:    info.URL,
-				CdnURL:         info.CdnURL,
-				ExpectedSHA256: info.SHA256,
-				Trust:          entry.Trust,
-			}
+		if platformOpts, ok := entry.InstallOptsForPlatform(platform); ok {
+			opts = platformOpts
 		}
 
 		logger.Info("[Installer] Downloading template", "name", entry.Name)

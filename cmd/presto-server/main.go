@@ -68,6 +68,8 @@ func main() {
 	// Registry cache for SHA256 verification of imported templates
 	registry := template.NewRegistryCache(prestoDir)
 	registry.RefreshAsync()
+	manager := template.NewManager(templatesDir)
+	go installOfficialTemplatesOnStartup(manager, registry)
 
 	srv := api.NewServer(api.ServerOptions{
 		TemplatesDir: templatesDir,

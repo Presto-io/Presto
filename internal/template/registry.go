@@ -42,6 +42,45 @@ type Registry struct {
 	Templates []RegistryEntry `json:"templates"`
 }
 
+func PreferredDownloadURL(info RegistryPlatformInfo) string {
+	if info.CdnURL != "" {
+		return info.CdnURL
+	}
+	return info.URL
+}
+
+func (entry RegistryEntry) PlatformInfo(platform string) (RegistryPlatformInfo, bool) {
+	if entry.Platforms == nil {
+		return RegistryPlatformInfo{}, false
+	}
+	info, ok := entry.Platforms[platform]
+	if !ok || PreferredDownloadURL(info) == "" {
+		return RegistryPlatformInfo{}, false
+	}
+	return info, true
+}
+
+func (entry RegistryEntry) DownloadURLForPlatform(platform string) (string, bool) {
+	info, ok := entry.PlatformInfo(platform)
+	if !ok {
+		return "", false
+	}
+	return PreferredDownloadURL(info), true
+}
+
+func (entry RegistryEntry) InstallOptsForPlatform(platform string) (*InstallOpts, bool) {
+	info, ok := entry.PlatformInfo(platform)
+	if !ok {
+		return nil, false
+	}
+	return &InstallOpts{
+		DownloadURL:    info.URL,
+		CdnURL:         info.CdnURL,
+		ExpectedSHA256: info.SHA256,
+		Trust:          entry.Trust,
+	}, true
+}
+
 // VerifyResult describes the outcome of SHA256 verification against the registry.
 type VerifyResult string
 
