@@ -206,11 +206,11 @@ jobs:
       - name: Add MSYS2 MinGW to PATH
         run: echo "C:/msys64/mingw64/bin" >> "$GITHUB_PATH"
 
-      - name: Install NSIS
+      - name: Install Inno Setup
         shell: powershell
         run: |
-          choco install nsis -y --no-progress
-          "C:\Program Files (x86)\NSIS" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          choco install innosetup -y --no-progress
+          "C:\Program Files (x86)\Inno Setup 6" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Cache llvm-mingw toolchain
         if: matrix.goarch == 'arm64'
@@ -278,19 +278,27 @@ jobs:
           unzip -qo typst.zip -d typst-tmp
           find typst-tmp -name 'typst.exe' | head -1 | xargs -I{} cp {} dist/typst.exe
 
-      - name: Package NSIS installer
+      - name: Package Inno Setup installer
+        shell: powershell
         run: |
-          BINARY_PATH="$(cygpath -w "$PWD/dist/Presto.exe")"
-          TYPST_PATH="$(cygpath -w "$PWD/dist/typst.exe")"
-          OUTPUT_PATH="$(cygpath -w "$PWD/dist/Presto-${VERSION}-windows-${{ matrix.goarch }}-installer.exe")"
-          makensis \
-            -DARG_VERSION="${VERSION}" \
-            -DARG_FILE_VERSION="${FILE_VERSION}" \
-            -DARG_ARCH=${{ matrix.goarch }} \
-            -DARG_BINARY="$BINARY_PATH" \
-            -DARG_TYPST_BINARY="$TYPST_PATH" \
-            -DARG_OUTPUT_NAME="$OUTPUT_PATH" \
-            build/windows/installer/custom.nsi
+          $binaryPath = (Resolve-Path "dist/Presto.exe").Path
+          $typstPath = (Resolve-Path "dist/typst.exe").Path
+          $outputDir = (Resolve-Path "dist").Path
+          $outputBaseName = "Presto-${env:VERSION}-windows-${{ matrix.goarch }}-installer"
+
+          & ISCC.exe `
+            "/DARG_VERSION=""${env:VERSION}""" `
+            "/DARG_FILE_VERSION=""${env:FILE_VERSION}""" `
+            "/DARG_ARCH=""${{ matrix.goarch }}""" `
+            "/DARG_BINARY=""$binaryPath""" `
+            "/DARG_TYPST_BINARY=""$typstPath""" `
+            "/DARG_OUTPUT_DIR=""$outputDir""" `
+            "/DARG_OUTPUT_BASENAME=""$outputBaseName""" `
+            "build/windows/installer/presto.iss"
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:

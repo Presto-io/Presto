@@ -2,7 +2,7 @@
        _build-macos-arm64 _build-macos-amd64 \
        dist-macos dist-macos-arm64 dist-macos-amd64 dist-macos-universal \
        dist-dmg dist-dmg-arm64 dist-dmg-amd64 dist-dmg-universal \
-       dist-windows dist-linux dist notarize nsis
+       dist-windows dist-linux dist notarize inno windows-installer
 
 # ─── Config ──────────────────────────────────────────────
 APP_NAME     := Presto
@@ -16,6 +16,7 @@ DIST         := dist
 DESKTOP_SRC  := ./cmd/presto-desktop
 DESKTOP_EMBED:= cmd/presto-desktop/build
 MACOSX_DEPLOYMENT_TARGET := 11.0
+INNO_COMPILER ?= ISCC.exe
 
 # Typst download URL patterns
 TYPST_BASE   := https://github.com/typst/typst/releases/download/v$(TYPST_VERSION)
@@ -301,18 +302,24 @@ clean:
 	mkdir -p $(DESKTOP_EMBED)
 	echo '<!doctype html>' > $(DESKTOP_EMBED)/index.html
 
-# ─── NSIS Windows Installer ──────────────────────────────
-# Note: Requires `makensis` in PATH
+# ─── Inno Setup Windows Installer ────────────────────────
+# Note: Requires Inno Setup's ISCC compiler in PATH.
 
-.PHONY: nsis
-nsis: dist-windows-amd64
-	@echo "==> Building NSIS installer..."
-	makensis \
-		-DARG_VERSION=$(VERSION) \
-		-DARG_FILE_VERSION=$(VERSION_BASE).0 \
-		-DARG_ARCH=amd64 \
-		-DARG_BINARY="$(PWD)/$(DIST)/$(APP_NAME)-$(VERSION)-windows.exe" \
-		-DARG_TYPST_BINARY="$(PWD)/$(DIST)/typst.exe" \
-		-DARG_OUTPUT_NAME="$(PWD)/$(DIST)/$(APP_NAME)-$(VERSION)-windows-amd64-installer.exe" \
-		build/windows/installer/custom.nsi
+.PHONY: inno windows-installer
+windows-installer: inno
+
+inno: dist-windows-amd64
+	@echo "==> Building Inno Setup installer..."
+	@BINARY_PATH="$$(command -v cygpath >/dev/null 2>&1 && cygpath -w "$(PWD)/$(DIST)/$(APP_NAME)-$(VERSION)-windows.exe" || printf '%s' "$(PWD)/$(DIST)/$(APP_NAME)-$(VERSION)-windows.exe")"; \
+	TYPST_PATH="$$(command -v cygpath >/dev/null 2>&1 && cygpath -w "$(PWD)/$(DIST)/typst.exe" || printf '%s' "$(PWD)/$(DIST)/typst.exe")"; \
+	OUTPUT_DIR="$$(command -v cygpath >/dev/null 2>&1 && cygpath -w "$(PWD)/$(DIST)" || printf '%s' "$(PWD)/$(DIST)")"; \
+	$(INNO_COMPILER) \
+		"/DARG_VERSION=\"$(VERSION)\"" \
+		"/DARG_FILE_VERSION=\"$(VERSION_BASE).0\"" \
+		"/DARG_ARCH=\"amd64\"" \
+		"/DARG_BINARY=\"$$BINARY_PATH\"" \
+		"/DARG_TYPST_BINARY=\"$$TYPST_PATH\"" \
+		"/DARG_OUTPUT_DIR=\"$$OUTPUT_DIR\"" \
+		"/DARG_OUTPUT_BASENAME=\"$(APP_NAME)-$(VERSION)-windows-amd64-installer\"" \
+		build/windows/installer/presto.iss
 	@echo "==> Installer created: $(DIST)/$(APP_NAME)-$(VERSION)-windows-amd64-installer.exe"
