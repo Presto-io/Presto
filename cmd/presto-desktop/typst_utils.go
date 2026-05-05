@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 )
 
@@ -65,25 +66,50 @@ func sanitizeFilename(s string) string {
 }
 
 func findTypstBinary() string {
+	exeDir := ""
 	exe, err := os.Executable()
 	if err == nil {
 		exe, _ = filepath.EvalSymlinks(exe)
-		exeDir := filepath.Dir(exe)
+		exeDir = filepath.Dir(exe)
+	}
 
-		resources := filepath.Join(exeDir, "..", "Resources", "typst")
-		if _, err := os.Stat(resources); err == nil {
-			return resources
-		}
+	return findTypstBinaryFrom(exeDir, runtime.GOOS, exec.LookPath)
+}
 
-		beside := filepath.Join(exeDir, "typst")
-		if _, err := os.Stat(beside); err == nil {
-			return beside
+func findTypstBinaryFrom(exeDir string, goos string, lookPath func(string) (string, error)) string {
+	candidates := typstBinaryCandidates(goos)
+
+	if exeDir != "" {
+		for _, name := range candidates {
+			resources := filepath.Join(exeDir, "..", "Resources", name)
+			if isRegularFile(resources) {
+				return resources
+			}
+
+			beside := filepath.Join(exeDir, name)
+			if isRegularFile(beside) {
+				return beside
+			}
 		}
 	}
 
-	if p, err := exec.LookPath("typst"); err == nil {
-		return p
+	for _, name := range candidates {
+		if p, err := lookPath(name); err == nil {
+			return p
+		}
 	}
 
 	return "typst"
+}
+
+func typstBinaryCandidates(goos string) []string {
+	if goos == "windows" {
+		return []string{"typst.exe", "typst"}
+	}
+	return []string{"typst"}
+}
+
+func isRegularFile(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
 }
