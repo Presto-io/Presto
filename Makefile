@@ -2,7 +2,7 @@
        _build-macos-arm64 _build-macos-amd64 \
        dist-macos dist-macos-arm64 dist-macos-amd64 dist-macos-universal \
        dist-dmg dist-dmg-arm64 dist-dmg-amd64 dist-dmg-universal \
-       dist-windows dist-linux dist notarize inno windows-installer _inno-language
+       dist-windows dist-linux dist notarize inno windows-installer _inno-language _download-vc-redist
 
 # ─── Config ──────────────────────────────────────────────
 APP_NAME     := Presto
@@ -28,6 +28,8 @@ TYPST_DARWIN_ARM64 := typst-aarch64-apple-darwin.tar.xz
 TYPST_DARWIN_AMD64 := typst-x86_64-apple-darwin.tar.xz
 TYPST_WINDOWS_AMD64:= typst-x86_64-pc-windows-msvc.zip
 TYPST_LINUX_AMD64  := typst-x86_64-unknown-linux-musl.tar.xz
+VC_REDIST_AMD64_URL := https://aka.ms/vc14/vc_redist.x64.exe
+VC_REDIST_ARM64_URL := https://aka.ms/vc14/vc_redist.arm64.exe
 
 # ─── Development ─────────────────────────────────────────
 
@@ -113,6 +115,17 @@ _download-typst:
 		chmod +x "$(TYPST_OUT)"; \
 		rm -rf "$$TMP"; \
 		echo "==> $(TYPST_OUT)"; \
+	fi
+
+# Download Microsoft Visual C++ Redistributable for Windows Typst (MSVC build).
+# Usage: $(MAKE) _download-vc-redist VC_REDIST_URL=<url> VC_REDIST_OUT=<path>
+_download-vc-redist:
+	@mkdir -p $(dir $(VC_REDIST_OUT))
+	@if [ ! -f "$(VC_REDIST_OUT)" ]; then \
+		echo "==> Downloading Microsoft Visual C++ Redistributable..."; \
+		curl -fsSL "$(VC_REDIST_URL)" -o "$(VC_REDIST_OUT).tmp"; \
+		mv "$(VC_REDIST_OUT).tmp" "$(VC_REDIST_OUT)"; \
+		echo "==> $(VC_REDIST_OUT)"; \
 	fi
 
 # ─── macOS Distribution ─────────────────────────────────
@@ -262,9 +275,12 @@ dist-windows-amd64: _frontend-embed
 		-o "$(DIST)/$(APP_NAME)-$(VERSION)-windows.exe" $(DESKTOP_SRC)/ ) & PID_GO=$$!; \
 	( $(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_WINDOWS_AMD64) \
 		TYPST_OUT=$(DIST)/typst.exe ) & PID_TYPST=$$!; \
+	( $(MAKE) _download-vc-redist VC_REDIST_URL=$(VC_REDIST_AMD64_URL) \
+		VC_REDIST_OUT=$(DIST)/vc_redist.x64.exe ) & PID_VC=$$!; \
 	wait $$PID_GO || exit 1; \
-	wait $$PID_TYPST || exit 1
-	@echo "==> $(DIST)/$(APP_NAME)-$(VERSION)-windows.exe + typst.exe"
+	wait $$PID_TYPST || exit 1; \
+	wait $$PID_VC || exit 1
+	@echo "==> $(DIST)/$(APP_NAME)-$(VERSION)-windows.exe + typst.exe + vc_redist.x64.exe"
 
 dist-windows: dist-windows-amd64
 
@@ -335,6 +351,7 @@ inno: dist-windows-amd64 _inno-language
 	@echo "==> Building Inno Setup installer..."
 	@BINARY_PATH="$$(command -v cygpath >/dev/null 2>&1 && cygpath -w "$(PWD)/$(DIST)/$(APP_NAME)-$(VERSION)-windows.exe" || printf '%s' "$(PWD)/$(DIST)/$(APP_NAME)-$(VERSION)-windows.exe")"; \
 	TYPST_PATH="$$(command -v cygpath >/dev/null 2>&1 && cygpath -w "$(PWD)/$(DIST)/typst.exe" || printf '%s' "$(PWD)/$(DIST)/typst.exe")"; \
+	VC_REDIST_PATH="$$(command -v cygpath >/dev/null 2>&1 && cygpath -w "$(PWD)/$(DIST)/vc_redist.x64.exe" || printf '%s' "$(PWD)/$(DIST)/vc_redist.x64.exe")"; \
 	OUTPUT_DIR="$$(command -v cygpath >/dev/null 2>&1 && cygpath -w "$(PWD)/$(DIST)" || printf '%s' "$(PWD)/$(DIST)")"; \
 	$(INNO_COMPILER) \
 		"/DARG_VERSION=\"$(VERSION)\"" \
@@ -342,6 +359,7 @@ inno: dist-windows-amd64 _inno-language
 		"/DARG_ARCH=\"amd64\"" \
 		"/DARG_BINARY=\"$$BINARY_PATH\"" \
 		"/DARG_TYPST_BINARY=\"$$TYPST_PATH\"" \
+		"/DARG_VC_REDIST=\"$$VC_REDIST_PATH\"" \
 		"/DARG_OUTPUT_DIR=\"$$OUTPUT_DIR\"" \
 		"/DARG_OUTPUT_BASENAME=\"$(APP_NAME)-$(VERSION)-windows-amd64-installer\"" \
 		build/windows/installer/presto.iss
