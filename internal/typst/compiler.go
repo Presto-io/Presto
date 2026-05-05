@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -50,7 +49,7 @@ func (c *Compiler) ListFonts() map[string]bool {
 	for _, fp := range c.FontPaths {
 		args = append(args, "--font-path", fp)
 	}
-	cmd := exec.CommandContext(ctx, c.typstBin(), args...)
+	cmd := execCommandContext(ctx, c.typstBin(), args...)
 	output, err := cmd.Output()
 	if err != nil {
 		log.Printf("[typst] failed to list fonts: %v", err)
@@ -91,7 +90,7 @@ func (c *Compiler) compileWithRoot(typFile, root string) (string, error) {
 		args = append(args, "--font-path", fp)
 	}
 	args = append(args, typFile, pdfFile)
-	cmd := exec.CommandContext(ctx, c.typstBin(), args...)
+	cmd := execCommandContext(ctx, c.typstBin(), args...)
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -181,7 +180,7 @@ func (c *Compiler) CompileToSVG(typstSource, workDir string) ([]string, error) {
 		args = append(args, "--font-path", fp)
 	}
 	args = append(args, typFile, outPattern)
-	cmd := exec.CommandContext(ctx, c.typstBin(), args...)
+	cmd := execCommandContext(ctx, c.typstBin(), args...)
 	log.Printf("[compile-svg] running: %s %s", c.typstBin(), strings.Join(args, " "))
 	output, err := cmd.CombinedOutput()
 	if err != nil {
