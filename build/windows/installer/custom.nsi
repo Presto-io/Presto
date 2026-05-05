@@ -98,10 +98,17 @@ Function .onInit
     ${EndIf}
   !endif
 
+  SetRegView 64
   ReadRegStr $0 HKLM "${UNINST_KEY}" "UninstallString"
   ReadRegStr $1 HKLM "${UNINST_KEY}" "InstallLocation"
   ${If} $0 != ""
-    ExecWait '"$0" /S _?=$1'
+    ExecWait '"$0" /S _?=$1' $2
+    ${If} $2 != 0
+      MessageBox MB_OK|MB_ICONEXCLAMATION \
+        "检测到旧版 Presto 但自动卸载失败（错误码: $2）。$\n$\n建议您手动卸载旧版后再继续。$\n安装将继续进行。" \
+        /SD IDOK
+    ${EndIf}
+    DeleteRegKey HKLM "${UNINST_KEY}"
   ${EndIf}
 FunctionEnd
 
