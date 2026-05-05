@@ -1,19 +1,13 @@
 services:
   presto:
-    build: .
     ports:
-      - "127.0.0.1:8080:8080" # SEC-33: Bind to localhost only
+      - 38080:8080
     volumes:
+    #   字体文件保存在 presto-data/fonts 目录下
       - presto-data:/home/presto/.presto
+    image: ghcr.io/presto-io/presto
     restart: unless-stopped
-    # SEC-42: Container security hardening
-    read_only: true
-    security_opt:
-      - "no-new-privileges:true"
-    cap_drop:
-      - ALL
-    tmpfs:
-      - /tmp
 
 volumes:
-  presto-data:
+    presto-data:
+        name: presto-data
