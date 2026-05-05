@@ -79,6 +79,32 @@ parse_hdiutil_output() {
 }
 
 # ─── 阶段一：nobrowse 挂载，复制资源文件 ─────────────────
+
+safe_detach() {
+  local dev="$1"
+  local max_retries=3
+
+  # 先尝试正常 detach
+  if hdiutil detach "$dev" 2>/dev/null; then
+    return 0
+  fi
+
+  # 重试循环
+  for i in $(seq 1 $max_retries); do
+    echo "  Detach failed (attempt $i/$max_retries), diagnosing..."
+    lsof +D "$MOUNT_DIR" 2>/dev/null | head -20 || true
+    sleep 2
+    if hdiutil detach "$dev" 2>/dev/null; then
+      return 0
+    fi
+  done
+
+  # 强制卸载
+  echo "  WARNING: force unmounting..."
+  diskutil unmount force "$MOUNT_DIR" 2>/dev/null || \
+    hdiutil detach "$dev" -force 2>/dev/null || true
+}
+
 echo "==> Phase 1: copying resources (nobrowse)..."
 ATTACH_OUT=$(hdiutil attach -nobrowse -noverify -noautoopen -readwrite "$TEMP_DMG")
 parse_hdiutil_output "$ATTACH_OUT"
@@ -111,8 +137,8 @@ for name in "${HIDE_EXT[@]}"; do
   [[ -e "$MOUNT_DIR/$name" ]] && SetFile -a E "$MOUNT_DIR/$name" 2>/dev/null || true
 done
 
-# 阶段一卸载（nobrowse 下必定成功）
-hdiutil detach "$DEV_NAME" -quiet 2>/dev/null || hdiutil detach "$DEV_NAME"
+# 阶段一卸载（nobrowse 下通常成功，偶尔 Resource busy 需重试）
+safe_detach "$DEV_NAME"
 echo "==> Phase 1 complete."
 
 # ─── 阶段二：正常挂载，AppleScript 设置窗口布局 ──────────
@@ -196,30 +222,6 @@ echo "==> AppleScript layout done."
 sleep 1
 
 # ─── 分层卸载 ──────────────────────────────────────────
-safe_detach() {
-  local dev="$1"
-  local max_retries=3
-
-  # 先尝试正常 detach
-  if hdiutil detach "$dev" 2>/dev/null; then
-    return 0
-  fi
-
-  # 重试循环
-  for i in $(seq 1 $max_retries); do
-    echo "  Detach failed (attempt $i/$max_retries), diagnosing..."
-    lsof +D "$MOUNT_DIR" 2>/dev/null | head -20 || true
-    sleep 2
-    if hdiutil detach "$dev" 2>/dev/null; then
-      return 0
-    fi
-  done
-
-  # 强制卸载
-  echo "  WARNING: force unmounting..."
-  diskutil unmount force "$MOUNT_DIR" 2>/dev/null || \
-    hdiutil detach "$dev" -force 2>/dev/null || true
-}
 
 safe_detach "$DEV_NAME"
 echo "==> Phase 2 complete."
