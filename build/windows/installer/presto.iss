@@ -148,12 +148,9 @@ Root: HKA; Subkey: "Software\Clients\Presto\Capabilities\FileAssociations"; Valu
 Root: HKA; Subkey: "Software\Clients\Presto\Capabilities\FileAssociations"; ValueType: string; ValueName: ".markdown"; ValueData: "Presto.Markdown"
 
 [UninstallDelete]
-Type: filesandordirs; Name: "{code:UserPrestoDir}"; Check: ShouldDeleteUserData
+Type: filesandordirs; Name: "{code:UserPrestoDir}"
 
 [Code]
-var
-  KeepUserData: Boolean;
-
 function UserPrestoDir(Param: string): string;
 begin
   Result := AddBackslash(GetEnv('USERPROFILE')) + '.presto';
@@ -196,35 +193,4 @@ function InitializeSetup(): Boolean;
 begin
   RunLegacyInstallerUninstaller();
   Result := True;
-end;
-
-function InitializeUninstall(): Boolean;
-begin
-  KeepUserData := True;
-
-  if UninstallSilent then begin
-    Result := True;
-    Exit;
-  end;
-
-  if MsgBox('确定要卸载 Presto 吗？', mbConfirmation, MB_YESNO) = IDNO then begin
-    Result := False;
-    Exit;
-  end;
-
-  KeepUserData :=
-    MsgBox(
-      '保留用户数据目录？' + #13#10 + #13#10 +
-      '如果您选择“是”，您的文档、模板和设置将被保留。' + #13#10 + #13#10 +
-      '位置：' + UserPrestoDir(''),
-      mbConfirmation,
-      MB_YESNO
-    ) = IDYES;
-
-  Result := True;
-end;
-
-function ShouldDeleteUserData(): Boolean;
-begin
-  Result := not KeepUserData;
 end;

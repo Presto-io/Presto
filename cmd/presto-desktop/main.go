@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -152,7 +153,10 @@ func main() {
 	frontendFS, _ := fs.Sub(assets, "build")
 	handler := &spaFallbackHandler{api: apiHandler, assets: frontendFS}
 	app := NewApp(manager, compiler, registry)
-	appMenu := buildMenu(app)
+	var appMenu *menu.Menu
+	if runtime.GOOS != "windows" {
+		appMenu = buildMenu(app)
+	}
 	logger.Debug("[url-scheme] os.Args", "args", os.Args)
 	for _, arg := range os.Args[1:] {
 		if strings.HasPrefix(arg, "presto://") {
@@ -163,11 +167,13 @@ func main() {
 	}
 	app.dispatchOrQueueExternalFiles(os.Args[1:])
 	err = wails.Run(&options.App{
-		Title:     "Presto",
-		Width:     1280,
-		Height:    800,
-		MinWidth:  800,
-		MinHeight: 600,
+		Title:            "Presto",
+		Width:            1280,
+		Height:           800,
+		MinWidth:         800,
+		MinHeight:        600,
+		Frameless:        runtime.GOOS == "windows",
+		BackgroundColour: options.NewRGB(26, 27, 38),
 		AssetServer: &assetserver.Options{
 			Assets:  frontendFS,
 			Handler: handler,
@@ -200,6 +206,16 @@ func main() {
 		},
 		Windows: &windowsOptions.Options{
 			DisableWindowIcon: false,
+			Theme:             windowsOptions.Dark,
+			BackdropType:      windowsOptions.None,
+			CustomTheme: &windowsOptions.ThemeSettings{
+				DarkModeTitleBar:          windowsOptions.RGB(26, 27, 38),
+				DarkModeTitleBarInactive:  windowsOptions.RGB(31, 33, 51),
+				DarkModeTitleText:         windowsOptions.RGB(224, 228, 247),
+				DarkModeTitleTextInactive: windowsOptions.RGB(86, 95, 137),
+				DarkModeBorder:            windowsOptions.RGB(55, 59, 86),
+				DarkModeBorderInactive:    windowsOptions.RGB(42, 45, 68),
+			},
 		},
 		Mac: &macOptions.Options{
 			TitleBar: macOptions.TitleBarHiddenInset(),
