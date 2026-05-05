@@ -1,8 +1,22 @@
 {
   "RT_GROUP_ICON": {
-    "APP": {
+    "#3": {
       "0000": [
-        "../../build/windows/installer/resources/icon.png"
+        "../../build/windows/installer/resources/winres/icon-16.png",
+        "../../build/windows/installer/resources/winres/icon-20.png",
+        "../../build/windows/installer/resources/winres/icon-24.png",
+        "../../build/windows/installer/resources/winres/icon-30.png",
+        "../../build/windows/installer/resources/winres/icon-32.png",
+        "../../build/windows/installer/resources/winres/icon-36.png",
+        "../../build/windows/installer/resources/winres/icon-40.png",
+        "../../build/windows/installer/resources/winres/icon-48.png",
+        "../../build/windows/installer/resources/winres/icon-60.png",
+        "../../build/windows/installer/resources/winres/icon-64.png",
+        "../../build/windows/installer/resources/winres/icon-72.png",
+        "../../build/windows/installer/resources/winres/icon-80.png",
+        "../../build/windows/installer/resources/winres/icon-96.png",
+        "../../build/windows/installer/resources/winres/icon-128.png",
+        "../../build/windows/installer/resources/winres/icon-256.png"
       ]
     }
   },

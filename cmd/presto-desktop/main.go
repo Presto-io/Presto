@@ -19,6 +19,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	macOptions "github.com/wailsapp/wails/v2/pkg/options/mac"
+	windowsOptions "github.com/wailsapp/wails/v2/pkg/options/windows"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/mrered/presto/internal/api"
@@ -207,6 +208,9 @@ func main() {
 				}
 				app.dispatchOrQueueExternalFiles(data.Args)
 			},
+		},
+		Windows: &windowsOptions.Options{
+			DisableWindowIcon: false,
 		},
 		Mac: &macOptions.Options{
 			TitleBar: macOptions.TitleBarHiddenInset(),
