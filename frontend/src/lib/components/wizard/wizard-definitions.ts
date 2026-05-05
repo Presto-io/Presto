@@ -126,8 +126,8 @@ export const WIZARD_POINTS: WizardPointDef[] = [
     trigger: 'on-action',
     anchorSelector: '.nav-divider',
     position: 'right',
-    title: '模板管理已解锁',
-    body: '侧栏新增了「模板管理」和「模板搜索」，点击即可浏览和安装第三方模板。',
+    title: '社区模板已启用',
+    body: '现在可以在「模板商店」中浏览和安装第三方社区模板。',
     route: '/settings',
   },
 ];
