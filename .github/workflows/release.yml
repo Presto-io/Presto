@@ -301,12 +301,20 @@ jobs:
         run: |
           Invoke-WebRequest -Uri "${{ matrix.vc_redist_url }}" -OutFile "dist/vc_redist.exe"
 
+      - name: Prepare official templates
+        run: |
+          node scripts/prepare-windows-official-templates.mjs \
+            --registry-url "https://presto.c-1o.top/templates/registry.json" \
+            --arch "${{ matrix.goarch }}" \
+            --out "dist/windows-templates/${{ matrix.goarch }}"
+
       - name: Package Inno Setup installer
         shell: powershell
         run: |
           $binaryPath = (Resolve-Path "dist/Presto.exe").Path
           $typstPath = (Resolve-Path "dist/typst.exe").Path
           $vcRedistPath = (Resolve-Path "dist/vc_redist.exe").Path
+          $templateDir = (Resolve-Path "dist/windows-templates/${{ matrix.goarch }}").Path
           $outputDir = (Resolve-Path "dist").Path
           $outputBaseName = "Presto-${env:VERSION}-windows-${{ matrix.goarch }}-installer"
 
@@ -317,6 +325,7 @@ jobs:
             "/DARG_BINARY=""$binaryPath""" `
             "/DARG_TYPST_BINARY=""$typstPath""" `
             "/DARG_VC_REDIST=""$vcRedistPath""" `
+            "/DARG_TEMPLATE_DIR=""$templateDir""" `
             "/DARG_OUTPUT_DIR=""$outputDir""" `
             "/DARG_OUTPUT_BASENAME=""$outputBaseName""" `
             "build/windows/installer/presto.iss"
