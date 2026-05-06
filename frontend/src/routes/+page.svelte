@@ -628,6 +628,24 @@
       });
     }
 
+    function handleTemplatesUpdated(e: Event) {
+      const detail = (e as CustomEvent<{ updated?: string[] }>).detail;
+      const updated = detail?.updated ?? [];
+      if (!editor.selectedTemplate || !updated.includes(editor.selectedTemplate)) {
+        return;
+      }
+
+      handleConvert(editor.markdown);
+      notificationStore.show({
+        message: `当前模板 ${editor.selectedTemplate} 已更新，已刷新工作区`,
+        type: 'success',
+        source: 'editor',
+        groupKey: 'template-refresh',
+        durationMs: 3200,
+      });
+    }
+    window.addEventListener('presto:templates-updated', handleTemplatesUpdated);
+
     function handleEmbeddedMenuAction(e: Event) {
       const action = (e as CustomEvent<string>).detail;
       e.preventDefault();
@@ -717,6 +735,7 @@
     document.addEventListener('keydown', handleKeydown);
     return () => {
       document.removeEventListener('keydown', handleKeydown);
+      window.removeEventListener('presto:templates-updated', handleTemplatesUpdated);
       window.removeEventListener('presto:menu-action', handleEmbeddedMenuAction);
       if (!hasDesktopRuntime) {
         window.removeEventListener('beforeunload', handleBeforeUnload);

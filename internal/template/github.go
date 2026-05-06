@@ -534,28 +534,6 @@ func (m *Manager) completeInstall(owner, repo string, data []byte, expectedHash 
 		}
 	}
 
-	// SEC-28: Use restrictive permissions
-	if err := os.MkdirAll(tplDir, 0700); err != nil {
-		slog.Error("[templates] failed to create template directory",
-			"path", tplDir,
-			"error", err.Error())
-
-		// DOWN-02: Windows-specific permission error detection
-		if runtime.GOOS == "windows" && isWindowsPermissionError(err) {
-			return &InstallError{
-				Type:    ErrServer,
-				Message: windowsPermissionErrorMsg(tplDir),
-				Err:     err,
-			}
-		}
-
-		return &InstallError{
-			Type:    ErrServer,
-			Message: fmt.Sprintf("create template dir: %v", err),
-			Err:     err,
-		}
-	}
-
 	binaryName, writeManifest, err := installArtifactLayout(runtime.GOOS, manifest.Name, downloadedFilename)
 	if err != nil {
 		return &InstallError{
@@ -565,7 +543,45 @@ func (m *Manager) completeInstall(owner, repo string, data []byte, expectedHash 
 		}
 	}
 
-	binPath := filepath.Join(tplDir, binaryName)
+	if err := os.MkdirAll(m.TemplatesDir, 0700); err != nil {
+		slog.Error("[templates] failed to create templates directory",
+			"path", m.TemplatesDir,
+			"error", err.Error())
+
+		if runtime.GOOS == "windows" && isWindowsPermissionError(err) {
+			return &InstallError{
+				Type:    ErrServer,
+				Message: windowsPermissionErrorMsg(m.TemplatesDir),
+				Err:     err,
+			}
+		}
+
+		return &InstallError{
+			Type:    ErrServer,
+			Message: fmt.Sprintf("create templates dir: %v", err),
+			Err:     err,
+		}
+	}
+
+	// Stage the complete template in a sibling temp directory first. Only after
+	// every file is written do we replace the live directory, so failed updates
+	// keep the already-installed template intact.
+	stageDir, err := os.MkdirTemp(m.TemplatesDir, ".install-"+manifest.Name+"-")
+	if err != nil {
+		return &InstallError{
+			Type:    ErrServer,
+			Message: fmt.Sprintf("create staging dir: %v", err),
+			Err:     err,
+		}
+	}
+	stageCommitted := false
+	defer func() {
+		if !stageCommitted {
+			os.RemoveAll(stageDir)
+		}
+	}()
+
+	binPath := filepath.Join(stageDir, binaryName)
 	if err := os.WriteFile(binPath, data, 0700); err != nil {
 		slog.Error("[templates] failed to write binary",
 			"path", binPath,
@@ -590,7 +606,7 @@ func (m *Manager) completeInstall(owner, repo string, data []byte, expectedHash 
 	if writeManifest {
 		// Write manifest.json
 		// SEC-45: Restrictive file permissions
-		manifestPath := filepath.Join(tplDir, "manifest.json")
+		manifestPath := filepath.Join(stageDir, "manifest.json")
 		if err := os.WriteFile(manifestPath, manifestBytes, 0600); err != nil {
 			slog.Error("[templates] failed to write manifest",
 				"path", manifestPath,
@@ -611,27 +627,16 @@ func (m *Manager) completeInstall(owner, repo string, data []byte, expectedHash 
 				Err:     err,
 			}
 		}
-	} else {
-		legacyManifestPath := filepath.Join(tplDir, "manifest.json")
-		if err := os.Remove(legacyManifestPath); err != nil && !os.IsNotExist(err) {
-			return &InstallError{
-				Type:    ErrServer,
-				Message: fmt.Sprintf("remove legacy manifest: %v", err),
-				Err:     err,
-			}
-		}
+	}
 
-		legacyBinaryPath := filepath.Join(tplDir, templateBinaryName(manifest.Name))
-		if legacyBinaryPath != binPath {
-			if err := os.Remove(legacyBinaryPath); err != nil && !os.IsNotExist(err) {
-				return &InstallError{
-					Type:    ErrServer,
-					Message: fmt.Sprintf("remove legacy binary: %v", err),
-					Err:     err,
-				}
-			}
+	if err := replaceTemplateDir(tplDir, stageDir); err != nil {
+		return &InstallError{
+			Type:    ErrServer,
+			Message: fmt.Sprintf("replace template dir: %v", err),
+			Err:     err,
 		}
 	}
+	stageCommitted = true
 
 	// Log completion with duration
 	duration := time.Since(startTime)
@@ -641,6 +646,45 @@ func (m *Manager) completeInstall(owner, repo string, data []byte, expectedHash 
 		"duration", duration.String(),
 		"duration_ms", duration.Milliseconds())
 
+	return nil
+}
+
+func replaceTemplateDir(targetDir, stageDir string) error {
+	info, err := os.Lstat(targetDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return os.Rename(stageDir, targetDir)
+		}
+		return fmt.Errorf("stat existing template: %w", err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("refusing to replace symlink: %s", filepath.Base(targetDir))
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("existing template path is not a directory: %s", targetDir)
+	}
+
+	backupDir := filepath.Join(
+		filepath.Dir(targetDir),
+		fmt.Sprintf(".%s-backup-%d", filepath.Base(targetDir), time.Now().UnixNano()),
+	)
+	if err := os.Rename(targetDir, backupDir); err != nil {
+		return fmt.Errorf("backup existing template: %w", err)
+	}
+
+	if err := os.Rename(stageDir, targetDir); err != nil {
+		restoreErr := os.Rename(backupDir, targetDir)
+		if restoreErr != nil {
+			return fmt.Errorf("activate staged template: %w; restore failed: %v", err, restoreErr)
+		}
+		return fmt.Errorf("activate staged template: %w", err)
+	}
+
+	if err := os.RemoveAll(backupDir); err != nil {
+		slog.Warn("[templates] failed to remove replaced template backup",
+			"path", backupDir,
+			"error", err.Error())
+	}
 	return nil
 }
 

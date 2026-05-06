@@ -10,6 +10,12 @@ import (
 	"github.com/mrered/presto/internal/template"
 )
 
+type templateUpdate struct {
+	name    string
+	latest  template.RegistryEntry
+	current string
+}
+
 func (a *App) checkFirstLaunch() {
 	logger.Debug("[first-launch] starting check", "registry_available", a.registry.Load() != nil)
 
@@ -133,7 +139,7 @@ func (a *App) emitFirstLaunchError(message string) {
 }
 
 func (a *App) checkTemplateUpdates(installed []template.InstalledTemplate) {
-	logger.Debug("[template-update] starting silent update check", "count", len(installed))
+	logger.Debug("[template-update] starting update check", "count", len(installed))
 
 	reg := a.registry.Load()
 	if reg == nil {
@@ -141,11 +147,7 @@ func (a *App) checkTemplateUpdates(installed []template.InstalledTemplate) {
 		return
 	}
 
-	var updatesAvailable []struct {
-		name    string
-		latest  template.RegistryEntry
-		current string
-	}
+	var updatesAvailable []templateUpdate
 
 	for _, inst := range installed {
 		entry := a.registry.LookupByName(inst.Manifest.Name)
@@ -158,11 +160,11 @@ func (a *App) checkTemplateUpdates(installed []template.InstalledTemplate) {
 				"name", inst.Manifest.Name,
 				"installed", inst.Manifest.Version,
 				"latest", entry.Version)
-			updatesAvailable = append(updatesAvailable, struct {
-				name    string
-				latest  template.RegistryEntry
-				current string
-			}{inst.Manifest.Name, *entry, inst.Manifest.Version})
+			updatesAvailable = append(updatesAvailable, templateUpdate{
+				name:    inst.Manifest.Name,
+				latest:  *entry,
+				current: inst.Manifest.Version,
+			})
 		}
 	}
 
@@ -171,11 +173,13 @@ func (a *App) checkTemplateUpdates(installed []template.InstalledTemplate) {
 		return
 	}
 
-	logger.Info("[template-update] silently updating templates in background", "count", len(updatesAvailable))
+	logger.Info("[template-update] updating templates in background", "count", len(updatesAvailable))
+	a.emitTemplateUpdateStart(updatesAvailable)
 
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, 3)
 	var successCount, failCount int
+	updatedNames := make([]string, 0, len(updatesAvailable))
 	var mu sync.Mutex
 
 	for _, update := range updatesAvailable {
@@ -190,23 +194,14 @@ func (a *App) checkTemplateUpdates(installed []template.InstalledTemplate) {
 				"old_version", oldVersion,
 				"new_version", entry.Version)
 
-			if err := a.manager.Uninstall(name); err != nil {
-				logger.Error("[template-update] failed to uninstall old version",
-					"name", name,
-					"error", err)
-				mu.Lock()
-				failCount++
-				mu.Unlock()
-				return
-			}
-
-			if err := a.InstallTemplate(name); err != nil {
+			if err := a.installTemplate(name, false); err != nil {
 				logger.Error("[template-update] failed to update template",
 					"name", name,
 					"error", err)
 				mu.Lock()
 				failCount++
 				mu.Unlock()
+				a.emitTemplateUpdateProgress(name, oldVersion, entry.Version, "error", err.Error())
 				return
 			}
 
@@ -215,20 +210,66 @@ func (a *App) checkTemplateUpdates(installed []template.InstalledTemplate) {
 				"version", entry.Version)
 			mu.Lock()
 			successCount++
+			updatedNames = append(updatedNames, name)
 			mu.Unlock()
+			a.emitTemplateUpdateProgress(name, oldVersion, entry.Version, "success", "")
 		}(update.name, update.latest, update.current)
 	}
 
 	wg.Wait()
 
-	logger.Info("[template-update] silent update complete", "success", successCount, "failed", failCount)
+	logger.Info("[template-update] update complete", "success", successCount, "failed", failCount)
+	a.emitTemplateUpdateComplete(successCount, failCount, updatedNames)
 
 	if successCount > 0 {
 		wailsRuntime.EventsEmit(a.ctx, "templates-changed")
 	}
 }
 
+func (a *App) emitTemplateUpdateStart(updates []templateUpdate) {
+	items := make([]map[string]string, 0, len(updates))
+	names := make([]string, 0, len(updates))
+	for _, update := range updates {
+		names = append(names, update.name)
+		items = append(items, map[string]string{
+			"name":           update.name,
+			"currentVersion": update.current,
+			"newVersion":     update.latest.Version,
+		})
+	}
+	wailsRuntime.EventsEmit(a.ctx, "template-update:start", map[string]interface{}{
+		"total":     len(updates),
+		"templates": items,
+	})
+	logger.Info("[template-update] user notified before update", "templates", strings.Join(names, ","))
+}
+
+func (a *App) emitTemplateUpdateProgress(name string, oldVersion string, newVersion string, status string, errorMsg string) {
+	payload := map[string]interface{}{
+		"name":           name,
+		"currentVersion": oldVersion,
+		"newVersion":     newVersion,
+		"status":         status,
+	}
+	if errorMsg != "" {
+		payload["error"] = errorMsg
+	}
+	wailsRuntime.EventsEmit(a.ctx, "template-update:progress", payload)
+}
+
+func (a *App) emitTemplateUpdateComplete(success int, failed int, updated []string) {
+	wailsRuntime.EventsEmit(a.ctx, "template-update:complete", map[string]interface{}{
+		"success": success,
+		"failed":  failed,
+		"updated": updated,
+	})
+}
+
 func (a *App) InstallTemplate(templateName string) error {
+	return a.installTemplate(templateName, true)
+}
+
+func (a *App) installTemplate(templateName string, notify bool) error {
 	if a.registry == nil {
 		return fmt.Errorf("registry not available")
 	}
@@ -267,11 +308,13 @@ func (a *App) InstallTemplate(templateName string) error {
 		return err
 	}
 
-	wailsRuntime.EventsEmit(a.ctx, "templates-changed")
-	wailsRuntime.EventsEmit(a.ctx, "app:notification", map[string]string{
-		"message": fmt.Sprintf("模板 %s 下载完成", templateName),
-		"type":    "success",
-	})
+	if notify {
+		wailsRuntime.EventsEmit(a.ctx, "templates-changed")
+		wailsRuntime.EventsEmit(a.ctx, "app:notification", map[string]string{
+			"message": fmt.Sprintf("模板 %s 下载完成", templateName),
+			"type":    "success",
+		})
+	}
 	return nil
 }
 
