@@ -6,6 +6,7 @@
 import { templateStore } from './templates.svelte';
 import { installState } from './install-state.svelte';
 import { editor } from './editor.svelte';
+import { notificationStore } from './notification.svelte';
 import { getExample, convertAndCompile } from '$lib/api/client';
 
 interface TemplateProgress {
@@ -32,6 +33,13 @@ let _state = $state<FirstLaunchState>({
   failed: 0,
   templates: new Map(),
 });
+
+function templateNamesFrom(items: any[] | undefined): string[] {
+  if (!Array.isArray(items)) return [];
+  return items
+    .map((item) => typeof item === 'string' ? item : item?.name)
+    .filter((name): name is string => typeof name === 'string' && name.length > 0);
+}
 
 export const firstLaunchStore = {
   get state() { return _state; },
@@ -70,9 +78,10 @@ export const firstLaunchStore = {
       console.log('[first-launch] started, total:', _state.total);
 
       // Mark all templates as installing to show breathing animation
-      if (data.templates) {
-        console.log('[first-launch] marking templates as installing:', data.templates);
-        data.templates.forEach((name: string) => {
+      const templateNames = templateNamesFrom(data.templates);
+      if (templateNames.length > 0) {
+        console.log('[first-launch] marking templates as installing:', templateNames);
+        templateNames.forEach((name: string) => {
           installState.setInstalling(name);
         });
       } else {
@@ -166,6 +175,76 @@ export const firstLaunchStore = {
     rt.EventsOn('template-download:progress', (data: any) => {
       const { template, downloaded, total, percent } = data;
       installState.updateProgress(template, { downloaded, total, percent });
+    });
+
+    rt.EventsOn('template-update:start', (data: any) => {
+      console.log('[template-update] received start event:', data);
+      const templateNames = templateNamesFrom(data.templates);
+      notificationStore.dismissGroup('template-update');
+      notificationStore.show({
+        message: `检测到 ${templateNames.length} 个模板需要更新，开始自动更新`,
+        type: 'info',
+        source: 'template-update',
+        groupKey: 'template-update',
+        durationMs: 4200,
+      });
+      templateNames.forEach((name) => {
+        _state.templates.set(name, { name, status: 'downloading' });
+        installState.setInstalling(name);
+      });
+    });
+
+    rt.EventsOn('template-update:progress', (data: any) => {
+      console.log('[template-update] received progress event:', data);
+      const { name, status, error } = data;
+      if (!name) return;
+      _state.templates.set(name, { name, status, error });
+      if (status === 'success') {
+        installState.setInstalled(name);
+      } else if (status === 'error') {
+        installState.reset(name);
+      }
+    });
+
+    rt.EventsOn('template-update:complete', (data: any) => {
+      console.log('[template-update] received complete event:', data);
+      const updated = Array.isArray(data.updated) ? data.updated : [];
+      if ((data.success ?? 0) > 0) {
+        templateStore.refresh().catch(err => {
+          console.error('[template-update] failed to refresh templates:', err);
+        });
+      }
+      const success = data.success ?? 0;
+      const failed = data.failed ?? 0;
+      notificationStore.dismissGroup('template-update');
+      if (success === 0 && failed > 0) {
+        notificationStore.show({
+          message: '模板更新失败，已保留现有模板',
+          type: 'warning',
+          source: 'template-update',
+          groupKey: 'template-update',
+          durationMs: 5600,
+        });
+      } else if (failed > 0) {
+        notificationStore.show({
+          message: `已更新 ${success} 个模板，${failed} 个失败，失败项已保留旧版本`,
+          type: 'warning',
+          source: 'template-update',
+          groupKey: 'template-update',
+          durationMs: 5600,
+        });
+      } else {
+        notificationStore.show({
+          message: `模板已更新：${success} 个模板`,
+          type: 'success',
+          source: 'template-update',
+          groupKey: 'template-update',
+          durationMs: 3600,
+        });
+      }
+      window.dispatchEvent(new CustomEvent('presto:templates-updated', {
+        detail: { updated, success, failed },
+      }));
     });
 
     console.log('[first-launch] all event listeners registered successfully');

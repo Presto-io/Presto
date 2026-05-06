@@ -148,3 +148,72 @@ func TestInstallArtifactLayoutNonWindowsKeepsExistingLayout(t *testing.T) {
 		t.Fatal("non-Windows install should keep writing manifest.json")
 	}
 }
+
+func TestReplaceTemplateDirSwapsStagedDirectory(t *testing.T) {
+	dir := t.TempDir()
+	targetDir := filepath.Join(dir, "mock")
+	stageDir := filepath.Join(dir, ".install-mock")
+
+	if err := os.MkdirAll(targetDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(targetDir, "old.txt"), []byte("old"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(stageDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(stageDir, "new.txt"), []byte("new"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := replaceTemplateDir(targetDir, stageDir); err != nil {
+		t.Fatalf("replaceTemplateDir failed: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(targetDir, "new.txt")); err != nil {
+		t.Fatalf("new staged file missing after replace: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(targetDir, "old.txt")); !os.IsNotExist(err) {
+		t.Fatalf("old live file should be gone after replace, stat err = %v", err)
+	}
+	if _, err := os.Stat(stageDir); !os.IsNotExist(err) {
+		t.Fatalf("stage dir should be moved, stat err = %v", err)
+	}
+}
+
+func TestReplaceTemplateDirRejectsSymlinkWithoutDeletingExisting(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation requires elevated privileges on some Windows setups")
+	}
+
+	dir := t.TempDir()
+	realDir := filepath.Join(dir, "real")
+	targetDir := filepath.Join(dir, "mock")
+	stageDir := filepath.Join(dir, ".install-mock")
+
+	if err := os.MkdirAll(realDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(realDir, "old.txt"), []byte("old"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(realDir, targetDir); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(stageDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(stageDir, "new.txt"), []byte("new"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := replaceTemplateDir(targetDir, stageDir); err == nil {
+		t.Fatal("replaceTemplateDir should reject symlink targets")
+	}
+	if _, err := os.Stat(filepath.Join(realDir, "old.txt")); err != nil {
+		t.Fatalf("existing template content should remain: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(stageDir, "new.txt")); err != nil {
+		t.Fatalf("stage dir should remain for caller cleanup: %v", err)
+	}
+}
