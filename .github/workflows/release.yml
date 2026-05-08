@@ -11,7 +11,7 @@ permissions:
   packages: write
 
 env:
-  GO_VERSION: '1.25.9'
+  GO_VERSION: '1.26.3'
   NODE_VERSION: '22'
   TYPST_VERSION: '0.14.2'
 
@@ -533,7 +533,8 @@ jobs:
             PRERELEASE_FLAG="--prerelease"
           fi
           if gh release view "${{ github.ref_name }}" &>/dev/null; then
-            gh release upload "${{ github.ref_name }}" dist/* --clobber
+            echo "::error::Release ${{ github.ref_name }} already exists; refusing to overwrite published assets."
+            exit 1
           else
             gh release create "${{ github.ref_name }}" \
               --title "Presto ${{ env.VERSION }}" \

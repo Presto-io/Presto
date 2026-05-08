@@ -2,7 +2,9 @@ services:
   presto:
     image: ghcr.io/presto-io/presto
     ports:
-      - 8080:8080
+      - 127.0.0.1:8080:8080
+    environment:
+      PRESTO_INJECT_API_KEY: "true"
     volumes:
       - ./.presto-data/fonts:/home/presto/.presto/fonts
     restart: unless-stopped

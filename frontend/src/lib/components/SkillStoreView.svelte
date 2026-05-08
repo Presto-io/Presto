@@ -6,6 +6,7 @@
   import { marked } from 'marked';
   import DOMPurify from 'dompurify';
   import Fuse from 'fuse.js';
+  import { githubUrlFromRepo, trustedGithubUrl } from '$lib/utils/external-url';
 
   interface Props {
     mode: 'desktop' | 'web';
@@ -164,10 +165,12 @@
   }
 
   function openExternal(url: string) {
+    const safeUrl = trustedGithubUrl(url);
+    if (!safeUrl) return;
     if (mode === 'web' && window.parent !== window) {
-      window.parent.postMessage({ type: 'presto-open-skill', url }, '*');
+      window.parent.postMessage({ type: 'presto-open-skill', url: safeUrl }, window.location.origin);
     } else {
-      window.open(url, '_blank', 'noopener,noreferrer');
+      window.open(safeUrl, '_blank', 'noopener,noreferrer');
     }
   }
 
@@ -383,7 +386,7 @@
         <div class="detail-repo">
           <button
             class="repo-link"
-            onclick={() => openExternal(`https://github.com/${skill.repo}`)}
+            onclick={() => openExternal(githubUrlFromRepo(skill.repo))}
           >
             {t('github')}
             <ExternalLink size={12} />

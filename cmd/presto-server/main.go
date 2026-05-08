@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/mrered/presto/internal/api"
 	"github.com/mrered/presto/internal/template"
@@ -76,6 +77,7 @@ func main() {
 		StaticDir:    staticDir,
 		TypstBin:     "typst",
 		APIKey:       apiKey,
+		InjectAPIKey: shouldInjectAPIKey(host),
 		FontPaths:    fontPaths,
 		Registry:     registry,
 	})
@@ -84,5 +86,21 @@ func main() {
 	fmt.Printf("Presto server listening on %s\n", addr)
 	// SEC-43: Only show truncated API key to avoid full key in logs
 	fmt.Printf("API Key: %s...%s\n", apiKey[:8], apiKey[len(apiKey)-4:])
-	log.Fatal(http.ListenAndServe(addr, srv))
+	server := &http.Server{
+		Addr:              addr,
+		Handler:           srv,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      2 * time.Minute,
+		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    1 << 20,
+	}
+	log.Fatal(server.ListenAndServe())
+}
+
+func shouldInjectAPIKey(host string) bool {
+	if override := os.Getenv("PRESTO_INJECT_API_KEY"); override != "" {
+		return override == "1" || strings.EqualFold(override, "true") || strings.EqualFold(override, "yes")
+	}
+	return host == "127.0.0.1" || host == "localhost" || host == "::1"
 }
