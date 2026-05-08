@@ -20,7 +20,7 @@ type Server struct {
 	compiler       *typst.Compiler
 	registry       *template.RegistryCache
 	availableFonts map[string]bool // cached from typst fonts at startup
-	skillManager  *skill.SkillManager
+	skillManager   *skill.SkillManager
 }
 
 // ServerOptions configures the API server.
@@ -29,6 +29,7 @@ type ServerOptions struct {
 	StaticDir    string
 	TypstBin     string
 	APIKey       string   // empty = desktop mode (no auth required)
+	InjectAPIKey bool     // inject API key into static HTML only for trusted local deployments
 	FontPaths    []string // additional font directories for typst
 	Registry     *template.RegistryCache
 }
@@ -50,7 +51,7 @@ func NewServer(opts ServerOptions) http.Handler {
 		compiler:       compiler,
 		registry:       opts.Registry,
 		availableFonts: compiler.ListFonts(),
-		skillManager:  skill.NewManager(),
+		skillManager:   skill.NewManager(),
 	}
 
 	log.Printf("[presto] starting server, templates=%s static=%s typst=%s root=%s",
@@ -79,7 +80,7 @@ func NewServer(opts ServerOptions) http.Handler {
 		// SEC-27: Filter hidden files from static file server
 		fs := http.FileServer(http.Dir(opts.StaticDir))
 		var static http.Handler
-		if opts.APIKey != "" {
+		if opts.APIKey != "" && opts.InjectAPIKey {
 			static = apiKeyInjectionHandler(opts.StaticDir, opts.APIKey, fs)
 		} else {
 			static = fs

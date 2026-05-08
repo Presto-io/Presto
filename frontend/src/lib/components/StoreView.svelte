@@ -12,6 +12,7 @@
   import { networkStore } from '$lib/stores/network.svelte';
   import Toast from '$lib/components/Toast.svelte';
   import OfflineMode from '$lib/components/OfflineMode.svelte';
+  import { githubUrlFromRepo, isValidPrestoInstallName, trustedGithubUrl } from '$lib/utils/external-url';
 
   interface Props {
     mode: 'desktop' | 'web';
@@ -406,16 +407,18 @@
   }
 
   function openExternal(url: string) {
+    const safeUrl = trustedGithubUrl(url);
+    if (!safeUrl) return;
     if (mode === 'desktop' && (window as any).runtime?.BrowserOpenURL) {
-      (window as any).runtime.BrowserOpenURL(url);
+      (window as any).runtime.BrowserOpenURL(safeUrl);
     } else {
-      window.open(url, '_blank', 'noopener,noreferrer');
+      window.open(safeUrl, '_blank', 'noopener,noreferrer');
     }
   }
 
   function getRepoUrl(tpl: RegistryItem): string {
-    if (tpl.repository) return tpl.repository;
-    if (tpl.repo) return `https://github.com/${tpl.repo}`;
+    if (tpl.repository) return trustedGithubUrl(tpl.repository);
+    if (tpl.repo) return githubUrlFromRepo(tpl.repo);
     return '';
   }
 
@@ -784,9 +787,10 @@
                 {/if}
               {:else if mode === 'web'}
                 <button class="btn-install" onclick={() => {
+                  if (!isValidPrestoInstallName(selectedTemplate!.name)) return;
                   const url = `presto://install/${selectedTemplate!.name}`;
                   if (window.parent !== window) {
-                    window.parent.postMessage({ type: 'presto-open-template', url }, '*');
+                    window.parent.postMessage({ type: 'presto-open-template', url }, window.location.origin);
                   } else {
                     window.location.href = url;
                   }

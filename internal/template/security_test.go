@@ -1,6 +1,7 @@
 package template
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"net/url"
@@ -27,6 +28,13 @@ func TestIsAllowedDownloadHost(t *testing.T) {
 		if got := isAllowedDownloadHost(tt.host); got != tt.allowed {
 			t.Errorf("isAllowedDownloadHost(%q) = %v, want %v", tt.host, got, tt.allowed)
 		}
+	}
+}
+
+func TestReadAllLimitedRejectsTooLargeInput(t *testing.T) {
+	_, err := readAllLimited(bytes.NewBufferString("abcd"), 3)
+	if err == nil {
+		t.Fatal("expected oversized input to be rejected")
 	}
 }
 
@@ -143,44 +151,44 @@ func splitLines(s string) []string {
 // Missing checksum should result in ErrChecksumMismatch.
 func TestMandatorySHA256ForOfficialTemplates(t *testing.T) {
 	tests := []struct {
-		name        string
-		trust       string
+		name         string
+		trust        string
 		expectedHash string
-		wantErr     bool
-		errType     InstallErrorType
-		description string
+		wantErr      bool
+		errType      InstallErrorType
+		description  string
 	}{
 		{
-			name:        "official_no_sha256",
-			trust:       "official",
+			name:         "official_no_sha256",
+			trust:        "official",
 			expectedHash: "",
-			wantErr:     true,
-			errType:     ErrChecksumMismatch,
-			description: "Official template without SHA256 must be rejected",
+			wantErr:      true,
+			errType:      ErrChecksumMismatch,
+			description:  "Official template without SHA256 must be rejected",
 		},
 		{
-			name:        "verified_no_sha256",
-			trust:       "verified",
+			name:         "verified_no_sha256",
+			trust:        "verified",
 			expectedHash: "",
-			wantErr:     true,
-			errType:     ErrChecksumMismatch,
-			description: "Verified template without SHA256 must be rejected",
+			wantErr:      true,
+			errType:      ErrChecksumMismatch,
+			description:  "Verified template without SHA256 must be rejected",
 		},
 		{
-			name:        "community_no_sha256",
-			trust:       "community",
+			name:         "community_no_sha256",
+			trust:        "community",
 			expectedHash: "",
-			wantErr:     false,
-			errType:     "",
-			description: "Community template without SHA256 should be allowed (warning logged)",
+			wantErr:      false,
+			errType:      "",
+			description:  "Community template without SHA256 should be allowed (warning logged)",
 		},
 		{
-			name:        "official_sha256_mismatch",
-			trust:       "official",
+			name:         "official_sha256_mismatch",
+			trust:        "official",
 			expectedHash: "0000000000000000000000000000000000000000000000000000000000000000",
-			wantErr:     true,
-			errType:     ErrChecksumMismatch,
-			description: "Official template with wrong SHA256 must be rejected",
+			wantErr:      true,
+			errType:      ErrChecksumMismatch,
+			description:  "Official template with wrong SHA256 must be rejected",
 		},
 	}
 
@@ -260,9 +268,9 @@ func TestTemporaryFileCleanup(t *testing.T) {
 // Temporary files must have restrictive permissions (0700).
 func TestTemporaryFilePermissions(t *testing.T) {
 	tests := []struct {
-		name         string
-		permissions  string
-		description  string
+		name        string
+		permissions string
+		description string
 	}{
 		{
 			name:        "temp_file_permissions_0700",

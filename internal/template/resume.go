@@ -59,6 +59,10 @@ func downloadWithResume(downloadURL string, maxRetries int, onProgress ProgressC
 	var offset int64 = 0
 	if info, err := os.Stat(tmpFile); err == nil {
 		offset = info.Size()
+		if offset > maxTemplateBinarySize {
+			os.Remove(tmpFile)
+			offset = 0
+		}
 		slog.Info("[download] resuming from partial download",
 			"offset_bytes", offset)
 	}
@@ -184,15 +188,28 @@ func downloadWithResume(downloadURL string, maxRetries int, onProgress ProgressC
 		if offset > 0 {
 			total += offset // Total = remaining + already downloaded
 		}
+		if total > maxTemplateBinarySize {
+			file.Close()
+			resp.Body.Close()
+			cancel()
+			os.Remove(tmpFile)
+			return nil, &InstallError{
+				Type:    ErrServer,
+				Message: fmt.Sprintf("download exceeds maximum size of %d bytes", maxTemplateBinarySize),
+				Err:     fmt.Errorf("download too large"),
+			}
+		}
 
 		// Wrap with progress reader
-		pr := NewProgressReader(resp.Body, total, func(downloaded, total int64) {
+		remainingLimit := maxTemplateBinarySize - offset
+		limitedBody := io.LimitReader(resp.Body, remainingLimit+1)
+		pr := NewProgressReader(limitedBody, total, func(downloaded, total int64) {
 			if onProgress != nil {
 				onProgress(downloaded+offset, total)
 			}
 		})
 
-		_, err = io.Copy(file, pr)
+		written, err := io.Copy(file, pr)
 		file.Close()
 		resp.Body.Close()
 		cancel()
@@ -203,6 +220,14 @@ func downloadWithResume(downloadURL string, maxRetries int, onProgress ProgressC
 				"error", err.Error())
 			lastErr = &InstallError{Type: ErrNetwork, Message: fmt.Sprintf("download failed: %v", err), Err: err}
 			continue // Keep tmp file for retry
+		}
+		if offset+written > maxTemplateBinarySize {
+			os.Remove(tmpFile)
+			return nil, &InstallError{
+				Type:    ErrServer,
+				Message: fmt.Sprintf("download exceeds maximum size of %d bytes", maxTemplateBinarySize),
+				Err:     fmt.Errorf("download too large"),
+			}
 		}
 
 		// Success: read full file

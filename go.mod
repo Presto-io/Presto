@@ -1,6 +1,6 @@
 module github.com/mrered/presto
 
-go 1.25.9
+go 1.26.3
 
 require (
 	github.com/wailsapp/wails/v2 v2.11.0

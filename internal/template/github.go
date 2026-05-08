@@ -30,6 +30,8 @@ const (
 	ErrServer           InstallErrorType = "server_error"
 )
 
+const maxTemplateBinarySize int64 = 100 << 20
+
 // InstallError wraps installation errors with type classification
 type InstallError struct {
 	Type    InstallErrorType
@@ -139,6 +141,17 @@ func checkHTTPStatus(resp *http.Response, op string) error {
 		return fmt.Errorf("%s: HTTP %d: %s", op, resp.StatusCode, string(body))
 	}
 	return nil
+}
+
+func readAllLimited(r io.Reader, limit int64) ([]byte, error) {
+	data, err := io.ReadAll(io.LimitReader(r, limit+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > limit {
+		return nil, fmt.Errorf("download exceeds maximum size of %d bytes", limit)
+	}
+	return data, nil
 }
 
 type GitHubRepo struct {
@@ -906,10 +919,10 @@ func downloadWithRetry(downloadURL string, maxRetries int, onProgress ProgressCa
 		if onProgress != nil && resp.ContentLength > 0 {
 			// Use ProgressReader to track download progress
 			pr := NewProgressReader(resp.Body, resp.ContentLength, onProgress)
-			data, err = io.ReadAll(pr)
+			data, err = readAllLimited(pr, maxTemplateBinarySize)
 		} else {
 			// No progress callback or unknown content length, read directly
-			data, err = io.ReadAll(resp.Body)
+			data, err = readAllLimited(resp.Body, maxTemplateBinarySize)
 		}
 		resp.Body.Close()
 		cancel() // Cancel after reading and closing body

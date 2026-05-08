@@ -107,7 +107,7 @@ func ProcessBatchZip(zipData []byte, mgr *template.Manager, registry *template.R
 		if err != nil {
 			continue
 		}
-		fileData, err := io.ReadAll(io.LimitReader(rc, 10<<20))
+		fileData, err := readZipFileLimited(rc, 10<<20)
 		rc.Close()
 		if err != nil {
 			continue

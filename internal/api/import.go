@@ -23,6 +23,17 @@ import (
 // SEC-29: Maximum ZIP upload size (100MB)
 const maxZIPUploadSize = 100 << 20
 
+func readZipFileLimited(r io.Reader, limit int64) ([]byte, error) {
+	data, err := io.ReadAll(io.LimitReader(r, limit+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > limit {
+		return nil, fmt.Errorf("ZIP entry exceeds maximum size of %d bytes", limit)
+	}
+	return data, nil
+}
+
 type importResult struct {
 	Name        string   `json:"name"`
 	DisplayName string   `json:"displayName"`
@@ -167,7 +178,7 @@ func readManifestFromZip(zr *zip.Reader, prefix string) (*template.Manifest, err
 			if err != nil {
 				return nil, fmt.Errorf("failed to read manifest.json")
 			}
-			data, err := io.ReadAll(io.LimitReader(rc, 1<<20))
+			data, err := readZipFileLimited(rc, 1<<20)
 			rc.Close()
 			if err != nil {
 				return nil, fmt.Errorf("failed to read manifest.json")
@@ -251,7 +262,7 @@ func importTemplateFromZipDir(zr *zip.Reader, prefix string, installName string,
 			if err != nil {
 				return nil, fmt.Errorf("failed to read manifest.json")
 			}
-			manifestData, err = io.ReadAll(io.LimitReader(rc, 1<<20))
+			manifestData, err = readZipFileLimited(rc, 1<<20)
 			rc.Close()
 			if err != nil {
 				return nil, fmt.Errorf("failed to read manifest.json")
@@ -316,7 +327,7 @@ func importTemplateFromZipDir(zr *zip.Reader, prefix string, installName string,
 		return nil, fmt.Errorf("failed to read binary from ZIP")
 	}
 	// SEC-13: Limit binary size to 100MB
-	binData, err := io.ReadAll(io.LimitReader(rc, 100<<20))
+	binData, err := readZipFileLimited(rc, 100<<20)
 	rc.Close()
 	if err != nil {
 		return nil, fmt.Errorf("failed to read binary")

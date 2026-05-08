@@ -7,6 +7,8 @@ on:
       - 'frontend/src/routes/showcase/**'
       - 'frontend/src/lib/showcase/**'
       - 'frontend/src/lib/components/StoreView.svelte'
+      - 'frontend/src/lib/components/SkillStoreView.svelte'
+      - 'frontend/src/lib/utils/external-url.ts'
   workflow_dispatch:
 
 permissions: {}

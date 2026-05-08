@@ -298,7 +298,7 @@ dist-linux-amd64: frontend
 		-v "$(PWD)":/src \
 		-w /src \
 		-e GOOS=linux -e GOARCH=amd64 -e CGO_ENABLED=1 \
-		golang:1.25 \
+		golang:1.26.3 \
 		bash -c '\
 			apt-get update -qq && \
 			apt-get install -y -qq libgtk-3-dev libwebkit2gtk-4.0-dev pkg-config > /dev/null 2>&1 && \
