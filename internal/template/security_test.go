@@ -19,6 +19,8 @@ func TestIsAllowedDownloadHost(t *testing.T) {
 		{"github-releases.githubusercontent.com", true},
 		{"codeload.github.com", true},
 		{"presto.c-1o.top", true},
+		{"assets.mre.red", true},
+		{"templates.anything.c-1o.top", true},
 		{"evil.com", false},
 		{"github.com.evil.com", false},
 		{"", false},
@@ -71,6 +73,8 @@ func TestDomainWhitelistForDownloadURL(t *testing.T) {
 		{"https://github.com/owner/repo/releases/download/v1/binary", true},
 		{"https://objects.githubusercontent.com/path/binary", true},
 		{"https://presto.c-1o.top/templates/gongwen/binaries/presto-template-gongwen-darwin-arm64", true},
+		{"https://cdn.mre.red/templates/gongwen/manifest.json", true},
+		{"https://deep.cdn.c-1o.top/templates/gongwen/manifest.json", true},
 
 		// New test cases - additional whitelisted domains
 		{"https://cdn.presto.c-1o.top/templates/binaries/v1.0.0/gongwen/darwin-arm64", true},
@@ -82,6 +86,7 @@ func TestDomainWhitelistForDownloadURL(t *testing.T) {
 		{"https://evil.com/binary", false},
 		{"https://github.com.evil.com/binary", false},
 		{"https://presto.c-1o.top.evil.com/binary", false},
+		{"https://mre.red.evil.com/binary", false},
 
 		// HTTP protocol - also validated (security doesn't depend on protocol)
 		{"http://github.com/binary", true},

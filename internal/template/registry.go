@@ -29,11 +29,23 @@ type RegistryPlatformInfo struct {
 }
 
 type RegistryEntry struct {
-	Name      string                          `json:"name"`
-	Version   string                          `json:"version"`
-	Trust     string                          `json:"trust"`
-	Repo      string                          `json:"repo"`
-	Platforms map[string]RegistryPlatformInfo `json:"platforms"`
+	Name              string                          `json:"name"`
+	DisplayName       string                          `json:"displayName,omitempty"`
+	Description       string                          `json:"description,omitempty"`
+	Version           string                          `json:"version"`
+	Author            string                          `json:"author,omitempty"`
+	Trust             string                          `json:"trust"`
+	Repo              string                          `json:"repo"`
+	License           string                          `json:"license,omitempty"`
+	Category          string                          `json:"category,omitempty"`
+	Keywords          []string                        `json:"keywords,omitempty"`
+	MinPrestoVersion  string                          `json:"minPrestoVersion,omitempty"`
+	RequiredFonts     []FontRequirement               `json:"requiredFonts,omitempty"`
+	FrontmatterSchema map[string]FieldSchema          `json:"frontmatterSchema,omitempty"`
+	Runtimes          []RuntimeSpec                   `json:"runtimes,omitempty"`
+	ManifestURL       string                          `json:"manifest_url,omitempty"`
+	ManifestSHA256    string                          `json:"manifest_sha256,omitempty"`
+	Platforms         map[string]RegistryPlatformInfo `json:"platforms"`
 }
 
 type Registry struct {
@@ -73,12 +85,49 @@ func (entry RegistryEntry) InstallOptsForPlatform(platform string) (*InstallOpts
 	if !ok {
 		return nil, false
 	}
+	manifestBytes, _ := entry.ManifestBytes()
 	return &InstallOpts{
-		DownloadURL:    info.URL,
-		CdnURL:         info.CdnURL,
-		ExpectedSHA256: info.SHA256,
-		Trust:          entry.Trust,
+		DownloadURL:      info.URL,
+		CdnURL:           info.CdnURL,
+		ExpectedSHA256:   info.SHA256,
+		Trust:            entry.Trust,
+		TemplateName:     entry.Name,
+		TemplateVersion:  entry.Version,
+		ManifestURL:      entry.ManifestDownloadURL(),
+		ManifestSHA256:   entry.ManifestSHA256,
+		RegistryManifest: manifestBytes,
 	}, true
+}
+
+func (entry RegistryEntry) ManifestDownloadURL() string {
+	if entry.ManifestURL != "" {
+		return entry.ManifestURL
+	}
+	if entry.Name == "" {
+		return ""
+	}
+	return fmt.Sprintf("https://presto.c-1o.top/templates/%s/manifest.json", entry.Name)
+}
+
+func (entry RegistryEntry) ManifestBytes() ([]byte, error) {
+	displayName := entry.DisplayName
+	if displayName == "" {
+		displayName = entry.Name
+	}
+	manifest := Manifest{
+		Name:              entry.Name,
+		DisplayName:       displayName,
+		Description:       entry.Description,
+		Version:           entry.Version,
+		Author:            entry.Author,
+		License:           entry.License,
+		MinPrestoVersion:  entry.MinPrestoVersion,
+		Keywords:          entry.Keywords,
+		RequiredFonts:     entry.RequiredFonts,
+		FrontmatterSchema: entry.FrontmatterSchema,
+		Runtimes:          entry.Runtimes,
+	}
+	return json.MarshalIndent(manifest, "", "  ")
 }
 
 // VerifyResult describes the outcome of SHA256 verification against the registry.

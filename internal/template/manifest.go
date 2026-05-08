@@ -14,6 +14,12 @@ type FontRequirement struct {
 	URL         string `json:"url"`
 }
 
+type RuntimeSpec struct {
+	Type    string   `json:"type"`
+	Image   string   `json:"image,omitempty"`
+	Command []string `json:"command,omitempty"`
+}
+
 type Manifest struct {
 	Name              string                 `json:"name"`
 	DisplayName       string                 `json:"displayName"`
@@ -25,6 +31,7 @@ type Manifest struct {
 	Keywords          []string               `json:"keywords"`
 	RequiredFonts     []FontRequirement      `json:"requiredFonts"`
 	FrontmatterSchema map[string]FieldSchema `json:"frontmatterSchema"`
+	Runtimes          []RuntimeSpec          `json:"runtimes,omitempty"`
 }
 
 func ParseManifest(data []byte) (*Manifest, error) {

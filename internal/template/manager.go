@@ -54,7 +54,7 @@ func installArtifactLayout(goos string, manifestName string, downloadedFilename 
 		return "", false, fmt.Errorf("invalid downloaded filename: %w", err)
 	}
 
-	return downloadedFilename, false, nil
+	return downloadedFilename, true, nil
 }
 
 func (m *Manager) List() ([]InstalledTemplate, error) {
