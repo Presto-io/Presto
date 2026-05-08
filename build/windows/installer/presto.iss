@@ -25,10 +25,6 @@
   #error ARG_VC_REDIST is required
 #endif
 
-#ifndef ARG_TEMPLATE_DIR
-  #error ARG_TEMPLATE_DIR is required
-#endif
-
 #ifndef ARG_OUTPUT_DIR
   #define ARG_OUTPUT_DIR "."
 #endif
@@ -109,10 +105,6 @@ Name: "startmenuicon"; Description: "{cm:CreateStartMenuShortcut}"; GroupDescrip
 Source: "{#ARG_BINARY}"; DestDir: "{app}"; DestName: "{#PRODUCT_EXECUTABLE}"; Flags: ignoreversion
 Source: "{#ARG_TYPST_BINARY}"; DestDir: "{app}"; DestName: "{#TYPST_EXECUTABLE}"; Flags: ignoreversion
 Source: "{#ARG_VC_REDIST}"; DestDir: "{tmp}"; DestName: "vc_redist.exe"; Flags: deleteafterinstall
-Source: "{#ARG_TEMPLATE_DIR}\gongwen\presto-template-gongwen.exe"; DestDir: "{code:UserPrestoDir}\templates\gongwen"; Flags: ignoreversion
-Source: "{#ARG_TEMPLATE_DIR}\gongwen\manifest.json"; DestDir: "{code:UserPrestoDir}\templates\gongwen"; Flags: ignoreversion
-Source: "{#ARG_TEMPLATE_DIR}\jiaoan-shicao\presto-template-jiaoan-shicao.exe"; DestDir: "{code:UserPrestoDir}\templates\jiaoan-shicao"; Flags: ignoreversion
-Source: "{#ARG_TEMPLATE_DIR}\jiaoan-shicao\manifest.json"; DestDir: "{code:UserPrestoDir}\templates\jiaoan-shicao"; Flags: ignoreversion
 
 [Icons]
 Name: "{autodesktop}\Presto"; Filename: "{app}\{#PRODUCT_EXECUTABLE}"; WorkingDir: "{app}"; IconFilename: "{app}\{#PRODUCT_EXECUTABLE}"; Tasks: desktopicon
@@ -148,9 +140,12 @@ Root: HKA; Subkey: "Software\Clients\Presto\Capabilities\FileAssociations"; Valu
 Root: HKA; Subkey: "Software\Clients\Presto\Capabilities\FileAssociations"; ValueType: string; ValueName: ".markdown"; ValueData: "Presto.Markdown"
 
 [UninstallDelete]
-Type: filesandordirs; Name: "{code:UserPrestoDir}"
+Type: filesandordirs; Name: "{code:UserPrestoDir}"; Check: ShouldDeleteUserPrestoData
 
 [Code]
+var
+  DeleteUserPrestoData: Boolean;
+
 function UserPrestoDir(Param: string): string;
 begin
   Result := AddBackslash(GetEnv('USERPROFILE')) + '.presto';
@@ -193,4 +188,28 @@ function InitializeSetup(): Boolean;
 begin
   RunLegacyInstallerUninstaller();
   Result := True;
+end;
+
+function InitializeUninstall(): Boolean;
+var
+  DataDir: string;
+begin
+  Result := True;
+  DeleteUserPrestoData := False;
+  DataDir := UserPrestoDir('');
+
+  if DirExists(DataDir) then begin
+    DeleteUserPrestoData := MsgBox(
+      '是否同时删除 Presto 下载的模板文件和本地数据？' + #13#10 + #13#10 +
+      '路径：' + DataDir + #13#10 + #13#10 +
+      '选择“是”会删除模板、字体、注册中心缓存等文件；选择“否”会保留这些数据，重新安装后仍可使用。',
+      mbConfirmation,
+      MB_YESNO
+    ) = IDYES;
+  end;
+end;
+
+function ShouldDeleteUserPrestoData(): Boolean;
+begin
+  Result := DeleteUserPrestoData;
 end;

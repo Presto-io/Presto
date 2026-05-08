@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mrered/presto/internal/api"
+	"github.com/mrered/presto/internal/appdata"
 	"github.com/mrered/presto/internal/template"
 )
 
@@ -58,6 +59,9 @@ func main() {
 	fontsDir := filepath.Join(prestoDir, "fonts")
 	if err := os.MkdirAll(fontsDir, 0755); err != nil {
 		log.Fatal("failed to create fonts directory: ", err)
+	}
+	if err := appdata.MarkGenerated(prestoDir); err != nil {
+		log.Printf("[presto] failed to mark generated app data: %v", err)
 	}
 	var fontPaths []string
 	if fp := os.Getenv("FONT_PATHS"); fp != "" {

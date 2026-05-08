@@ -24,6 +24,7 @@ import (
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/mrered/presto/internal/api"
+	"github.com/mrered/presto/internal/appdata"
 	"github.com/mrered/presto/internal/template"
 	"github.com/mrered/presto/internal/typst"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -136,6 +137,9 @@ func main() {
 	templatesDir := filepath.Join(prestoDir, "templates")
 	if err := os.MkdirAll(templatesDir, 0755); err != nil {
 		log.Fatal("failed to create templates directory: ", err)
+	}
+	if err := appdata.MarkGenerated(prestoDir); err != nil {
+		logger.Warn("[presto] failed to mark generated app data", "error", err)
 	}
 	manager := template.NewManager(templatesDir)
 	typstBin := findTypstBinary()

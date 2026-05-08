@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mrered/presto/internal/appdata"
 	"github.com/mrered/presto/internal/template"
 )
 
@@ -31,6 +32,9 @@ func downloadTemplatesAndExit() {
 	if err := os.MkdirAll(templatesDir, 0755); err != nil {
 		logger.Error("[Installer] Failed to create templates directory", "error", err)
 		os.Exit(1)
+	}
+	if err := appdata.MarkGenerated(prestoDir); err != nil {
+		logger.Warn("[Installer] Failed to mark generated app data", "error", err)
 	}
 
 	manager := template.NewManager(templatesDir)
