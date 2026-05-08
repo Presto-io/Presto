@@ -50,7 +50,12 @@ func TestRegistryEntryDownloadURLForPlatformFallsBackToURL(t *testing.T) {
 
 func TestRegistryEntryInstallOptsForPlatform(t *testing.T) {
 	entry := RegistryEntry{
-		Trust: "official",
+		Name:           "example",
+		DisplayName:    "Example",
+		Version:        "1.2.3",
+		Trust:          "official",
+		ManifestURL:    "https://presto.c-1o.top/templates/example/manifest.json",
+		ManifestSHA256: "def456",
 		Platforms: map[string]RegistryPlatformInfo{
 			"linux-arm64": {
 				URL:    "https://github.com/example/linux-arm64",
@@ -75,6 +80,18 @@ func TestRegistryEntryInstallOptsForPlatform(t *testing.T) {
 	}
 	if opts.Trust != "official" {
 		t.Fatalf("Trust = %q", opts.Trust)
+	}
+	if opts.TemplateName != "example" || opts.TemplateVersion != "1.2.3" {
+		t.Fatalf("template identity = %q/%q", opts.TemplateName, opts.TemplateVersion)
+	}
+	if opts.ManifestURL != "https://presto.c-1o.top/templates/example/manifest.json" {
+		t.Fatalf("ManifestURL = %q", opts.ManifestURL)
+	}
+	if opts.ManifestSHA256 != "def456" {
+		t.Fatalf("ManifestSHA256 = %q", opts.ManifestSHA256)
+	}
+	if len(opts.RegistryManifest) == 0 {
+		t.Fatal("expected registry manifest fallback")
 	}
 }
 

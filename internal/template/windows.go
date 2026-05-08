@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 package template
@@ -6,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
 )
 
@@ -21,11 +23,21 @@ func validateWindowsPath(path string) error {
 		return fmt.Errorf("path too long (%d > %d): %s", len(path), MAX_PATH, path)
 	}
 
-	// Check if path contains invalid characters
+	// Check path segments for invalid characters. The full absolute path can
+	// legally contain a drive colon such as C:\, so validate each segment after
+	// stripping the volume prefix.
 	invalidChars := `<>:"|?*`
-	for _, ch := range invalidChars {
-		if containsRune(path, ch) {
-			return fmt.Errorf("path contains invalid character '%c': %s", ch, path)
+	withoutVolume := strings.TrimPrefix(path, filepath.VolumeName(path))
+	for _, segment := range strings.FieldsFunc(withoutVolume, func(r rune) bool {
+		return r == '\\' || r == '/'
+	}) {
+		if segment == "" {
+			continue
+		}
+		for _, ch := range invalidChars {
+			if containsRune(segment, ch) {
+				return fmt.Errorf("path contains invalid character '%c': %s", ch, path)
+			}
 		}
 	}
 

@@ -131,8 +131,8 @@ func TestInstallArtifactLayoutWindowsPreservesDownloadedFile(t *testing.T) {
 	if binaryName != "presto-template-gongwen-windows-amd64.exe" {
 		t.Fatalf("binaryName = %q", binaryName)
 	}
-	if writeManifest {
-		t.Fatal("Windows install should not write manifest.json")
+	if !writeManifest {
+		t.Fatal("Windows install should write manifest.json")
 	}
 }
 

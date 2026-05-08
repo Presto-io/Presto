@@ -84,11 +84,15 @@ export interface RegistryTemplate {
   keywords: string[];
   license: string;
   trust: 'official' | 'verified' | 'community' | 'unverified';
+  manifest_url?: string;
+  manifest_sha256?: string;
   publishedAt?: string;
   repository?: string;                           // v1: full URL
   repo?: string;                                 // v2: "owner/repo"
   platforms?: Record<string, PlatformInfo>;       // v2: per-platform URL + SHA256
   minPrestoVersion?: string;
+  frontmatterSchema?: Record<string, FieldSchema>;
+  runtimes?: { type: string; image?: string; command?: string[] }[];
   previewImage?: string;
 }
 

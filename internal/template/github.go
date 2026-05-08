@@ -30,7 +30,10 @@ const (
 	ErrServer           InstallErrorType = "server_error"
 )
 
-const maxTemplateBinarySize int64 = 100 << 20
+const (
+	maxTemplateBinarySize int64 = 100 << 20
+	maxManifestSize       int64 = 1 << 20
+)
 
 // InstallError wraps installation errors with type classification
 type InstallError struct {
@@ -115,6 +118,22 @@ var allowedDownloadHosts = map[string]bool{
 }
 
 func isAllowedDownloadHost(host string) bool {
+	host = strings.TrimSuffix(strings.ToLower(host), ".")
+	if allowedDownloadHosts[host] {
+		return true
+	}
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	if allowedDownloadHosts[host] {
+		return true
+	}
+	if host == "c-1o.top" || strings.HasSuffix(host, ".c-1o.top") {
+		return true
+	}
+	if host == "mre.red" || strings.HasSuffix(host, ".mre.red") {
+		return true
+	}
 	return allowedDownloadHosts[host]
 }
 
@@ -211,9 +230,56 @@ type InstallOpts struct {
 	ExpectedSHA256 string
 	// Trust is the trust level: "official", "verified", "community", or "".
 	Trust string
+	// TemplateName and TemplateVersion come from the registry entry and are
+	// checked against the resolved manifest before anything is installed.
+	TemplateName    string
+	TemplateVersion string
+	// ManifestURL points to the standalone manifest.json. If omitted, registry
+	// installs try the canonical CDN manifest path and then fall back to the
+	// registry-embedded manifest bytes.
+	ManifestURL string
+	// ManifestSHA256 is the optional SHA256 for ManifestURL.
+	ManifestSHA256 string
+	// RegistryManifest is a registry-embedded manifest fallback for offline
+	// cache use and older registries that do not yet publish manifest hashes.
+	RegistryManifest []byte
 	// OnProgress is an optional callback for download progress updates.
 	// If set, called periodically with bytes downloaded and total bytes.
 	OnProgress ProgressCallback
+}
+
+type resolvedManifest struct {
+	bytes  []byte
+	parsed *Manifest
+	source string
+	url    string
+	sha256 string
+}
+
+type installLock struct {
+	SchemaVersion int                 `json:"schemaVersion"`
+	Name          string              `json:"name"`
+	Version       string              `json:"version"`
+	Repo          string              `json:"repo"`
+	Trust         string              `json:"trust,omitempty"`
+	Platform      string              `json:"platform"`
+	InstalledAt   string              `json:"installedAt"`
+	Artifact      installLockArtifact `json:"artifact"`
+	Manifest      installLockManifest `json:"manifest"`
+}
+
+type installLockArtifact struct {
+	Type     string `json:"type"`
+	Source   string `json:"source,omitempty"`
+	URL      string `json:"url,omitempty"`
+	Filename string `json:"filename"`
+	SHA256   string `json:"sha256"`
+}
+
+type installLockManifest struct {
+	Source string `json:"source"`
+	URL    string `json:"url,omitempty"`
+	SHA256 string `json:"sha256"`
 }
 
 type downloadCandidate struct {
@@ -294,7 +360,7 @@ func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
 
 			data, err := downloadWithResume(candidate.url, 3, opts.OnProgress)
 			if err == nil {
-				return m.completeInstall(owner, repo, data, expectedHash, opts, startTime, candidate.filename)
+				return m.completeInstall(owner, repo, data, expectedHash, opts, startTime, candidate)
 			}
 
 			lastErr = err
@@ -408,12 +474,16 @@ func (m *Manager) Install(owner, repo string, opts *InstallOpts) error {
 		}
 
 		// Continue with installation using downloaded data
-		return m.completeInstall(owner, repo, data, expectedHash, nil, startTime, assetName)
+		return m.completeInstall(owner, repo, data, expectedHash, nil, startTime, downloadCandidate{
+			source:   "github",
+			url:      downloadURL,
+			filename: assetName,
+		})
 	}
 }
 
 // completeInstall finishes the installation process after download.
-func (m *Manager) completeInstall(owner, repo string, data []byte, expectedHash string, opts *InstallOpts, startTime time.Time, downloadedFilename string) error {
+func (m *Manager) completeInstall(owner, repo string, data []byte, expectedHash string, opts *InstallOpts, startTime time.Time, artifact downloadCandidate) error {
 	// SEC-30: 下载→验证→执行 三步流程
 	// Step 1: 下载已完成（data 已获取）
 	// Step 2: 验证 SHA256
@@ -458,59 +528,19 @@ func (m *Manager) completeInstall(owner, repo string, data []byte, expectedHash 
 			"hash", actualHex)
 	}
 
-	// Step 3: 验证通过后才执行二进制
-	// FIX: Windows requires .exe suffix for executable files
-	tmpPattern := "presto-template-*"
-	if runtime.GOOS == "windows" {
-		tmpPattern = "presto-template-*.exe"
-	}
-	tmpFile, err := os.CreateTemp("", tmpPattern)
+	// Step 3: Resolve manifest without executing registry-provided binaries.
+	// Registry installs use standalone/embedded manifest data; only legacy
+	// discovery installs fall back to executing --manifest.
+	resolved, err := m.resolveManifestForInstall(data, opts)
 	if err != nil {
 		return &InstallError{
 			Type:    ErrServer,
-			Message: fmt.Sprintf("create temp file: %v", err),
+			Message: fmt.Sprintf("resolve manifest: %v", err),
 			Err:     err,
 		}
 	}
-	tmpPath := tmpFile.Name()
-	defer os.Remove(tmpPath)
-
-	if _, err := tmpFile.Write(data); err != nil {
-		tmpFile.Close()
-		return &InstallError{
-			Type:    ErrServer,
-			Message: fmt.Sprintf("write temp binary: %v", err),
-			Err:     err,
-		}
-	}
-	tmpFile.Close()
-
-	// SEC-28: Set executable permission
-	if err := os.Chmod(tmpPath, 0700); err != nil {
-		return &InstallError{
-			Type:    ErrServer,
-			Message: fmt.Sprintf("chmod temp binary: %v", err),
-			Err:     err,
-		}
-	}
-
-	executor := NewExecutor(tmpPath)
-	manifestBytes, err := executor.GetManifest()
-	if err != nil {
-		return &InstallError{
-			Type:    ErrServer,
-			Message: fmt.Sprintf("get manifest from binary: %v", err),
-			Err:     err,
-		}
-	}
-	manifest, err := ParseManifest(manifestBytes)
-	if err != nil {
-		return &InstallError{
-			Type:    ErrServer,
-			Message: fmt.Sprintf("parse manifest: %v", err),
-			Err:     err,
-		}
-	}
+	manifestBytes := resolved.bytes
+	manifest := resolved.parsed
 
 	// SEC-06: Validate manifest name
 	if err := validateName(manifest.Name); err != nil {
@@ -547,7 +577,7 @@ func (m *Manager) completeInstall(owner, repo string, data []byte, expectedHash 
 		}
 	}
 
-	binaryName, writeManifest, err := installArtifactLayout(runtime.GOOS, manifest.Name, downloadedFilename)
+	binaryName, writeManifest, err := installArtifactLayout(runtime.GOOS, manifest.Name, artifact.filename)
 	if err != nil {
 		return &InstallError{
 			Type:    ErrServer,
@@ -642,6 +672,46 @@ func (m *Manager) completeInstall(owner, repo string, data []byte, expectedHash 
 		}
 	}
 
+	lock := installLock{
+		SchemaVersion: 1,
+		Name:          manifest.Name,
+		Version:       manifest.Version,
+		Repo:          owner + "/" + repo,
+		Platform:      Platform(),
+		InstalledAt:   time.Now().UTC().Format(time.RFC3339),
+		Artifact: installLockArtifact{
+			Type:     "native",
+			Source:   artifact.source,
+			URL:      artifact.url,
+			Filename: binaryName,
+			SHA256:   actualHex,
+		},
+		Manifest: installLockManifest{
+			Source: resolved.source,
+			URL:    resolved.url,
+			SHA256: resolved.sha256,
+		},
+	}
+	if opts != nil {
+		lock.Trust = opts.Trust
+	}
+	lockData, err := json.MarshalIndent(lock, "", "  ")
+	if err != nil {
+		return &InstallError{
+			Type:    ErrServer,
+			Message: fmt.Sprintf("marshal install lock: %v", err),
+			Err:     err,
+		}
+	}
+	lockPath := filepath.Join(stageDir, "install-lock.json")
+	if err := os.WriteFile(lockPath, lockData, 0600); err != nil {
+		return &InstallError{
+			Type:    ErrServer,
+			Message: fmt.Sprintf("write install lock: %v", err),
+			Err:     err,
+		}
+	}
+
 	if err := replaceTemplateDir(tplDir, stageDir); err != nil {
 		return &InstallError{
 			Type:    ErrServer,
@@ -659,6 +729,140 @@ func (m *Manager) completeInstall(owner, repo string, data []byte, expectedHash 
 		"duration", duration.String(),
 		"duration_ms", duration.Milliseconds())
 
+	return nil
+}
+
+func (m *Manager) resolveManifestForInstall(data []byte, opts *InstallOpts) (*resolvedManifest, error) {
+	if opts == nil {
+		return manifestFromBinary(data)
+	}
+
+	manifestURL := opts.ManifestURL
+	if manifestURL != "" {
+		resolved, err := downloadStandaloneManifest(manifestURL, opts.ManifestSHA256)
+		if err == nil {
+			if err := validateRegistryManifest(resolved.parsed, opts); err != nil {
+				return nil, err
+			}
+			return resolved, nil
+		}
+		if opts.ManifestSHA256 != "" {
+			return nil, err
+		}
+		slog.Warn("[templates] standalone manifest unavailable, falling back to registry manifest",
+			"url", SanitizeURL(manifestURL),
+			"error", err.Error())
+	}
+
+	if len(opts.RegistryManifest) == 0 {
+		return nil, fmt.Errorf("registry manifest unavailable")
+	}
+	resolved, err := parseResolvedManifest(opts.RegistryManifest, "registry", "", "")
+	if err != nil {
+		return nil, err
+	}
+	if err := validateRegistryManifest(resolved.parsed, opts); err != nil {
+		return nil, err
+	}
+	return resolved, nil
+}
+
+func manifestFromBinary(data []byte) (*resolvedManifest, error) {
+	tmpPattern := "presto-template-*"
+	if runtime.GOOS == "windows" {
+		tmpPattern = "presto-template-*.exe"
+	}
+	tmpFile, err := os.CreateTemp("", tmpPattern)
+	if err != nil {
+		return nil, fmt.Errorf("create temp file: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+	defer os.Remove(tmpPath)
+
+	if _, err := tmpFile.Write(data); err != nil {
+		tmpFile.Close()
+		return nil, fmt.Errorf("write temp binary: %w", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		return nil, fmt.Errorf("close temp binary: %w", err)
+	}
+
+	if err := os.Chmod(tmpPath, 0700); err != nil {
+		return nil, fmt.Errorf("chmod temp binary: %w", err)
+	}
+
+	manifestBytes, err := NewExecutor(tmpPath).GetManifest()
+	if err != nil {
+		return nil, fmt.Errorf("get manifest from binary: %w", err)
+	}
+	return parseResolvedManifest(manifestBytes, "binary", "", "")
+}
+
+func downloadStandaloneManifest(manifestURL string, expectedHash string) (*resolvedManifest, error) {
+	parsedURL, err := url.Parse(manifestURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid manifest URL: %w", err)
+	}
+	if !isAllowedDownloadHost(parsedURL.Host) {
+		return nil, fmt.Errorf("manifest URL host not allowed: %s", parsedURL.Host)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, "GET", manifestURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create manifest request: %w", err)
+	}
+	resp, err := downloadClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("download manifest: %w", err)
+	}
+	defer resp.Body.Close()
+	if err := checkHTTPStatus(resp, "download manifest"); err != nil {
+		return nil, err
+	}
+
+	data, err := readAllLimited(resp.Body, maxManifestSize)
+	if err != nil {
+		return nil, fmt.Errorf("read manifest: %w", err)
+	}
+	actualHash := sha256.Sum256(data)
+	actualHex := hex.EncodeToString(actualHash[:])
+	expectedHash = strings.ToLower(strings.TrimSpace(expectedHash))
+	if expectedHash != "" && actualHex != expectedHash {
+		return nil, fmt.Errorf("manifest SHA256 mismatch: expected %s, got %s", expectedHash, actualHex)
+	}
+	return parseResolvedManifest(data, "standalone", manifestURL, actualHex)
+}
+
+func parseResolvedManifest(data []byte, source string, manifestURL string, hash string) (*resolvedManifest, error) {
+	if int64(len(data)) > maxManifestSize {
+		return nil, fmt.Errorf("manifest exceeds maximum size of %d bytes", maxManifestSize)
+	}
+	manifest, err := ParseManifest(data)
+	if err != nil {
+		return nil, fmt.Errorf("parse manifest: %w", err)
+	}
+	if hash == "" {
+		sum := sha256.Sum256(data)
+		hash = hex.EncodeToString(sum[:])
+	}
+	return &resolvedManifest{
+		bytes:  data,
+		parsed: manifest,
+		source: source,
+		url:    manifestURL,
+		sha256: hash,
+	}, nil
+}
+
+func validateRegistryManifest(manifest *Manifest, opts *InstallOpts) error {
+	if opts.TemplateName != "" && manifest.Name != opts.TemplateName {
+		return fmt.Errorf("manifest name %q does not match registry name %q", manifest.Name, opts.TemplateName)
+	}
+	if opts.TemplateVersion != "" && manifest.Version != opts.TemplateVersion {
+		return fmt.Errorf("manifest version %q does not match registry version %q", manifest.Version, opts.TemplateVersion)
+	}
 	return nil
 }
 
