@@ -17,7 +17,7 @@
 		"@sveltejs/kit": "^2.50.2",
 		"@sveltejs/vite-plugin-svelte": "^7.1.0",
 		"@types/node": "^25.6.0",
-		"svelte": "^5.49.2",
+		"svelte": "^5.55.5",
 		"svelte-check": "^4.4.6",
 		"typescript": "^5.9.3",
 		"vite": "^8.0.10"
