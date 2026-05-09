@@ -1,0 +1,48 @@
+name: Dependabot Auto Merge
+
+on:
+  pull_request_target:
+    types: [opened, edited, reopened, synchronize, ready_for_review]
+  workflow_run:
+    workflows: [Test, Security Scan]
+    types: [completed]
+  schedule:
+    - cron: '17 */4 * * *'
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Optional PR number to evaluate
+        required: false
+        type: number
+      dry_run:
+        description: Preview labels and merge decisions without changing PRs
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  checks: read
+  statuses: read
+
+concurrency:
+  group: dependabot-automerge-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || inputs.pr_number || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  automerge:
+    name: Classify and merge Dependabot PRs
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Classify and merge Dependabot PRs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || inputs.pr_number }}
+          DRY_RUN: ${{ inputs.dry_run || false }}
+        run: node .github/scripts/dependabot-automerge.cjs
