@@ -1,0 +1,329 @@
+{
+  "labels": [
+    {
+      "name": "bug",
+      "color": "d73a4a",
+      "description": "Something is not working"
+    },
+    {
+      "name": "documentation",
+      "color": "0075ca",
+      "description": "Improvements or additions to documentation"
+    },
+    {
+      "name": "enhancement",
+      "color": "a2eeef",
+      "description": "New feature or request"
+    },
+    {
+      "name": "question",
+      "color": "d876e3",
+      "description": "Further information is requested"
+    },
+    {
+      "name": "dependencies",
+      "color": "0366d6",
+      "description": "Dependency updates or dependency-related issues"
+    },
+    {
+      "name": "go",
+      "color": "16e2e2",
+      "description": "Go backend or desktop runtime"
+    },
+    {
+      "name": "javascript",
+      "color": "168700",
+      "description": "JavaScript, TypeScript, or frontend code"
+    },
+    {
+      "name": "needs-triage",
+      "color": "fef2c0",
+      "description": "Needs initial maintainer triage"
+    },
+    {
+      "name": "needs-info",
+      "color": "fbca04",
+      "description": "Needs more details before it can be acted on"
+    },
+    {
+      "name": "needs-reproduction",
+      "color": "fbca04",
+      "description": "Needs reproduction steps, logs, screenshots, or environment details"
+    },
+    {
+      "name": "area: templates",
+      "color": "c2e0c6",
+      "description": "Templates, template registry, or template installation"
+    },
+    {
+      "name": "area: frontend",
+      "color": "1d76db",
+      "description": "Frontend, UI, showcase, or store"
+    },
+    {
+      "name": "area: desktop",
+      "color": "c5def5",
+      "description": "Desktop app, installer, or local runtime"
+    },
+    {
+      "name": "area: release",
+      "color": "f9d0c4",
+      "description": "Release, versioning, packaging, or signing"
+    },
+    {
+      "name": "os: windows",
+      "color": "0052cc",
+      "description": "Windows-specific issue"
+    },
+    {
+      "name": "os: macos",
+      "color": "5319e7",
+      "description": "macOS-specific issue"
+    },
+    {
+      "name": "os: linux",
+      "color": "0e8a16",
+      "description": "Linux-specific issue"
+    }
+  ],
+  "typeLabels": [
+    "bug",
+    "enhancement",
+    "documentation",
+    "question"
+  ],
+  "typeRules": [
+    {
+      "label": "bug",
+      "weight": 2,
+      "patterns": [
+        "\\bbug\\b",
+        "\\berror\\b",
+        "\\bexception\\b",
+        "\\bcrash(?:es|ed|ing)?\\b",
+        "\\bfail(?:s|ed|ing|ure)?\\b",
+        "\\bbroken\\b",
+        "not working",
+        "doesn.?t work",
+        "can't",
+        "cannot",
+        "报错",
+        "错误",
+        "异常",
+        "崩溃",
+        "失败",
+        "无法",
+        "不能",
+        "失效",
+        "无反应",
+        "安装不了",
+        "打不开",
+        "换页问题"
+      ]
+    },
+    {
+      "label": "enhancement",
+      "patterns": [
+        "\\bfeature\\b",
+        "\\brequest\\b",
+        "\\bproposal\\b",
+        "\\benhancement\\b",
+        "\\bsupport\\b",
+        "\\badd\\b",
+        "建议",
+        "新增",
+        "增加",
+        "希望",
+        "支持",
+        "能否",
+        "可否",
+        "需求",
+        "功能",
+        "模板"
+      ]
+    },
+    {
+      "label": "documentation",
+      "patterns": [
+        "\\bdocs?\\b",
+        "\\breadme\\b",
+        "\\bguide\\b",
+        "文档",
+        "说明",
+        "教程",
+        "指南",
+        "示例"
+      ]
+    },
+    {
+      "label": "question",
+      "patterns": [
+        "\\?",
+        "？",
+        "\\bhow\\b",
+        "\\bwhat\\b",
+        "\\bwhy\\b",
+        "怎么",
+        "如何",
+        "请问",
+        "咨询",
+        "疑问"
+      ]
+    }
+  ],
+  "additiveRules": [
+    {
+      "label": "area: templates",
+      "patterns": [
+        "\\btemplates?\\b",
+        "模板",
+        "模版",
+        "gongwen",
+        "公文",
+        "简历",
+        "\\bresume\\b",
+        "\\bstarter\\b",
+        "\\bregistry\\b",
+        "\\bmanifest\\b"
+      ]
+    },
+    {
+      "label": "area: frontend",
+      "patterns": [
+        "\\bfrontend\\b",
+        "前端",
+        "\\bui\\b",
+        "界面",
+        "\\bsvelte\\b",
+        "\\bvite\\b",
+        "\\bstore\\b",
+        "模板商店",
+        "商店",
+        "package\\.json",
+        "package-lock"
+      ]
+    },
+    {
+      "label": "area: desktop",
+      "patterns": [
+        "\\bdesktop\\b",
+        "桌面",
+        "\\bapp\\b",
+        "安装",
+        "启动",
+        "presto desktop",
+        "应用",
+        "\\binstaller\\b"
+      ]
+    },
+    {
+      "label": "area: release",
+      "patterns": [
+        "\\brelease\\b",
+        "发布",
+        "升级",
+        "\\bbeta\\b",
+        "代码签名",
+        "应用签名",
+        "签名失败",
+        "notariz"
+      ]
+    },
+    {
+      "label": "os: windows",
+      "patterns": [
+        "\\bwindows\\b",
+        "\\bwin\\b",
+        "win11",
+        "win10"
+      ]
+    },
+    {
+      "label": "os: macos",
+      "patterns": [
+        "\\bmacos\\b",
+        "\\bmac\\b",
+        "\\bdarwin\\b",
+        "苹果"
+      ]
+    },
+    {
+      "label": "os: linux",
+      "patterns": [
+        "\\blinux\\b",
+        "\\bubuntu\\b",
+        "\\bdebian\\b",
+        "\\bfedora\\b",
+        "\\barch\\b"
+      ]
+    },
+    {
+      "label": "dependencies",
+      "patterns": [
+        "\\bdependabot\\b",
+        "\\bdependenc(?:y|ies)\\b",
+        "依赖",
+        "\\bnpm\\b",
+        "package-lock",
+        "go\\.mod",
+        "go\\.sum"
+      ]
+    },
+    {
+      "label": "javascript",
+      "patterns": [
+        "\\bjavascript\\b",
+        "\\btypescript\\b",
+        "\\bjs\\b",
+        "\\bts\\b",
+        "\\bnpm\\b",
+        "\\bnode\\b",
+        "\\bsvelte\\b",
+        "\\bvite\\b",
+        "\\bfrontend\\b",
+        "前端",
+        "package\\.json"
+      ]
+    },
+    {
+      "label": "go",
+      "patterns": [
+        "\\bgo\\b",
+        "\\bgolang\\b",
+        "go\\.mod",
+        "go\\.sum",
+        "cmd/",
+        "后端"
+      ]
+    }
+  ],
+  "needsInfo": {
+    "label": "needs-info",
+    "minBodyLength": 60
+  },
+  "needsReproduction": {
+    "label": "needs-reproduction",
+    "appliesToType": "bug",
+    "sufficientPatterns": [
+      "复现",
+      "重现",
+      "步骤",
+      "预期",
+      "实际",
+      "\\bexpected\\b",
+      "\\bactual\\b",
+      "\\blog\\b",
+      "日志",
+      "截图",
+      "录屏",
+      "\\bscreenshot\\b",
+      "\\bvideo\\b",
+      "\\bversion\\b",
+      "版本",
+      "环境",
+      "系统",
+      "<img\\b",
+      "user-attachments"
+    ]
+  }
+}
