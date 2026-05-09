@@ -1,0 +1,47 @@
+name: Close Inactive Response Issues
+
+on:
+  schedule:
+    - cron: '23 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  pull-requests: read
+
+jobs:
+  close-needs-response:
+    name: Close needs-response issues
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Ensure issue workflow labels exist
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh label create needs-response \
+            --color C5DEF5 \
+            --description "Waiting for author response; auto-closes after 7 inactive days" \
+            --force
+          gh label create closed-no-response \
+            --color D4C5F9 \
+            --description "Closed after no response for 7 inactive days" \
+            --force
+
+      - name: Close issues waiting for response
+        uses: actions/stale@b5d41d4e1d5dceea10e7104786b73624c18a190f # v10.2.0
+        with:
+          repo-token: ${{ github.token }}
+          only-issue-labels: needs-response
+          stale-issue-label: needs-response
+          close-issue-label: closed-no-response
+          days-before-issue-stale: -1
+          days-before-issue-close: 7
+          days-before-pr-stale: -1
+          days-before-pr-close: -1
+          remove-issue-stale-when-updated: true
+          close-issue-reason: not_planned
+          close-issue-message: |
+            Closing this because it has been waiting on a response for more than 7 days.
+
+            If you can provide the requested details, please reopen this issue or create a new one and link back here.
