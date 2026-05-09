@@ -18,6 +18,8 @@
     locale?: 'zh' | 'en';
   }
 
+  type CopyCommandTarget = 'install' | 'uninstall';
+
   let {
     mode,
     registryUrl,
@@ -85,7 +87,11 @@
   $effect(() => { if (initialSelectedId !== null) selectedId = initialSelectedId; });
   let readmeContent = $state('');
   let readmeLoading = $state(false);
-  let copied = $state(false);
+  let copiedCommands = $state<Record<CopyCommandTarget, boolean>>({
+    install: false,
+    uninstall: false,
+  });
+  const copyResetTimers: Partial<Record<CopyCommandTarget, ReturnType<typeof setTimeout>>> = {};
 
   // --- Derived data ---
   let categories = $derived(() => {
@@ -136,12 +142,27 @@
   // --- Actions ---
   function selectSkill(name: string) {
     selectedId = name;
+    clearCopiedCommands();
   }
 
-  function copyCommand(cmd: string) {
+  function clearCopiedCommands() {
+    for (const target of ['install', 'uninstall'] as const) {
+      copiedCommands[target] = false;
+      if (copyResetTimers[target]) {
+        clearTimeout(copyResetTimers[target]);
+        delete copyResetTimers[target];
+      }
+    }
+  }
+
+  function copyCommand(cmd: string, target: CopyCommandTarget) {
     navigator.clipboard.writeText(cmd).then(() => {
-      copied = true;
-      setTimeout(() => { copied = false; }, 2000);
+      copiedCommands[target] = true;
+      if (copyResetTimers[target]) clearTimeout(copyResetTimers[target]);
+      copyResetTimers[target] = setTimeout(() => {
+        copiedCommands[target] = false;
+        delete copyResetTimers[target];
+      }, 2000);
     });
   }
 
@@ -330,11 +351,11 @@
             <code class="install-cmd">npx skills add --repo {skill.repo} --path {skill.path}</code>
             <button
               class="btn-copy"
-              class:copied
-              onclick={() => copyCommand(`npx skills add --repo ${skill.repo} --path ${skill.path}`)}
+              class:copied={copiedCommands.install}
+              onclick={() => copyCommand(`npx skills add --repo ${skill.repo} --path ${skill.path}`, 'install')}
               aria-label={t('copy')}
             >
-              {#if copied}
+              {#if copiedCommands.install}
                 <Check size={14} />
                 <span>{t('copied')}</span>
               {:else}
@@ -353,11 +374,11 @@
             <code class="install-cmd">npx skills remove {skill.path} -g -y</code>
             <button
               class="btn-copy"
-              class:copied
-              onclick={() => copyCommand(`npx skills remove ${skill.path} -g -y`)}
+              class:copied={copiedCommands.uninstall}
+              onclick={() => copyCommand(`npx skills remove ${skill.path} -g -y`, 'uninstall')}
               aria-label={t('copy')}
             >
-              {#if copied}
+              {#if copiedCommands.uninstall}
                 <Check size={14} />
                 <span>{t('copied')}</span>
               {:else}
@@ -777,6 +798,7 @@
     line-height: 1.5;
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
