@@ -11,6 +11,103 @@ import (
 
 var letPattern = regexp.MustCompile(`#let\s+(\w+)\s*=\s*"([^"]*)"`)
 
+func exportPDFBaseName(markdown string, templateID string, typstOutput string) string {
+	if name := jiaoanShicaoPDFBaseName(markdown, templateID); name != "" {
+		return name
+	}
+	return extractTypstTitle(typstOutput)
+}
+
+func jiaoanShicaoPDFBaseName(markdown string, templateID string) string {
+	if templateID != "jiaoan-shicao" {
+		return ""
+	}
+	fields := extractSimpleFrontMatter(markdown)
+	courseName := strings.TrimSpace(fields["course_name"])
+	totalHours := normalizeHourLabel(fields["total_hours"])
+	if courseName == "" || totalHours == "" {
+		return ""
+	}
+	return sanitizeFilename("教学设计方案 " + courseName + " " + totalHours)
+}
+
+func extractSimpleFrontMatter(markdown string) map[string]string {
+	result := map[string]string{}
+	trimmed := strings.TrimLeft(markdown, "\ufeff \t\r\n")
+	if !strings.HasPrefix(trimmed, "---") {
+		return result
+	}
+	rest := trimmed[3:]
+	if strings.HasPrefix(rest, "\r\n") {
+		rest = rest[2:]
+	} else if strings.HasPrefix(rest, "\n") {
+		rest = rest[1:]
+	}
+
+	end := strings.Index(rest, "\n---")
+	if end < 0 {
+		return result
+	}
+	for _, line := range strings.Split(rest[:end], "\n") {
+		key, value, ok := strings.Cut(strings.TrimSpace(line), ":")
+		if !ok {
+			continue
+		}
+		key = strings.TrimSpace(key)
+		value = strings.TrimSpace(stripInlineYAMLComment(value))
+		if len(value) >= 2 {
+			first, last := value[0], value[len(value)-1]
+			if (first == '"' && last == '"') || (first == '\'' && last == '\'') {
+				value = value[1 : len(value)-1]
+			}
+		}
+		result[key] = value
+	}
+	return result
+}
+
+func stripInlineYAMLComment(value string) string {
+	inSingleQuote := false
+	inDoubleQuote := false
+	escaped := false
+	for i, r := range value {
+		if escaped {
+			escaped = false
+			continue
+		}
+		if r == '\\' && inDoubleQuote {
+			escaped = true
+			continue
+		}
+		if r == '\'' && !inDoubleQuote {
+			inSingleQuote = !inSingleQuote
+			continue
+		}
+		if r == '"' && !inSingleQuote {
+			inDoubleQuote = !inDoubleQuote
+			continue
+		}
+		if r == '#' && !inSingleQuote && !inDoubleQuote {
+			if i == 0 || value[i-1] == ' ' || value[i-1] == '\t' {
+				return strings.TrimSpace(value[:i])
+			}
+		}
+	}
+	return value
+}
+
+func normalizeHourLabel(totalHours string) string {
+	hours := strings.TrimSpace(totalHours)
+	if hours == "" {
+		return ""
+	}
+	upper := strings.ToUpper(hours)
+	if strings.HasSuffix(upper, "H") || strings.Contains(hours, "课时") || strings.Contains(hours, "小时") {
+		return hours
+	}
+	return hours + "H"
+}
+
 func (a *App) CompileSVG(typstSource string, workDir string) ([]string, error) {
 	return a.compiler.CompileToSVG(typstSource, workDir)
 }
