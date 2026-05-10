@@ -9,7 +9,7 @@
   import { editor } from '$lib/stores/editor.svelte';
   import { templateStore } from '$lib/stores/templates.svelte';
   import { notificationStore } from '$lib/stores/notification.svelte';
-  import { extractTemplateName, resolveTemplate } from '$lib/utils/frontmatter';
+  import { extractTemplateName, jiaoanShicaoPDFDownloadName, resolveTemplate } from '$lib/utils/frontmatter';
   import { triggerAction, shouldShowPoint } from '$lib/stores/wizard.svelte';
   import { fileRouter } from '$lib/stores/file-router.svelte';
 
@@ -495,7 +495,8 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = extractTypstTitle(editor.typstSource) + '.pdf';
+      a.download = jiaoanShicaoPDFDownloadName(editor.markdown, editor.selectedTemplate)
+        ?? extractTypstTitle(editor.typstSource) + '.pdf';
       a.click();
       URL.revokeObjectURL(url);
       clearEditorError('editor-action');

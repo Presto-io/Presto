@@ -191,7 +191,7 @@ func (a *App) SavePDF(markdown string, templateId string, workDir string) error 
 		return fmt.Errorf("compile failed: %w", err)
 	}
 
-	filename := extractTypstTitle(typstOutput) + ".pdf"
+	filename := exportPDFBaseName(markdown, templateId, typstOutput) + ".pdf"
 
 	savePath, err := wailsRuntime.SaveFileDialog(a.ctx, wailsRuntime.SaveDialogOptions{
 		DefaultFilename: filename,
