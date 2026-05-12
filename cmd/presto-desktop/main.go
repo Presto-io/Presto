@@ -25,6 +25,7 @@ import (
 
 	"github.com/mrered/presto/internal/api"
 	"github.com/mrered/presto/internal/appdata"
+	"github.com/mrered/presto/internal/preview"
 	"github.com/mrered/presto/internal/template"
 	"github.com/mrered/presto/internal/typst"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -53,6 +54,8 @@ type App struct {
 	manager         *template.Manager
 	compiler        *typst.Compiler
 	registry        *template.RegistryCache
+	previewService  *preview.Service
+	previewRunner   *previewRunner
 	saveMenuItem    *menu.MenuItem
 	exportMenuItem  *menu.MenuItem
 	hasDirtyContent bool
@@ -89,8 +92,14 @@ func (h *spaFallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	http.NotFound(w, r)
 }
 
-func NewApp(manager *template.Manager, compiler *typst.Compiler, registry *template.RegistryCache) *App {
-	return &App{manager: manager, compiler: compiler, registry: registry}
+func NewApp(manager *template.Manager, compiler *typst.Compiler, registry *template.RegistryCache, previewService *preview.Service, previewRunner *previewRunner) *App {
+	return &App{
+		manager:        manager,
+		compiler:       compiler,
+		registry:       registry,
+		previewService: previewService,
+		previewRunner:  previewRunner,
+	}
 }
 
 func (a *App) startup(ctx context.Context) {
@@ -144,6 +153,8 @@ func main() {
 	manager := template.NewManager(templatesDir)
 	typstBin := findTypstBinary()
 	logger.Info("[presto] using typst", "path", typstBin)
+	tinymistBin := findTinymistBinary()
+	logger.Info("[presto] using tinymist", "path", tinymistBin)
 	registry := template.NewRegistryCache(prestoDir)
 	registry.RefreshAsync()
 	// SEC-40: Use os temp dir instead of $HOME to restrict file access
@@ -156,7 +167,9 @@ func main() {
 	})
 	frontendFS, _ := fs.Sub(assets, "build")
 	handler := &spaFallbackHandler{api: apiHandler, assets: frontendFS}
-	app := NewApp(manager, compiler, registry)
+	previewService := preview.NewService()
+	previewRunner := newPreviewRunner(previewService, tinymistBin)
+	app := NewApp(manager, compiler, registry, previewService, previewRunner)
 	var appMenu *menu.Menu
 	if runtime.GOOS != "windows" {
 		appMenu = buildMenu(app)
@@ -189,6 +202,9 @@ func main() {
 		OnStartup: app.startup,
 		OnBeforeClose: func(ctx context.Context) (prevent bool) {
 			if !app.hasDirtyContent {
+				if app.previewRunner != nil {
+					_ = app.previewRunner.stop()
+				}
 				return false
 			}
 			wailsRuntime.EventsEmit(ctx, "app:request-close")
