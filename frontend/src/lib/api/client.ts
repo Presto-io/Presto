@@ -1,4 +1,4 @@
-import type { Template, Manifest, GitHubRepo, BatchImportResult, ImportResult, RegistryTemplate, PlatformInfo, StatsMap, InstalledSkill, OutputInfo } from './types';
+import type { Template, Manifest, GitHubRepo, BatchImportResult, ImportResult, RegistryTemplate, PlatformInfo, StatsMap, InstalledSkill, OutputInfo, PreviewEvent } from './types';
 
 const BASE = import.meta.env.VITE_API_URL || '';
 
@@ -103,6 +103,29 @@ export async function compileSvg(typstSource: string, workDir?: string): Promise
   }
   const data = await res.json();
   return data.pages;
+}
+
+export async function previewUpdate(
+  markdown: string,
+  templateId: string,
+  workDir?: string,
+  documentKey?: string
+): Promise<{ events: PreviewEvent[]; svgPages?: string[] }> {
+  const res = await authFetch(`${BASE}/api/preview/update`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ markdown, templateId, workDir, documentKey })
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Preview update failed (${res.status}): ${body}`);
+  }
+  return res.json();
+}
+
+export function previewEventsUrl(sessionId?: string): string {
+  const url = `${BASE}/api/preview/events`;
+  return sessionId ? `${url}?sessionId=${encodeURIComponent(sessionId)}` : url;
 }
 
 export async function convertAndCompile(
