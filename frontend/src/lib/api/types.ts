@@ -48,6 +48,46 @@ export interface OutputInfo {
   templateData?: Record<string, unknown>;
 }
 
+export type PreviewMode = 'starting' | 'embedded' | 'fallback';
+
+export interface PreviewError {
+  code: string;
+  message: string;
+  detail?: string;
+  recoverable?: boolean;
+}
+
+export interface PreviewDiagnostic {
+  severity: string;
+  message: string;
+  source?: string;
+  line?: number;
+  column?: number;
+  mappingConfidence?: 'reliable' | 'partial' | 'generated' | 'unmappable' | 'unknown';
+}
+
+export interface PreviewEvent {
+  at: string;
+  kind: string;
+  seq: number;
+  sessionId?: string;
+  documentVersion?: number;
+  mode?: PreviewMode;
+  dataPlaneUrl?: string;
+  page?: number;
+  svg?: string;
+  pageHash?: string;
+  error?: PreviewError;
+  diagnostics?: PreviewDiagnostic[];
+  metadata?: Record<string, unknown>;
+}
+
+export type PreviewModeState =
+  | { kind: 'fallback'; svgPages: string[]; label?: string }
+  | { kind: 'starting'; sessionId?: string; fallbackSvgPages: string[] }
+  | { kind: 'embedded'; sessionId: string; dataPlaneUrl: string; fallbackSvgPages: string[] }
+  | { kind: 'error'; fallbackSvgPages: string[]; message: string };
+
 export interface GitHubRepo {
   full_name: string;
   description: string;
