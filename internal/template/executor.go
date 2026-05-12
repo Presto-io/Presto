@@ -79,6 +79,18 @@ func (e *Executor) GetExample() (string, error) {
 	return string(out), nil
 }
 
+func (e *Executor) GetOutputInfo(markdown string) (OutputInfo, error) {
+	out, err := e.run([]string{"--info"}, markdown)
+	if err != nil {
+		return DefaultOutputInfo(), fmt.Errorf("get output info: %w", err)
+	}
+	info, err := ParseOutputInfo(out)
+	if err != nil {
+		return DefaultOutputInfo(), fmt.Errorf("parse output info: %w", err)
+	}
+	return info, nil
+}
+
 // setEnv overwrites the first matching key in the env slice, or appends if not found.
 func setEnv(env []string, key, value string) []string {
 	prefix := key + "="

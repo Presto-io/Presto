@@ -30,6 +30,7 @@
 | `./binary` | stdin 读取 Markdown，stdout 输出 Typst 源码 |
 | `./binary --manifest` | stdout 输出 manifest.json 内容 |
 | `./binary --example` | stdout 输出 example.md 内容 |
+| `./binary --info` | stdin 读取 Markdown，stdout 输出后台信息 JSON（输出文件名、预览标题、文档 metadata） |
 | `./binary -o output.typ input.md` | 从文件读取，输出到文件（可选支持） |
 
 ### 2.2 安全约束
@@ -66,6 +67,9 @@
   "category": "government",
   "keywords": ["公文", "国标", "GB/T 9704", "党政机关"],
   "minPrestoVersion": "0.1.0",
+  "capabilities": {
+    "outputInfo": true
+  },
   "requiredFonts": [
     {
       "name": "FZXiaoBiaoSong-B05",

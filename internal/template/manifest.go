@@ -20,6 +20,10 @@ type RuntimeSpec struct {
 	Command []string `json:"command,omitempty"`
 }
 
+type Capabilities struct {
+	OutputInfo bool `json:"outputInfo,omitempty"`
+}
+
 type Manifest struct {
 	Name              string                 `json:"name"`
 	DisplayName       string                 `json:"displayName"`
@@ -31,6 +35,7 @@ type Manifest struct {
 	Keywords          []string               `json:"keywords"`
 	RequiredFonts     []FontRequirement      `json:"requiredFonts"`
 	FrontmatterSchema map[string]FieldSchema `json:"frontmatterSchema"`
+	Capabilities      Capabilities           `json:"capabilities,omitempty"`
 	Runtimes          []RuntimeSpec          `json:"runtimes,omitempty"`
 }
 

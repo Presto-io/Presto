@@ -6,6 +6,8 @@ export const editor = $state({
   markdown: '',
   typstSource: '',
   svgPages: [] as string[],
+  outputInfo: null as import('$lib/api/types').OutputInfo | null,
+  outputInfoCacheKey: '',
   selectedTemplate: '',
   documentDir: '',
   pendingExternalLoad: false,

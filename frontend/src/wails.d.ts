@@ -1,5 +1,20 @@
 interface WailsApp {
-	SavePDF: (markdown: string, templateId: string, workDir: string) => Promise<void>;
+	GetOutputInfo: (markdown: string, templateId: string) => Promise<{
+		schemaVersion: number;
+		outputBaseName: string;
+		previewTitle?: string;
+		document?: {
+			title?: string;
+			authors?: string[];
+			date?: string;
+			keywords?: string[];
+			subject?: string;
+			description?: string;
+			language?: string;
+		};
+		templateData?: Record<string, unknown>;
+	}>;
+	SavePDF: (markdown: string, templateId: string, workDir: string, outputBaseName: string) => Promise<void>;
 	OpenFile: () => Promise<{ content: string; dir: string; path: string } | null>;
 	OpenFiles: () => Promise<
 		{ name: string; content: string; dir: string; isZip: boolean; path?: string }[] | null

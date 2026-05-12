@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/mrered/presto/internal/template"
 )
 
 const maxRequestBody = 10 << 20 // 10MB (SEC-11)
@@ -184,8 +186,16 @@ func (s *Server) handleConvertAndCompile(w http.ResponseWriter, r *http.Request)
 	}
 
 	log.Printf("[convert-and-compile] success, pdf_len=%d", len(pdf))
+	info := template.DefaultOutputInfo()
+	if tpl.Manifest.Capabilities.OutputInfo {
+		if templateInfo, err := exec.GetOutputInfo(req.Markdown); err == nil {
+			info = templateInfo
+		} else {
+			log.Printf("[convert-and-compile] output info failed: %v", err)
+		}
+	}
 	w.Header().Set("Content-Type", "application/pdf")
-	w.Header().Set("Content-Disposition", "attachment; filename=output.pdf")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", info.OutputBaseName+".pdf"))
 	w.Write(pdf)
 }
 

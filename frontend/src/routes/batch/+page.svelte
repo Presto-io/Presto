@@ -3,7 +3,7 @@
   import { convertAndCompile, importBatchZip } from '$lib/api/client';
   import { createZip } from '$lib/utils/zip';
   import { templateStore } from '$lib/stores/templates.svelte';
-  import { extractTemplateName, jiaoanShicaoPDFDownloadName, resolveTemplate } from '$lib/utils/frontmatter';
+  import { extractTemplateName, resolveTemplate } from '$lib/utils/frontmatter';
   import { pendingDrop } from '$lib/stores/pending-drop.svelte';
   import type { BatchFile, BatchResult } from '$lib/api/types';
   import { ArrowLeft, Upload, FileText, Download, X, Loader, CheckCircle, AlertCircle, Search, Package, GripVertical } from 'lucide-svelte';
@@ -391,11 +391,10 @@
         const bf = queue.shift()!;
         try {
           const text = await bf.file.text();
-          const blob = await convertAndCompile(text, bf.templateId, bf.workDir);
+          const { blob, fileName } = await convertAndCompile(text, bf.templateId, bf.workDir);
           results = [...results, {
             fileId: bf.id,
-            fileName: jiaoanShicaoPDFDownloadName(text, bf.templateId)
-              ?? bf.file.name.replace(/\.\w+$/, '.pdf'),
+            fileName,
             templateId: bf.templateId,
             blob,
           }];
