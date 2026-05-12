@@ -3,7 +3,8 @@
   import Editor from '$lib/components/Editor.svelte';
   import Preview from '$lib/components/Preview.svelte';
   import TemplateSelector from '$lib/components/TemplateSelector.svelte';
-  import { convert, compileSvg, convertAndCompile, getExample, getOutputInfo } from '$lib/api/client';
+  import { convert, compileSvg, convertAndCompile, getExample, getOutputInfo, previewUpdate } from '$lib/api/client';
+  import type { PreviewEvent } from '$lib/api/types';
   import { Download, Settings, FolderOpen, Layers, AlertTriangle, ExternalLink } from 'lucide-svelte';
   import { goto } from '$app/navigation';
   import { editor } from '$lib/stores/editor.svelte';
@@ -67,6 +68,14 @@
   let previewScrollRatio = $state(0);
   let scrollSource: 'editor' | 'preview' | null = $state(null);
   let debounceTimer: ReturnType<typeof setTimeout>;
+
+  type ResidentPreviewResult = {
+    events?: PreviewEvent[];
+    svgPages?: string[];
+    Events?: PreviewEvent[];
+    SVGPages?: string[];
+    Version?: number;
+  };
 
   // Resizable split pane
   let splitRatio = $state(0.5);
@@ -441,11 +450,138 @@
     handleConvert(md);
   }
 
+  function fallbackPagesForCurrentMode(): string[] {
+    const mode = editor.previewMode;
+    if (mode.kind === 'fallback') return mode.svgPages;
+    return mode.fallbackSvgPages;
+  }
+
+  function syncFallbackPages(pages: string[]) {
+    editor.svgPages = pages;
+    editor.previewMode = { kind: 'fallback', svgPages: pages };
+  }
+
+  function setFallbackPagesForMode(pages: string[]) {
+    editor.svgPages = pages;
+    const mode = editor.previewMode;
+    if (mode.kind === 'starting') {
+      editor.previewMode = { ...mode, fallbackSvgPages: pages };
+    } else if (mode.kind === 'embedded') {
+      editor.previewMode = { ...mode, fallbackSvgPages: pages };
+    } else if (mode.kind === 'error') {
+      editor.previewMode = { ...mode, fallbackSvgPages: pages };
+    } else {
+      editor.previewMode = { kind: 'fallback', svgPages: pages, label: mode.label };
+    }
+  }
+
+  function applyPreviewEvent(event: PreviewEvent) {
+    if (typeof event.documentVersion === 'number') {
+      if (event.documentVersion < editor.previewDocumentVersion) return;
+      editor.previewDocumentVersion = event.documentVersion;
+    } else {
+      return;
+    }
+
+    if (event.sessionId) editor.previewSessionId = event.sessionId;
+    if (event.kind === 'retry') editor.previewRetryCount += 1;
+
+    if (event.svg && typeof event.page === 'number' && event.page > 0) {
+      const pages = [...fallbackPagesForCurrentMode()];
+      pages[event.page - 1] = event.svg;
+      setFallbackPagesForMode(pages);
+    }
+
+    if (event.dataPlaneUrl && event.sessionId && (event.kind === 'ready' || event.mode === 'embedded')) {
+      editor.previewMode = {
+        kind: 'embedded',
+        sessionId: event.sessionId,
+        dataPlaneUrl: event.dataPlaneUrl,
+        fallbackSvgPages: editor.svgPages,
+      };
+      return;
+    }
+
+    if (event.mode === 'starting') {
+      editor.previewMode = {
+        kind: 'starting',
+        sessionId: event.sessionId || editor.previewSessionId || undefined,
+        fallbackSvgPages: editor.svgPages,
+      };
+      return;
+    }
+
+    if (event.kind === 'error') {
+      editor.previewMode = {
+        kind: 'error',
+        fallbackSvgPages: editor.svgPages,
+        message: event.error?.message || '预览暂不可用，请检查文档内容',
+      };
+      return;
+    }
+
+    if (event.kind === 'fallback' || event.mode === 'fallback') {
+      editor.previewMode = {
+        kind: 'fallback',
+        svgPages: editor.svgPages,
+        label: event.error?.message || '兼容预览',
+      };
+    }
+  }
+
+  async function runLegacyPreview(md: string) {
+    editor.typstSource = await convert(md, editor.selectedTemplate);
+    // Compile to SVG for preview — use Wails binding when available
+    // (Wails WebView strips HTTP headers/query params, so workDir gets lost via fetch)
+    if (window.go?.main?.App?.CompileSVG) {
+      syncFallbackPages(await window.go.main.App.CompileSVG(editor.typstSource, editor.documentDir));
+    } else {
+      syncFallbackPages(await compileSvg(editor.typstSource, editor.documentDir || undefined));
+    }
+  }
+
+  async function runResidentPreview(md: string): Promise<boolean> {
+    editor.previewMode = {
+      kind: 'starting',
+      sessionId: editor.previewSessionId || undefined,
+      fallbackSvgPages: editor.svgPages,
+    };
+
+    let result: ResidentPreviewResult;
+    if (window.go?.main?.App?.PreviewUpdate) {
+      result = await window.go.main.App.PreviewUpdate(
+        md,
+        editor.selectedTemplate,
+        editor.documentDir,
+        editor.currentFilePath || editor.documentTitle || '',
+      ) as unknown as ResidentPreviewResult;
+    } else {
+      result = await previewUpdate(
+        md,
+        editor.selectedTemplate,
+        editor.documentDir || undefined,
+        editor.currentFilePath || editor.documentTitle || undefined,
+      );
+    }
+
+    const events = result.events ?? result.Events ?? [];
+    for (const event of events) applyPreviewEvent(event);
+
+    const svgPages = result.svgPages ?? result.SVGPages;
+    if (svgPages && svgPages.length > 0) {
+      syncFallbackPages(svgPages);
+      return true;
+    }
+
+    return events.some((event) => Boolean(event.dataPlaneUrl && (event.kind === 'ready' || event.mode === 'embedded')));
+  }
+
   async function handleConvert(md: string) {
     if (!editor.selectedTemplate || !md.trim()) {
       editor.outputInfo = null;
       editor.outputInfoCacheKey = '';
       editor.documentTitle = '';
+      syncFallbackPages([]);
       clearEditorError('compile-error');
       return;
     }
@@ -458,13 +594,15 @@
     debounceTimer = setTimeout(async () => {
       converting = true;
       try {
-        editor.typstSource = await convert(md, editor.selectedTemplate);
-        // Compile to SVG for preview — use Wails binding when available
-        // (Wails WebView strips HTTP headers/query params, so workDir gets lost via fetch)
-        if (window.go?.main?.App?.CompileSVG) {
-          editor.svgPages = await window.go.main.App.CompileSVG(editor.typstSource, editor.documentDir);
-        } else {
-          editor.svgPages = await compileSvg(editor.typstSource, editor.documentDir || undefined);
+        let residentHandled = false;
+        try {
+          residentHandled = await runResidentPreview(md);
+        } catch (previewError) {
+          console.warn('Resident preview update failed, using fallback preview:', previewError);
+          editor.previewRetryCount += 1;
+        }
+        if (!residentHandled) {
+          await runLegacyPreview(md);
         }
         await refreshOutputInfo(md, editor.selectedTemplate);
         clearEditorError('compile-error');
@@ -610,6 +748,9 @@
 
     // Listen for Wails menu events
     if (runtime?.EventsOn) {
+      runtime.EventsOn('preview:event', (event: PreviewEvent) => {
+        applyPreviewEvent(event);
+      });
       runtime.EventsOn('menu:open', handleOpen);
       runtime.EventsOn('menu:export', handleDownload);
       runtime.EventsOn('menu:settings', () => goto('/settings'));
@@ -760,6 +901,7 @@
         runtime.EventsOff('menu:quit');
         runtime.EventsOff('app:save-and-close');
         runtime.EventsOff('app:request-close');
+        runtime.EventsOff('preview:event');
       }
     };
   });
@@ -785,6 +927,11 @@
   >
     {#if isDebugMode && errorMsg}
       <span class="error-msg" title={errorMsg}>{errorMsg}</span>
+    {/if}
+    {#if isDebugMode}
+      <span class="preview-debug">
+        mode {editor.previewMode.kind} · session {editor.previewSessionId || '-'} · v{editor.previewDocumentVersion} · retry {editor.previewRetryCount}
+      </span>
     {/if}
     <div class="toolbar-hidden-group" class:visible={hiddenButtonsVisible}>
       <button class="btn-toolbar" onclick={() => goto('/settings')} aria-label="设置" title="设置 ({mod},)">
@@ -842,7 +989,7 @@
     </div>
   </div>
   <div class="pane" style="flex: {1 - splitRatio}">
-    <Preview svgPages={editor.svgPages} scrollRatio={previewScrollRatio} onscroll={(ratio: number) => {
+    <Preview svgPages={editor.svgPages} modeState={editor.previewMode} debug={isDebugMode} scrollRatio={previewScrollRatio} onscroll={(ratio: number) => {
       if (scrollSource !== 'editor') {
         scrollSource = 'preview';
         editorScrollRatio = ratio;
@@ -930,6 +1077,14 @@
     font-size: 12px;
     color: var(--color-danger);
     max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .preview-debug {
+    font-size: 11px;
+    color: var(--color-muted);
+    max-width: min(420px, 40vw);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
