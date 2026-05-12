@@ -24,7 +24,11 @@ import (
 )
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "--manifest" {
-		fmt.Print(` + "`" + `{"name":"mock","version":"0.1.0"}` + "`" + `)
+		fmt.Print(` + "`" + `{"name":"mock","version":"0.1.0","capabilities":{"outputInfo":true}}` + "`" + `)
+		return
+	}
+	if len(os.Args) > 1 && os.Args[1] == "--info" {
+		fmt.Print(` + "`" + `{"schemaVersion":1,"outputBaseName":"Mock Output","previewTitle":"Mock Preview","document":{"title":"Mock Preview"}}` + "`" + `)
 		return
 	}
 	data, _ := io.ReadAll(os.Stdin)
@@ -68,5 +72,25 @@ func TestExecuteManifest(t *testing.T) {
 	}
 	if m.Name != "mock" {
 		t.Errorf("got name %q, want %q", m.Name, "mock")
+	}
+	if !m.Capabilities.OutputInfo {
+		t.Errorf("expected outputInfo capability")
+	}
+}
+
+func TestExecuteOutputInfo(t *testing.T) {
+	dir := t.TempDir()
+	bin := createMockTemplate(t, dir)
+
+	ex := NewExecutor(bin)
+	info, err := ex.GetOutputInfo("# Hello")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if info.OutputBaseName != "Mock Output" {
+		t.Fatalf("outputBaseName = %q, want %q", info.OutputBaseName, "Mock Output")
+	}
+	if info.PreviewTitle != "Mock Preview" {
+		t.Fatalf("previewTitle = %q, want %q", info.PreviewTitle, "Mock Preview")
 	}
 }

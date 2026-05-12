@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	templ "github.com/mrered/presto/internal/template"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -174,7 +175,23 @@ func (a *App) SaveFile(b64Data string, defaultFilename string) error {
 	return nil
 }
 
-func (a *App) SavePDF(markdown string, templateId string, workDir string) error {
+func (a *App) GetOutputInfo(markdown string, templateId string) (templ.OutputInfo, error) {
+	tpl, err := a.manager.Get(templateId)
+	if err != nil {
+		return templ.DefaultOutputInfo(), fmt.Errorf("template not found: %w", err)
+	}
+	if !tpl.Manifest.Capabilities.OutputInfo {
+		return templ.DefaultOutputInfo(), nil
+	}
+	info, err := a.manager.Executor(tpl).GetOutputInfo(markdown)
+	if err != nil {
+		logger.Warn("[desktop] output info failed", "template", templateId, "error", err)
+		return templ.DefaultOutputInfo(), nil
+	}
+	return info, nil
+}
+
+func (a *App) SavePDF(markdown string, templateId string, workDir string, outputBaseName string) error {
 	tpl, err := a.manager.Get(templateId)
 	if err != nil {
 		return fmt.Errorf("template not found: %w", err)
@@ -191,7 +208,10 @@ func (a *App) SavePDF(markdown string, templateId string, workDir string) error 
 		return fmt.Errorf("compile failed: %w", err)
 	}
 
-	filename := exportPDFBaseName(markdown, templateId, typstOutput) + ".pdf"
+	if outputBaseName == "" {
+		outputBaseName = "output"
+	}
+	filename := outputBaseName + ".pdf"
 
 	savePath, err := wailsRuntime.SaveFileDialog(a.ctx, wailsRuntime.SaveDialogOptions{
 		DefaultFilename: filename,

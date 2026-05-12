@@ -3,13 +3,13 @@
   import Editor from '$lib/components/Editor.svelte';
   import Preview from '$lib/components/Preview.svelte';
   import TemplateSelector from '$lib/components/TemplateSelector.svelte';
-  import { convert, compile, compileSvg, convertAndCompile, getExample } from '$lib/api/client';
+  import { convert, compileSvg, convertAndCompile, getExample, getOutputInfo } from '$lib/api/client';
   import { Download, Settings, FolderOpen, Layers, AlertTriangle, ExternalLink } from 'lucide-svelte';
   import { goto } from '$app/navigation';
   import { editor } from '$lib/stores/editor.svelte';
   import { templateStore } from '$lib/stores/templates.svelte';
   import { notificationStore } from '$lib/stores/notification.svelte';
-  import { extractTemplateName, jiaoanShicaoPDFDownloadName, resolveTemplate } from '$lib/utils/frontmatter';
+  import { extractTemplateName, resolveTemplate } from '$lib/utils/frontmatter';
   import { triggerAction, shouldShowPoint } from '$lib/stores/wizard.svelte';
   import { fileRouter } from '$lib/stores/file-router.svelte';
 
@@ -305,34 +305,33 @@
     }
   }
 
-  function extractTypstTitle(typ: string): string {
-    const lines = typ.split('\n');
-    for (let level = 1; level <= 5; level++) {
-      const prefix = '='.repeat(level) + ' ';
-      const deeper = '='.repeat(level + 1);
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith(prefix)) continue;
-        if (level < 5 && trimmed.startsWith(deeper)) continue;
-        let content = trimmed.slice(prefix.length).trim();
-        if (content.startsWith('#')) {
-          let varName = content.slice(1);
-          const cut = varName.search(/[.( ]/);
-          if (cut > 0) varName = varName.slice(0, cut);
-          // SEC-26: Escape regex metacharacters to prevent ReDoS
-          const escaped = varName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          const re = new RegExp(`#let\\s+${escaped}\\s*=\\s*"([^"]*)"`);
-          for (const l of lines) {
-            const m = l.match(re);
-            if (m) { content = m[1]; break; }
-          }
-          if (content.startsWith('#')) continue;
-        }
-        const title = content.trim().replace(/[/\\:*?"<>|]/g, '_');
-        if (title) return title;
-      }
+  function outputInfoCacheKey(markdown: string, templateId: string): string {
+    return `${templateId}\n${markdown}`;
+  }
+
+  async function refreshOutputInfo(markdown: string, templateId: string) {
+    const info = window.go?.main?.App?.GetOutputInfo
+      ? await window.go.main.App.GetOutputInfo(markdown, templateId)
+      : await getOutputInfo(markdown, templateId);
+    editor.outputInfo = info;
+    editor.outputInfoCacheKey = outputInfoCacheKey(markdown, templateId);
+    editor.documentTitle = info.previewTitle || info.document?.title || '';
+  }
+
+  function cachedOutputBaseName(): string {
+    const key = outputInfoCacheKey(editor.markdown, editor.selectedTemplate);
+    if (editor.outputInfo && editor.outputInfoCacheKey === key) {
+      return editor.outputInfo.outputBaseName || 'output';
     }
     return 'output';
+  }
+
+  async function outputBaseNameForCurrentDocument(): Promise<string> {
+    const key = outputInfoCacheKey(editor.markdown, editor.selectedTemplate);
+    if (!editor.outputInfo || editor.outputInfoCacheKey !== key) {
+      await refreshOutputInfo(editor.markdown, editor.selectedTemplate);
+    }
+    return cachedOutputBaseName();
   }
 
   async function handleNew() {
@@ -348,6 +347,8 @@
     editor.markdown = '';
     editor.typstSource = '';
     editor.svgPages = [];
+    editor.outputInfo = null;
+    editor.outputInfoCacheKey = '';
     editor.currentFilePath = '';
     editor.documentDir = '';
     editor.isDirty = false;
@@ -386,7 +387,7 @@
     if (!editor.markdown.trim()) return false;
     if (!window.go?.main?.App?.SaveMarkdownAs) return false;
     try {
-      const defaultName = (editor.documentTitle || 'untitled') + '.md';
+      const defaultName = (editor.outputInfo?.previewTitle || editor.documentTitle || 'untitled') + '.md';
       const savedPath = await window.go.main.App.SaveMarkdownAs(editor.markdown, defaultName);
       if (savedPath) {
         editor.currentFilePath = savedPath;
@@ -442,6 +443,9 @@
 
   async function handleConvert(md: string) {
     if (!editor.selectedTemplate || !md.trim()) {
+      editor.outputInfo = null;
+      editor.outputInfoCacheKey = '';
+      editor.documentTitle = '';
       clearEditorError('compile-error');
       return;
     }
@@ -455,7 +459,6 @@
       converting = true;
       try {
         editor.typstSource = await convert(md, editor.selectedTemplate);
-        editor.documentTitle = extractTypstTitle(editor.typstSource);
         // Compile to SVG for preview — use Wails binding when available
         // (Wails WebView strips HTTP headers/query params, so workDir gets lost via fetch)
         if (window.go?.main?.App?.CompileSVG) {
@@ -463,6 +466,7 @@
         } else {
           editor.svgPages = await compileSvg(editor.typstSource, editor.documentDir || undefined);
         }
+        await refreshOutputInfo(md, editor.selectedTemplate);
         clearEditorError('compile-error');
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -487,16 +491,18 @@
     if (!editor.selectedTemplate || !editor.markdown.trim()) return;
     try {
       if (window.go?.main?.App?.SavePDF) {
-        await window.go.main.App.SavePDF(editor.markdown, editor.selectedTemplate, editor.documentDir);
+        const outputBaseName = await outputBaseNameForCurrentDocument();
+        await window.go.main.App.SavePDF(editor.markdown, editor.selectedTemplate, editor.documentDir, outputBaseName);
         clearEditorError('editor-action');
         return;
       }
-      const blob = await convertAndCompile(editor.markdown, editor.selectedTemplate, editor.documentDir || undefined);
+      const { blob, fileName } = await convertAndCompile(editor.markdown, editor.selectedTemplate, editor.documentDir || undefined);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = jiaoanShicaoPDFDownloadName(editor.markdown, editor.selectedTemplate)
-        ?? extractTypstTitle(editor.typstSource) + '.pdf';
+      a.download = editor.outputInfo && editor.outputInfoCacheKey === outputInfoCacheKey(editor.markdown, editor.selectedTemplate)
+        ? cachedOutputBaseName() + '.pdf'
+        : fileName;
       a.click();
       URL.revokeObjectURL(url);
       clearEditorError('editor-action');

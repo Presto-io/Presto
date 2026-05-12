@@ -33,31 +33,6 @@ export function extractFrontmatterField(markdown: string, fieldName: string): st
   return value || null;
 }
 
-export function jiaoanShicaoPDFDownloadName(
-  markdown: string,
-  templateId: string,
-): string | null {
-  if (templateId === 'jiaoan-shicao') {
-    const courseName = extractFrontmatterField(markdown, 'course_name');
-    const totalHours = normalizeHourLabel(extractFrontmatterField(markdown, 'total_hours'));
-    if (courseName && totalHours) {
-      return sanitizeFilename(`教学设计方案 ${courseName} ${totalHours}`) + '.pdf';
-    }
-  }
-  return null;
-}
-
-function normalizeHourLabel(value: string | null): string | null {
-  const hours = value?.trim();
-  if (!hours) return null;
-  if (/h$/i.test(hours) || hours.includes('课时') || hours.includes('小时')) return hours;
-  return `${hours}H`;
-}
-
-function sanitizeFilename(value: string): string {
-  return value.trim().replace(/[\/\\:*?"<>|]/g, '_');
-}
-
 /**
  * Resolves a template field value to an installed template's internal name.
  * Matches against `name` (exact), then `displayName` (exact), then `displayName` (case-insensitive).

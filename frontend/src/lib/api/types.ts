@@ -25,6 +25,27 @@ export interface Manifest extends Template {
   license: string;
   minPrestoVersion: string;
   frontmatterSchema?: Record<string, FieldSchema>;
+  capabilities?: {
+    outputInfo?: boolean;
+  };
+}
+
+export interface DocumentInfo {
+  title?: string;
+  authors?: string[];
+  date?: string;
+  keywords?: string[];
+  subject?: string;
+  description?: string;
+  language?: string;
+}
+
+export interface OutputInfo {
+  schemaVersion: number;
+  outputBaseName: string;
+  previewTitle?: string;
+  document?: DocumentInfo;
+  templateData?: Record<string, unknown>;
 }
 
 export interface GitHubRepo {

@@ -230,3 +230,34 @@ func (s *Server) handleGetExample(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"example": example})
 }
+
+func (s *Server) handleGetOutputInfo(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
+	id := r.PathValue("id")
+	tpl, err := s.manager.Get(id)
+	if err != nil {
+		writeJSONError(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	var req struct {
+		Markdown string `json:"markdown"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	info := template.DefaultOutputInfo()
+	if tpl.Manifest.Capabilities.OutputInfo {
+		exec := s.manager.Executor(tpl)
+		if templateInfo, err := exec.GetOutputInfo(req.Markdown); err == nil {
+			info = templateInfo
+		} else {
+			log.Printf("[templates] output info failed for %s: %v", id, err)
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(info)
+}

@@ -1,4 +1,4 @@
-import type { Template, Manifest, GitHubRepo, BatchImportResult, ImportResult, RegistryTemplate, PlatformInfo, StatsMap, InstalledSkill } from './types';
+import type { Template, Manifest, GitHubRepo, BatchImportResult, ImportResult, RegistryTemplate, PlatformInfo, StatsMap, InstalledSkill, OutputInfo } from './types';
 
 const BASE = import.meta.env.VITE_API_URL || '';
 
@@ -44,6 +44,14 @@ export async function getManifest(id: string): Promise<Manifest> {
 export async function getExample(id: string): Promise<string> {
   const data = await api<{ example: string }>(`/api/templates/${id}/example`);
   return data.example;
+}
+
+export async function getOutputInfo(markdown: string, templateId: string): Promise<OutputInfo> {
+  return api(`/api/templates/${encodeURIComponent(templateId)}/info`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ markdown })
+  });
 }
 
 export async function convert(markdown: string, templateId: string): Promise<string> {
@@ -101,7 +109,7 @@ export async function convertAndCompile(
   markdown: string,
   templateId: string,
   workDir?: string
-): Promise<Blob> {
+): Promise<{ blob: Blob; fileName: string }> {
   const res = await authFetch(`${BASE}/api/convert-and-compile`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -111,7 +119,12 @@ export async function convertAndCompile(
     const body = await res.text();
     throw new Error(`Compile failed (${res.status}): ${body}`);
   }
-  return res.blob();
+  const disposition = res.headers.get('Content-Disposition') || '';
+  const match = disposition.match(/filename="([^"]+)"/) ?? disposition.match(/filename=([^;]+)/);
+  return {
+    blob: await res.blob(),
+    fileName: match?.[1]?.trim() || 'output.pdf'
+  };
 }
 
 // SEC-39: Only send owner/repo — server looks up download URL from registry
