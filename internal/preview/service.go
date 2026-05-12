@@ -13,6 +13,12 @@ type UpdateRequest struct {
 	DocumentKey string
 }
 
+type UpdateResult struct {
+	Version        int64
+	RestartSession bool
+	Events         []Event
+}
+
 type DocumentIdentity struct {
 	TemplateID    string
 	WorkDir       string
@@ -39,10 +45,80 @@ func (s *Service) NextDocumentVersion(identity DocumentIdentity) (version int64,
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	restartSession = s.identity != identity
-	s.documentVersion++
-	s.identity = identity
-	return s.documentVersion, restartSession
+	return s.nextDocumentVersionLocked(identity)
+}
+
+func (s *Service) BeginUpdate(identity DocumentIdentity) UpdateResult {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	version, restartSession := s.nextDocumentVersionLocked(identity)
+	event := s.eventLocked(EventStatus, nil, map[string]interface{}{
+		"phase": "convert",
+	})
+	return UpdateResult{
+		Version:        version,
+		RestartSession: restartSession,
+		Events:         []Event{event},
+	}
+}
+
+func (s *Service) ConversionFailed(version int64, err error) Event {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if version != s.documentVersion {
+		return s.staleIgnoredLocked(map[string]interface{}{
+			"rejectedDocumentVersion": version,
+			"phase":                   "convert",
+		})
+	}
+
+	return s.eventLocked(EventError, &ErrorInfo{
+		Code:        "conversion_failed",
+		Message:     "转换失败",
+		Detail:      errorDetail(err),
+		Recoverable: true,
+	}, map[string]interface{}{
+		"phase": "convert",
+	})
+}
+
+func (s *Service) FallbackFailed(version int64, err error) Event {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if version != s.documentVersion {
+		return s.staleIgnoredLocked(map[string]interface{}{
+			"rejectedDocumentVersion": version,
+			"phase":                   "fallback",
+		})
+	}
+
+	s.mode = ModeFallback
+	return s.eventLocked(EventError, &ErrorInfo{
+		Code:        "fallback_compile_failed",
+		Message:     "兼容预览生成失败",
+		Detail:      errorDetail(err),
+		Recoverable: true,
+	}, map[string]interface{}{
+		"phase": "fallback",
+	})
+}
+
+func (s *Service) TinymistUnavailable(reason string) Event {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.mode = ModeFallback
+	return s.eventLocked(EventFallback, &ErrorInfo{
+		Code:        "tinymist_unavailable",
+		Message:     "兼容预览",
+		Detail:      reason,
+		Recoverable: true,
+	}, map[string]interface{}{
+		"phase": "fallback",
+	})
 }
 
 func (s *Service) CurrentSessionID() string {
@@ -131,6 +207,20 @@ func (s *Service) eventLocked(kind EventKind, errInfo *ErrorInfo, metadata map[s
 
 func (s *Service) staleIgnoredLocked(metadata map[string]interface{}) Event {
 	return s.eventLocked(EventStaleIgnored, nil, metadata)
+}
+
+func (s *Service) nextDocumentVersionLocked(identity DocumentIdentity) (version int64, restartSession bool) {
+	restartSession = s.identity != identity
+	s.documentVersion++
+	s.identity = identity
+	return s.documentVersion, restartSession
+}
+
+func errorDetail(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }
 
 func clonePages(pages []Page) []Page {
