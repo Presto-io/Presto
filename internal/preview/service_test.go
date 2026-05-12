@@ -1,6 +1,9 @@
 package preview
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 func TestNextDocumentVersion(t *testing.T) {
 	svc := NewService()
@@ -105,5 +108,99 @@ func TestErrorRetainsLastFallback(t *testing.T) {
 	got := svc.LastFallback()
 	if len(got) != 1 || got[0].SVG != pages[0].SVG || got[0].Hash != pages[0].Hash {
 		t.Fatalf("LastFallback = %#v, want %#v", got, pages)
+	}
+}
+
+func TestBeginUpdate(t *testing.T) {
+	svc := NewService()
+	identity := DocumentIdentity{TemplateID: "gongwen", WorkDir: "/tmp/doc", DocumentKey: "a.md", MainTypstPath: "/tmp/doc/main.typ"}
+
+	first := svc.BeginUpdate(identity)
+	second := svc.BeginUpdate(identity)
+
+	if first.Version != 1 || second.Version != 2 {
+		t.Fatalf("versions = %d, %d; want 1, 2", first.Version, second.Version)
+	}
+	if !first.RestartSession {
+		t.Fatal("first BeginUpdate should restart session for new identity")
+	}
+	if second.RestartSession {
+		t.Fatal("second BeginUpdate should reuse session for identical identity")
+	}
+	if len(first.Events) != 1 || first.Events[0].Kind != EventStatus {
+		t.Fatalf("first.Events = %#v, want one status event", first.Events)
+	}
+	if got := first.Events[0].Metadata["phase"]; got != "convert" {
+		t.Fatalf("metadata.phase = %#v, want convert", got)
+	}
+}
+
+func TestConversionFailed(t *testing.T) {
+	svc := NewService()
+	result := svc.BeginUpdate(DocumentIdentity{TemplateID: "gongwen"})
+	pages := []Page{{Index: 1, SVG: "<svg/>", Hash: "hash"}}
+	svc.ApplyFallback(result.Version, pages)
+
+	event := svc.ConversionFailed(result.Version, errors.New("bad markdown"))
+
+	if event.Kind != EventError {
+		t.Fatalf("event.Kind = %q, want %q", event.Kind, EventError)
+	}
+	if event.Error == nil || event.Error.Code != "conversion_failed" || !event.Error.Recoverable {
+		t.Fatalf("event.Error = %#v", event.Error)
+	}
+	if event.DocumentVersion != result.Version {
+		t.Fatalf("event.DocumentVersion = %d, want %d", event.DocumentVersion, result.Version)
+	}
+	if got := svc.LastFallback(); len(got) != 1 || got[0].SVG != pages[0].SVG {
+		t.Fatalf("LastFallback = %#v, want retained fallback", got)
+	}
+}
+
+func TestFallbackFailed(t *testing.T) {
+	svc := NewService()
+	result := svc.BeginUpdate(DocumentIdentity{TemplateID: "gongwen"})
+	pages := []Page{{Index: 1, SVG: "<svg/>", Hash: "hash"}}
+	svc.ApplyFallback(result.Version, pages)
+
+	event := svc.FallbackFailed(result.Version, errors.New("typst failed"))
+
+	if event.Kind != EventError {
+		t.Fatalf("event.Kind = %q, want %q", event.Kind, EventError)
+	}
+	if event.Error == nil || event.Error.Code != "fallback_compile_failed" || !event.Error.Recoverable {
+		t.Fatalf("event.Error = %#v", event.Error)
+	}
+	if got := svc.LastFallback(); len(got) != 1 || got[0].SVG != pages[0].SVG {
+		t.Fatalf("LastFallback = %#v, want retained fallback", got)
+	}
+}
+
+func TestTinymistUnavailableUsesUserFacingMessage(t *testing.T) {
+	svc := NewService()
+	svc.BeginUpdate(DocumentIdentity{TemplateID: "gongwen"})
+
+	event := svc.TinymistUnavailable("tinymist not found")
+
+	if event.Kind != EventFallback {
+		t.Fatalf("event.Kind = %q, want %q", event.Kind, EventFallback)
+	}
+	if event.Mode != ModeFallback {
+		t.Fatalf("event.Mode = %q, want %q", event.Mode, ModeFallback)
+	}
+	if event.Error == nil {
+		t.Fatal("event.Error is nil")
+	}
+	if event.Error.Code != "tinymist_unavailable" {
+		t.Fatalf("event.Error.Code = %q", event.Error.Code)
+	}
+	if event.Error.Message != "兼容预览" {
+		t.Fatalf("event.Error.Message = %q, want 兼容预览", event.Error.Message)
+	}
+	if event.Error.Detail != "tinymist not found" {
+		t.Fatalf("event.Error.Detail = %q", event.Error.Detail)
+	}
+	if !event.Error.Recoverable {
+		t.Fatal("event.Error.Recoverable = false, want true")
 	}
 }
