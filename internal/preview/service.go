@@ -20,12 +20,6 @@ type DocumentIdentity struct {
 	MainTypstPath string
 }
 
-type Page struct {
-	Index int
-	SVG   string
-	Hash  string
-}
-
 type Service struct {
 	mu              sync.Mutex
 	documentVersion int64
