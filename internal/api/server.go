@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mrered/presto/internal/preview"
 	"github.com/mrered/presto/internal/skill"
 	"github.com/mrered/presto/internal/template"
 	"github.com/mrered/presto/internal/typst"
@@ -21,6 +22,7 @@ type Server struct {
 	registry       *template.RegistryCache
 	availableFonts map[string]bool // cached from typst fonts at startup
 	skillManager   *skill.SkillManager
+	previewService *preview.Service
 }
 
 // ServerOptions configures the API server.
@@ -52,6 +54,7 @@ func NewServer(opts ServerOptions) http.Handler {
 		registry:       opts.Registry,
 		availableFonts: compiler.ListFonts(),
 		skillManager:   skill.NewManager(),
+		previewService: preview.NewService(),
 	}
 
 	log.Printf("[presto] starting server, templates=%s static=%s typst=%s root=%s",
@@ -62,6 +65,8 @@ func NewServer(opts ServerOptions) http.Handler {
 	s.mux.HandleFunc("POST /api/compile", s.handleCompile)
 	s.mux.HandleFunc("POST /api/compile-svg", s.handleCompileSVG)
 	s.mux.HandleFunc("POST /api/convert-and-compile", s.handleConvertAndCompile)
+	s.mux.HandleFunc("POST /api/preview/update", s.handlePreviewUpdate)
+	s.mux.HandleFunc("GET /api/preview/events", s.handlePreviewEvents)
 	s.mux.HandleFunc("POST /api/batch", s.handleBatch)
 	s.mux.HandleFunc("GET /api/templates", s.handleListTemplates)
 	s.mux.HandleFunc("GET /api/templates/discover", s.handleDiscoverTemplates)
