@@ -20,6 +20,21 @@ interface WailsApp {
 		{ name: string; content: string; dir: string; isZip: boolean; path?: string }[] | null
 	>;
 	CompileSVG: (typstSource: string, workDir: string) => Promise<string[]>;
+	PreviewUpdate: (
+		markdown: string,
+		templateID: string,
+		workDir: string,
+		documentKey: string
+	) => Promise<PreviewUpdateResult>;
+	PreviewStop: () => Promise<void>;
+	PreviewMode: () => Promise<{
+		mode: string;
+		sessionId: string;
+		documentVersion: number;
+		retryCount: number;
+		tinymistPath: string;
+		fallbackMessage?: string;
+	}>;
 	ImportBatchZip: (filePath: string) => Promise<any>;
 	SaveMarkdown: (content: string, filePath: string) => Promise<void>;
 	SaveMarkdownAs: (content: string, defaultFilename: string) => Promise<string>;
@@ -51,6 +66,40 @@ interface WailsApp {
 	InstallTemplate: (templateName: string) => Promise<void>;
 	DeleteTemplate: (name: string) => Promise<void>;
 	GetInstalledTemplates: () => Promise<string[]>;
+}
+
+interface PreviewEvent {
+	at: string;
+	kind: string;
+	seq: number;
+	sessionId?: string;
+	documentVersion?: number;
+	mode?: string;
+	dataPlaneUrl?: string;
+	page?: number;
+	svg?: string;
+	pageHash?: string;
+	error?: {
+		code: string;
+		message: string;
+		detail?: string;
+		recoverable: boolean;
+	};
+	diagnostics?: {
+		severity: string;
+		message: string;
+		source?: string;
+		line?: number;
+		column?: number;
+		mappingConfidence?: string;
+	}[];
+	metadata?: Record<string, unknown>;
+}
+
+interface PreviewUpdateResult {
+	Version: number;
+	RestartSession: boolean;
+	Events: PreviewEvent[];
 }
 
 interface WailsRuntime {
