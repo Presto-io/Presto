@@ -153,8 +153,13 @@ func (s *Service) ApplySessionEvent(sessionID string, kind EventKind, dataPlaneU
 	}
 
 	switch kind {
-	case EventReady, EventRecover:
+	case EventReady:
 		s.mode = ModeEmbedded
+	case EventRecover:
+		// Tinymist recovery is availability only; the next edit/ready cycle owns switching back to embedded.
+		if s.mode != ModeFallback {
+			s.mode = ModeFallback
+		}
 	case EventFallback, EventRetry, EventError:
 		s.mode = ModeFallback
 	case EventTeardown:

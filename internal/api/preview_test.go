@@ -73,3 +73,33 @@ func TestPreviewEventsDeferredBoundary(t *testing.T) {
 		t.Fatalf("deferred boundary comment missing from preview.go")
 	}
 }
+
+func TestPreviewRoutesRegisteredBehindMiddleware(t *testing.T) {
+	handler := NewServer(ServerOptions{APIKey: "secret-key"})
+
+	unauthorizedPreview := httptest.NewRecorder()
+	handler.ServeHTTP(unauthorizedPreview, httptest.NewRequest(http.MethodGet, "/api/preview/events", nil))
+	if unauthorizedPreview.Code != http.StatusUnauthorized {
+		t.Fatalf("preview events without auth = %d, want 401", unauthorizedPreview.Code)
+	}
+	if got := unauthorizedPreview.Header().Get("X-Content-Type-Options"); got != "nosniff" {
+		t.Fatalf("preview events security header = %q, want nosniff", got)
+	}
+
+	health := httptest.NewRecorder()
+	handler.ServeHTTP(health, httptest.NewRequest(http.MethodGet, "/api/health", nil))
+	if health.Code != http.StatusOK {
+		t.Fatalf("health without auth = %d, want 200", health.Code)
+	}
+	if got := health.Header().Get("X-Content-Type-Options"); got != "nosniff" {
+		t.Fatalf("health security header = %q, want nosniff", got)
+	}
+
+	authorizedPreview := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/preview/events", nil)
+	req.Header.Set("Authorization", "Bearer secret-key")
+	handler.ServeHTTP(authorizedPreview, req)
+	if authorizedPreview.Code != http.StatusNotImplemented {
+		t.Fatalf("authorized preview events = %d, want 501", authorizedPreview.Code)
+	}
+}
