@@ -97,6 +97,44 @@ func TestPreviewRunnerStopIsIdempotent(t *testing.T) {
 	}
 }
 
+func TestPreviewRunnerStopsOldSessionBeforeNewDocumentIdentity(t *testing.T) {
+	runner := newPreviewRunner(preview.NewService(), "tinymist")
+	oldMainTypPath, oldCleanup, err := runner.writeSessionFile("", "#let doc = old")
+	if err != nil {
+		t.Fatalf("write old session: %v", err)
+	}
+	defer oldCleanup()
+	oldWorkDir := runner.sessionWorkDir
+	if oldWorkDir == "" {
+		t.Fatal("old session workdir should be tracked")
+	}
+
+	if err := runner.stop(); err != nil {
+		t.Fatalf("stop old session: %v", err)
+	}
+	if _, err := os.Stat(oldMainTypPath); !os.IsNotExist(err) {
+		t.Fatalf("old session main.typ should be removed before new session, stat err = %v", err)
+	}
+
+	newMainTypPath, newCleanup, err := runner.writeSessionFile("", "#let doc = new")
+	if err != nil {
+		t.Fatalf("write new session: %v", err)
+	}
+	defer newCleanup()
+	if runner.sessionWorkDir == "" {
+		t.Fatal("new session workdir should be tracked")
+	}
+	if runner.sessionWorkDir == oldWorkDir {
+		t.Fatalf("new session reused old workdir %q after document identity switch", oldWorkDir)
+	}
+	if newMainTypPath == oldMainTypPath {
+		t.Fatalf("new session retained old main.typ path %q", newMainTypPath)
+	}
+	if _, err := os.Stat(newMainTypPath); err != nil {
+		t.Fatalf("new session main.typ should exist: %v", err)
+	}
+}
+
 func TestPreviewRunnerStartTinymistReturnsStartError(t *testing.T) {
 	runner := newPreviewRunner(preview.NewService(), filepath.Join(t.TempDir(), "missing-tinymist"))
 	if err := runner.startTinymist(context.Background(), "/tmp/main.typ", 1, 2); err == nil {

@@ -49,10 +49,11 @@ type ErrorInfo struct {
 }
 
 type Diagnostic struct {
-	Severity          string `json:"severity"`
-	Message           string `json:"message"`
-	Source            string `json:"source,omitempty"`
-	Line              int    `json:"line,omitempty"`
-	Column            int    `json:"column,omitempty"`
+	Severity string `json:"severity"`
+	Message  string `json:"message"`
+	Source   string `json:"source,omitempty"`
+	Line     int    `json:"line,omitempty"`
+	Column   int    `json:"column,omitempty"`
+	// click-to-source intentionally deferred to a later phase; only mappingConfidence is reserved here
 	MappingConfidence string `json:"mappingConfidence,omitempty"`
 }

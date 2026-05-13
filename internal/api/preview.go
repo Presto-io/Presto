@@ -77,6 +77,7 @@ func (s *Server) handlePreviewUpdate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handlePreviewEvents(w http.ResponseWriter, r *http.Request) {
+	// server embedded Tinymist proxy deferred; preview events endpoint preserves origin/WebSocket boundary
 	// TODO: server Tinymist embedded renderer deferred; this endpoint preserves WebSocket/origin boundary
 	writeJSONError(w, "server Tinymist embedded renderer deferred", http.StatusNotImplemented)
 }

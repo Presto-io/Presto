@@ -93,6 +93,66 @@ func TestReadyEventSetsEmbeddedMode(t *testing.T) {
 	}
 }
 
+func TestRecoverDoesNotStealPreviewUntilNextEdit(t *testing.T) {
+	svc := NewService()
+	identity := DocumentIdentity{TemplateID: "gongwen", WorkDir: "/tmp/doc", DocumentKey: "a.md", MainTypstPath: "/tmp/doc/main.typ"}
+	update := svc.BeginUpdate(identity)
+	svc.StartSession(identity)
+	if event, ok := svc.ApplySessionEvent(svc.CurrentSessionID(), EventReady, "http://127.0.0.1:1234", nil); !ok || event.Mode != ModeEmbedded {
+		t.Fatalf("ready event = (%#v, %v), want embedded", event, ok)
+	}
+	if event, ok := svc.ApplyFallback(update.Version, []Page{{Index: 1, SVG: "<svg>fallback</svg>", Hash: "fallback"}}); !ok || event.Mode != ModeFallback {
+		t.Fatalf("fallback event = (%#v, %v), want fallback", event, ok)
+	}
+
+	recoverEvent, ok := svc.ApplySessionEvent(svc.CurrentSessionID(), EventRecover, "http://127.0.0.1:1234", nil)
+	if !ok {
+		t.Fatal("recover event for current session returned ok=false")
+	}
+	if recoverEvent.Mode != ModeFallback {
+		t.Fatalf("recoverEvent.Mode = %q, want %q", recoverEvent.Mode, ModeFallback)
+	}
+	if got := svc.LastFallback(); len(got) != 1 || got[0].Hash != "fallback" {
+		t.Fatalf("LastFallback = %#v, want retained fallback", got)
+	}
+
+	next := svc.BeginUpdate(identity)
+	if next.Version != update.Version+1 {
+		t.Fatalf("next version = %d, want %d", next.Version, update.Version+1)
+	}
+	readyEvent, ok := svc.ApplySessionEvent(svc.CurrentSessionID(), EventReady, "http://127.0.0.1:1234", nil)
+	if !ok {
+		t.Fatal("ready event after next edit returned ok=false")
+	}
+	if readyEvent.Mode != ModeEmbedded {
+		t.Fatalf("readyEvent.Mode = %q, want %q", readyEvent.Mode, ModeEmbedded)
+	}
+}
+
+func TestRapidEditsEndOnLatestDocumentVersion(t *testing.T) {
+	svc := NewService()
+	identity := DocumentIdentity{TemplateID: "gongwen", WorkDir: "/tmp/doc", DocumentKey: "a.md", MainTypstPath: "/tmp/doc/main.typ"}
+
+	var latest int64
+	for i := 1; i <= 8; i++ {
+		latest = svc.BeginUpdate(identity).Version
+	}
+
+	for version := int64(1); version < latest; version++ {
+		if event, ok := svc.ApplyFallback(version, []Page{{Index: 1, SVG: "<svg>stale</svg>", Hash: "stale"}}); ok || event.Kind != EventStaleIgnored {
+			t.Fatalf("version %d fallback = (%#v, %v), want stale ignored", version, event, ok)
+		}
+	}
+
+	pages := []Page{{Index: 1, SVG: "<svg>latest</svg>", Hash: "latest"}}
+	if event, ok := svc.ApplyFallback(latest, pages); !ok || event.Kind != EventFallback {
+		t.Fatalf("latest fallback = (%#v, %v), want applied fallback", event, ok)
+	}
+	if got := svc.LastFallback(); len(got) != 1 || got[0].Hash != "latest" {
+		t.Fatalf("LastFallback = %#v, want latest fallback", got)
+	}
+}
+
 func TestErrorRetainsLastFallback(t *testing.T) {
 	svc := NewService()
 	version, _ := svc.NextDocumentVersion(DocumentIdentity{TemplateID: "gongwen"})
