@@ -98,8 +98,12 @@ interface PreviewEvent {
 
 interface PreviewUpdateResult {
 	Version: number;
+	version?: number;
 	RestartSession: boolean;
 	Events: PreviewEvent[];
+	events?: PreviewEvent[];
+	svgPages?: string[];
+	SVGPages?: string[];
 }
 
 interface WailsRuntime {

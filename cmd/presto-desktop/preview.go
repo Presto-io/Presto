@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,11 +13,21 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/mrered/presto/internal/preview"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 const previewFallbackMessage = "兼容预览"
+
+type runningPreviewProcess struct {
+	cmd          *exec.Cmd
+	cancel       context.CancelFunc
+	workDir      string
+	dataPlaneURL string
+	controlConn  *websocket.Conn
+	controlURL   string
+}
 
 type previewRunner struct {
 	service         *preview.Service
@@ -24,9 +36,14 @@ type previewRunner struct {
 	retryBase       time.Duration
 	cmd             *exec.Cmd
 	sessionWorkDir  string
+	dataPlaneURL    string
+	controlPlaneURL string
+	controlConn     *websocket.Conn
 	cancel          context.CancelFunc
 	retryCount      int
 	mu              sync.Mutex
+	controlMu       sync.Mutex
+	updateMu        sync.Mutex
 	currentMode     preview.Mode
 	documentVersion int64
 }
@@ -92,7 +109,8 @@ func (r *previewRunner) buildTinymistArgs(mainTypPath string, dataPort int, cont
 		"preview",
 		mainTypPath,
 		"--no-open",
-		"--partial-rendering=true",
+		"--partial-rendering=false",
+		"--input=presto_fast_preview=true",
 		"--data-plane-host=127.0.0.1:" + portString(dataPort),
 		"--control-plane-host=127.0.0.1:" + portString(controlPort),
 	}
@@ -113,28 +131,72 @@ func (r *previewRunner) startTinymist(ctx context.Context, mainTypPath string, d
 	r.cmd = cmd
 	go func() {
 		_ = cmd.Wait()
+		r.mu.Lock()
+		if r.cmd == cmd {
+			r.cmd = nil
+			r.cancel = nil
+		}
+		r.mu.Unlock()
 	}()
 	return nil
 }
 
 func (r *previewRunner) stop() error {
+	return stopRunningPreviewProcess(r.detachProcess())
+}
+
+func (r *previewRunner) detachProcess() runningPreviewProcess {
 	r.mu.Lock()
-	cmd := r.cmd
-	cancel := r.cancel
-	workDir := r.sessionWorkDir
+	process := runningPreviewProcess{
+		cmd:          r.cmd,
+		cancel:       r.cancel,
+		workDir:      r.sessionWorkDir,
+		dataPlaneURL: r.dataPlaneURL,
+		controlConn:  r.controlConn,
+		controlURL:   r.controlPlaneURL,
+	}
 	r.cmd = nil
 	r.cancel = nil
 	r.sessionWorkDir = ""
+	r.dataPlaneURL = ""
+	r.controlConn = nil
+	r.controlPlaneURL = ""
 	r.mu.Unlock()
 
-	if cancel != nil {
-		cancel()
+	return process
+}
+
+func (r *previewRunner) restoreProcess(process runningPreviewProcess) {
+	if process.cmd == nil {
+		return
 	}
-	if cmd != nil && cmd.Process != nil {
-		_ = cmd.Process.Kill()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.cmd != nil {
+		_ = stopRunningPreviewProcess(process)
+		return
 	}
-	if workDir != "" {
-		return os.RemoveAll(workDir)
+	r.cmd = process.cmd
+	r.cancel = process.cancel
+	r.sessionWorkDir = process.workDir
+	r.dataPlaneURL = process.dataPlaneURL
+	r.controlPlaneURL = process.controlURL
+	r.controlConn = process.controlConn
+}
+
+func stopRunningPreviewProcess(process runningPreviewProcess) error {
+	if process.cancel != nil {
+		process.cancel()
+	}
+	if process.cmd != nil && process.cmd.Process != nil {
+		_ = process.cmd.Process.Kill()
+	}
+	if process.controlConn != nil {
+		_ = process.controlConn.Close()
+	}
+	if process.workDir != "" {
+		return os.RemoveAll(process.workDir)
 	}
 	return nil
 }
@@ -143,6 +205,25 @@ func (r *previewRunner) hasProcess() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.cmd != nil
+}
+
+func (r *previewRunner) setDataPlaneURL(dataPlaneURL string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.dataPlaneURL = dataPlaneURL
+}
+
+func (r *previewRunner) setControlPlane(controlPlaneURL string, conn *websocket.Conn) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.controlPlaneURL = controlPlaneURL
+	r.controlConn = conn
+}
+
+func (r *previewRunner) controlConnSnapshot() *websocket.Conn {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.controlConn
 }
 
 func (r *previewRunner) nextRetryDelay() (time.Duration, bool) {
@@ -225,8 +306,27 @@ func (a *App) PreviewUpdate(markdown string, templateID string, workDir string, 
 		return &result, err
 	}
 
+	if !a.previewService.IsCurrentVersion(result.Version) {
+		return &result, nil
+	}
+
+	a.previewRunner.updateMu.Lock()
+	defer a.previewRunner.updateMu.Unlock()
+
+	if !a.previewService.IsCurrentVersion(result.Version) {
+		return &result, nil
+	}
+
+	var previousProcess runningPreviewProcess
 	if result.RestartSession {
-		_ = a.previewRunner.stop()
+		if logger != nil {
+			logger.Info("[preview] restarting tinymist session", "version", result.Version, "reason", "document identity changed")
+		}
+		if workDir == "" {
+			previousProcess = a.previewRunner.detachProcess()
+		} else {
+			_ = a.previewRunner.stop()
+		}
 	}
 
 	mainTypPath, cleanup, err := a.previewRunner.writeSessionFile(workDir, typstSource)
@@ -240,6 +340,11 @@ func (a *App) PreviewUpdate(markdown string, templateID string, workDir string, 
 		if cleanup != nil {
 			cleanup()
 		}
+		if previousProcess.cmd != nil {
+			_ = a.previewRunner.stop()
+			a.previewRunner.restoreProcess(previousProcess)
+			previousProcess = runningPreviewProcess{}
+		}
 		return a.applyFallback(&result, typstSource, workDir, reason)
 	}
 
@@ -249,12 +354,15 @@ func (a *App) PreviewUpdate(markdown string, templateID string, workDir string, 
 
 	if result.RestartSession || !a.previewRunner.hasProcess() {
 		sessionMainTypPath := identity.MainTypstPath
-		startEvent := a.previewService.StartSession(preview.DocumentIdentity{
+		startEvent, ok := a.previewService.StartSessionForVersion(result.Version, preview.DocumentIdentity{
 			TemplateID:    templateID,
 			WorkDir:       workDir,
 			DocumentKey:   documentKey,
 			MainTypstPath: sessionMainTypPath,
 		})
+		if !ok {
+			return &result, nil
+		}
 		result.Events = append(result.Events, startEvent)
 		a.emitPreviewEvent(startEvent)
 
@@ -266,15 +374,63 @@ func (a *App) PreviewUpdate(markdown string, templateID string, workDir string, 
 		if err := a.previewRunner.startTinymist(context.Background(), mainTypPath, dataPort, controlPort); err != nil {
 			return applyFallback(err.Error())
 		}
+		dataPlaneURL := fmt.Sprintf("http://127.0.0.1:%d", dataPort)
+		controlPlaneURL := fmt.Sprintf("ws://127.0.0.1:%d", controlPort)
+		if err := waitForPreviewDataPlane(context.Background(), dataPlaneURL, 5*time.Second, 100*time.Millisecond); err != nil {
+			_ = a.previewRunner.stop()
+			a.previewRunner.restoreProcess(previousProcess)
+			previousProcess = runningPreviewProcess{}
+			if !a.previewService.IsCurrentVersion(result.Version) {
+				return &result, nil
+			}
+			return applyFallback(fmt.Sprintf("tinymist preview not ready: %v", err))
+		}
+		controlConn, err := connectTinymistControlPlane(context.Background(), controlPlaneURL, 5*time.Second, 100*time.Millisecond)
+		if err != nil {
+			_ = a.previewRunner.stop()
+			a.previewRunner.restoreProcess(previousProcess)
+			previousProcess = runningPreviewProcess{}
+			if !a.previewService.IsCurrentVersion(result.Version) {
+				return &result, nil
+			}
+			return applyFallback(fmt.Sprintf("tinymist control plane not ready: %v", err))
+		}
+		if !a.previewService.IsCurrentVersion(result.Version) {
+			_ = controlConn.Close()
+			_ = a.previewRunner.stop()
+			a.previewRunner.restoreProcess(previousProcess)
+			return &result, nil
+		}
 
-		readyEvent, _ := a.previewService.ApplySessionEvent(
+		readyEvent, ok := a.previewService.ApplySessionEventForVersion(
+			result.Version,
 			a.previewService.CurrentSessionID(),
 			preview.EventReady,
-			fmt.Sprintf("http://127.0.0.1:%d", dataPort),
+			dataPlaneURL,
 			nil,
 		)
+		if !ok {
+			_ = a.previewRunner.stop()
+			a.previewRunner.restoreProcess(previousProcess)
+			return &result, nil
+		}
 		result.Events = append(result.Events, readyEvent)
 		a.emitPreviewEvent(readyEvent)
+		a.previewRunner.setDataPlaneURL(dataPlaneURL)
+		a.previewRunner.setControlPlane(controlPlaneURL, controlConn)
+		go drainTinymistControlPlane(controlConn)
+
+		if previousProcess.cmd != nil {
+			_ = stopRunningPreviewProcess(previousProcess)
+			previousProcess = runningPreviewProcess{}
+		}
+	} else {
+		if err := a.previewRunner.updateTinymistMemoryFile(context.Background(), mainTypPath, typstSource, 2*time.Second); err != nil {
+			if logger != nil {
+				logger.Warn("[preview] tinymist refresh failed", "version", result.Version, "error", err)
+			}
+			return applyFallback(fmt.Sprintf("tinymist preview refresh failed: %v", err))
+		}
 	}
 
 	return &result, nil
@@ -318,7 +474,10 @@ func (a *App) tinymistUnavailable() bool {
 }
 
 func (a *App) applyFallback(result *preview.UpdateResult, typstSource string, workDir string, reason string) (*preview.UpdateResult, error) {
-	unavailable := a.previewService.TinymistUnavailable(reason)
+	unavailable, ok := a.previewService.TinymistUnavailableForVersion(result.Version, reason)
+	if !ok {
+		return result, nil
+	}
 	result.Events = append(result.Events, unavailable)
 	a.emitPreviewEvent(unavailable)
 
@@ -377,4 +536,125 @@ func allocateLocalPort() (int, error) {
 		return 0, fmt.Errorf("unexpected preview listener address: %s", listener.Addr())
 	}
 	return addr.Port, nil
+}
+
+func waitForPreviewDataPlane(ctx context.Context, url string, timeout time.Duration, pollInterval time.Duration) error {
+	if pollInterval <= 0 {
+		pollInterval = 100 * time.Millisecond
+	}
+	waitCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	client := &http.Client{Timeout: pollInterval}
+	ticker := time.NewTicker(pollInterval)
+	defer ticker.Stop()
+
+	var lastErr error
+	for {
+		req, err := http.NewRequestWithContext(waitCtx, http.MethodGet, url, nil)
+		if err != nil {
+			return err
+		}
+		resp, err := client.Do(req)
+		if err == nil {
+			_ = resp.Body.Close()
+			if resp.StatusCode >= 200 && resp.StatusCode < 500 {
+				return nil
+			}
+			lastErr = fmt.Errorf("unexpected status %d", resp.StatusCode)
+		} else {
+			lastErr = err
+		}
+
+		select {
+		case <-waitCtx.Done():
+			if lastErr != nil {
+				return lastErr
+			}
+			return waitCtx.Err()
+		case <-ticker.C:
+		}
+	}
+}
+
+func connectTinymistControlPlane(ctx context.Context, controlPlaneURL string, timeout time.Duration, pollInterval time.Duration) (*websocket.Conn, error) {
+	if controlPlaneURL == "" {
+		return nil, fmt.Errorf("missing tinymist control plane URL")
+	}
+	if pollInterval <= 0 {
+		pollInterval = 100 * time.Millisecond
+	}
+
+	waitCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	ticker := time.NewTicker(pollInterval)
+	defer ticker.Stop()
+
+	var lastErr error
+	for {
+		conn, _, err := websocket.DefaultDialer.DialContext(waitCtx, controlPlaneURL, nil)
+		if err == nil {
+			return conn, nil
+		}
+		lastErr = err
+
+		select {
+		case <-waitCtx.Done():
+			if lastErr != nil {
+				return nil, lastErr
+			}
+			return nil, waitCtx.Err()
+		case <-ticker.C:
+		}
+	}
+}
+
+func drainTinymistControlPlane(conn *websocket.Conn) {
+	for {
+		_, message, err := conn.ReadMessage()
+		if err != nil {
+			return
+		}
+		var response struct {
+			Event string `json:"event"`
+			Kind  string `json:"kind"`
+		}
+		if err := json.Unmarshal(message, &response); err == nil && logger != nil {
+			switch response.Event {
+			case "compileStatus":
+				logger.Debug("[preview] tinymist compile status", "status", response.Kind)
+			case "syncEditorChanges":
+				logger.Debug("[preview] tinymist requested editor memory sync")
+			case "outline", "editorScrollTo":
+			default:
+				logger.Debug("[preview] tinymist control message", "event", response.Event)
+			}
+		}
+	}
+}
+
+func (r *previewRunner) updateTinymistMemoryFile(ctx context.Context, mainTypPath string, typstSource string, timeout time.Duration) error {
+	conn := r.controlConnSnapshot()
+	if conn == nil {
+		return fmt.Errorf("missing tinymist control plane connection")
+	}
+
+	waitCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	message := map[string]interface{}{
+		"event": "updateMemoryFiles",
+		"files": map[string]string{
+			mainTypPath: typstSource,
+		},
+	}
+
+	r.controlMu.Lock()
+	defer r.controlMu.Unlock()
+
+	if deadline, ok := waitCtx.Deadline(); ok {
+		_ = conn.SetWriteDeadline(deadline)
+	}
+	return conn.WriteJSON(message)
 }

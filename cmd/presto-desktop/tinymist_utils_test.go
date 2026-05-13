@@ -28,6 +28,33 @@ func TestFindTinymistBinaryFromPrefersBundledSidecar(t *testing.T) {
 	}
 }
 
+func TestFindTinymistBinaryFromPrefersResourcesBeforeSidecar(t *testing.T) {
+	exeDir := t.TempDir()
+	resources := filepath.Join(exeDir, "..", "Resources", "tinymist")
+	sidecar := filepath.Join(exeDir, "..", "Resources", "sidecars", "tinymist", "darwin-arm64", "tinymist")
+	if err := os.MkdirAll(filepath.Dir(resources), 0755); err != nil {
+		t.Fatalf("create resources dir: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(sidecar), 0755); err != nil {
+		t.Fatalf("create sidecar dir: %v", err)
+	}
+	if err := os.WriteFile(resources, []byte("resources"), 0755); err != nil {
+		t.Fatalf("write resources tinymist: %v", err)
+	}
+	if err := os.WriteFile(sidecar, []byte("sidecar"), 0755); err != nil {
+		t.Fatalf("write sidecar tinymist: %v", err)
+	}
+
+	got := findTinymistBinaryFrom(exeDir, "darwin", "arm64", func(name string) (string, error) {
+		t.Fatalf("lookPath should not be called when resources tinymist exists, got %q", name)
+		return "", errors.New("unreachable")
+	})
+
+	if got != resources {
+		t.Fatalf("expected Resources tinymist %q, got %q", resources, got)
+	}
+}
+
 func TestFindTinymistBinaryFromPrefersResourcesBeforeBesideExecutable(t *testing.T) {
 	exeDir := t.TempDir()
 	resources := filepath.Join(exeDir, "..", "Resources", "tinymist")

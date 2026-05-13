@@ -51,6 +51,94 @@
   function renderSvgPages(pages: string[]) {
     return pages;
   }
+
+  function embeddedSrc(url: string, reloadKey?: number): string {
+    if (!reloadKey) return url;
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}prestoPreviewVersion=${reloadKey}`;
+  }
+
+  type FrameSlot = 'a' | 'b';
+
+  let activeFrame = $state<FrameSlot>('a');
+  let pendingFrame = $state<FrameSlot | null>(null);
+  let frameASrc = $state('');
+  let frameBSrc = $state('');
+  let frameALoaded = $state(false);
+  let frameBLoaded = $state(false);
+  let frameALoadToken = 0;
+  let frameBLoadToken = 0;
+
+  function frameSrc(frame: FrameSlot): string {
+    return frame === 'a' ? frameASrc : frameBSrc;
+  }
+
+  function frameLoaded(frame: FrameSlot): boolean {
+    return frame === 'a' ? frameALoaded : frameBLoaded;
+  }
+
+  function setFrame(frame: FrameSlot, src: string) {
+    if (frame === 'a') {
+      frameASrc = src;
+      frameALoaded = false;
+      frameALoadToken += 1;
+    } else {
+      frameBSrc = src;
+      frameBLoaded = false;
+      frameBLoadToken += 1;
+    }
+  }
+
+  function markFrameLoaded(frame: FrameSlot) {
+    const token = frame === 'a' ? frameALoadToken : frameBLoadToken;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const currentToken = frame === 'a' ? frameALoadToken : frameBLoadToken;
+        if (token !== currentToken) return;
+        if (frame === 'a') {
+          frameALoaded = true;
+        } else {
+          frameBLoaded = true;
+        }
+        if (pendingFrame === frame) {
+          activeFrame = frame;
+          pendingFrame = null;
+        }
+      });
+    });
+  }
+
+  function activeEmbeddedLoaded(): boolean {
+    const src = frameSrc(activeFrame);
+    return src !== '' && frameLoaded(activeFrame);
+  }
+
+  $effect(() => {
+    if (modeState?.kind !== 'embedded') {
+      pendingFrame = null;
+      frameASrc = '';
+      frameBSrc = '';
+      frameALoaded = false;
+      frameBLoaded = false;
+      activeFrame = 'a';
+      return;
+    }
+
+    const nextSrc = embeddedSrc(modeState.dataPlaneUrl, modeState.reloadKey);
+    const currentSrc = frameSrc(activeFrame);
+    if (!currentSrc) {
+      setFrame(activeFrame, nextSrc);
+      pendingFrame = null;
+      return;
+    }
+    if (nextSrc === currentSrc || nextSrc === frameSrc(activeFrame === 'a' ? 'b' : 'a')) {
+      return;
+    }
+
+    const nextFrame = activeFrame === 'a' ? 'b' : 'a';
+    setFrame(nextFrame, nextSrc);
+    pendingFrame = nextFrame;
+  });
 </script>
 
 <div
@@ -76,12 +164,44 @@
       </div>
     {/if}
   {:else if modeState.kind === 'embedded'}
-    <iframe
-      class="embedded-preview"
-      src={modeState.dataPlaneUrl}
-      sandbox="allow-scripts allow-same-origin"
-      title="文档预览"
-    ></iframe>
+    {@const fallbackPages = modeState.fallbackSvgPages}
+    {#if !activeEmbeddedLoaded() && fallbackPages.length > 0}
+      <div class="embedded-fallback">
+        <div class="svg-pages">
+          {#each renderSvgPages(fallbackPages) as svg, i}
+            <div class="svg-page" data-page={i + 1}>
+              {@html sanitizeSvg(svg)}
+            </div>
+          {/each}
+        </div>
+      </div>
+    {:else if !activeEmbeddedLoaded()}
+      <div class="placeholder">
+        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <p>兼容预览</p>
+      </div>
+    {/if}
+    {#if frameASrc}
+      <iframe
+        class={`embedded-preview ${activeFrame === 'a' && frameALoaded ? 'active' : ''}`}
+        src={frameASrc}
+        sandbox="allow-scripts allow-same-origin"
+        title="文档预览"
+        onload={() => markFrameLoaded('a')}
+      ></iframe>
+    {/if}
+    {#if frameBSrc}
+      <iframe
+        class={`embedded-preview ${activeFrame === 'b' && frameBLoaded ? 'active' : ''}`}
+        src={frameBSrc}
+        sandbox="allow-scripts allow-same-origin"
+        title="文档预览"
+        onload={() => markFrameLoaded('b')}
+      ></iframe>
+    {/if}
+    {#if !activeEmbeddedLoaded()}
+      <div class="preview-status">兼容预览</div>
+    {/if}
     {#if debug}
       <div class="preview-status">mode embedded · {modeState.sessionId}</div>
     {/if}
@@ -113,6 +233,7 @@
 
 <style>
   .preview-container {
+    position: relative;
     height: 100%;
     overflow-y: auto;
     overflow-x: hidden;
@@ -142,11 +263,24 @@
     height: auto;
   }
   .embedded-preview {
-    display: block;
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
     border: 0;
     background: white;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .embedded-preview.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .embedded-fallback {
+    position: absolute;
+    inset: 0;
+    overflow-y: auto;
+    background: var(--color-preview-bg);
   }
   .preview-status,
   .preview-error {

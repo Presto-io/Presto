@@ -110,6 +110,24 @@ func (s *Service) TinymistUnavailable(reason string) Event {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	return s.tinymistUnavailableLocked(reason)
+}
+
+func (s *Service) TinymistUnavailableForVersion(version int64, reason string) (Event, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if version != s.documentVersion {
+		return s.staleIgnoredLocked(map[string]interface{}{
+			"rejectedDocumentVersion": version,
+			"phase":                   "fallback",
+		}), false
+	}
+
+	return s.tinymistUnavailableLocked(reason), true
+}
+
+func (s *Service) tinymistUnavailableLocked(reason string) Event {
 	s.mode = ModeFallback
 	return s.eventLocked(EventFallback, &ErrorInfo{
 		Code:        "tinymist_unavailable",
@@ -128,10 +146,35 @@ func (s *Service) CurrentSessionID() string {
 	return s.sessionID
 }
 
+func (s *Service) IsCurrentVersion(version int64) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return version == s.documentVersion
+}
+
 func (s *Service) StartSession(identity DocumentIdentity) Event {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	return s.startSessionLocked(identity)
+}
+
+func (s *Service) StartSessionForVersion(version int64, identity DocumentIdentity) (Event, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if version != s.documentVersion {
+		return s.staleIgnoredLocked(map[string]interface{}{
+			"rejectedDocumentVersion": version,
+			"lifecycle":               "start",
+		}), false
+	}
+
+	return s.startSessionLocked(identity), true
+}
+
+func (s *Service) startSessionLocked(identity DocumentIdentity) Event {
 	s.sessionSeq++
 	s.sessionID = fmt.Sprintf("session-%d", s.sessionSeq)
 	s.identity = identity
@@ -146,6 +189,24 @@ func (s *Service) ApplySessionEvent(sessionID string, kind EventKind, dataPlaneU
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	return s.applySessionEventLocked(sessionID, kind, dataPlaneURL, errInfo)
+}
+
+func (s *Service) ApplySessionEventForVersion(version int64, sessionID string, kind EventKind, dataPlaneURL string, errInfo *ErrorInfo) (Event, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if version != s.documentVersion {
+		return s.staleIgnoredLocked(map[string]interface{}{
+			"rejectedDocumentVersion": version,
+			"rejectedSessionId":       sessionID,
+		}), false
+	}
+
+	return s.applySessionEventLocked(sessionID, kind, dataPlaneURL, errInfo)
+}
+
+func (s *Service) applySessionEventLocked(sessionID string, kind EventKind, dataPlaneURL string, errInfo *ErrorInfo) (Event, bool) {
 	if sessionID != s.sessionID {
 		return s.staleIgnoredLocked(map[string]interface{}{
 			"rejectedSessionId": sessionID,

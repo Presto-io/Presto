@@ -2,7 +2,7 @@
        _build-macos-arm64 _build-macos-amd64 \
        dist-macos dist-macos-arm64 dist-macos-amd64 dist-macos-universal \
        dist-dmg dist-dmg-arm64 dist-dmg-amd64 dist-dmg-universal \
-       dist-windows dist-linux dist notarize inno windows-installer _inno-language _download-vc-redist
+       dist-windows dist-linux dist notarize inno windows-installer _inno-language _download-tinymist _download-vc-redist
 
 # ─── Config ──────────────────────────────────────────────
 APP_NAME     := Presto
@@ -10,6 +10,7 @@ APP_ID       := com.mrered.presto
 VERSION      ?= $(shell git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo "0.0.0-dev")
 VERSION_BASE := $(shell printf '%s' "$(VERSION)" | sed 's/-.*//')
 TYPST_VERSION:= 0.14.2
+TINYMIST_VERSION := 0.14.18
 WAILS_TAGS   := desktop,production
 LDFLAGS      := -s -w -X main.version=$(VERSION)
 DIST         := dist
@@ -27,6 +28,11 @@ TYPST_DARWIN_ARM64 := typst-aarch64-apple-darwin.tar.xz
 TYPST_DARWIN_AMD64 := typst-x86_64-apple-darwin.tar.xz
 TYPST_WINDOWS_AMD64:= typst-x86_64-pc-windows-msvc.zip
 TYPST_LINUX_AMD64  := typst-x86_64-unknown-linux-musl.tar.xz
+TINYMIST_BASE := https://github.com/Myriad-Dreamin/tinymist/releases/download/v$(TINYMIST_VERSION)
+TINYMIST_DARWIN_ARM64 := tinymist-aarch64-apple-darwin.tar.gz
+TINYMIST_DARWIN_AMD64 := tinymist-x86_64-apple-darwin.tar.gz
+TINYMIST_DARWIN_ARM64_SHA256 := 98d2f47e7973ff75c40e3716185385c8e7357a6a6f821771041565f222aac940
+TINYMIST_DARWIN_AMD64_SHA256 := ea0ed898ea6d0fec5ccf14468d5093949585189ee4cb440d6bbb250ea57206f4
 VC_REDIST_AMD64_URL := https://aka.ms/vc14/vc_redist.x64.exe
 VC_REDIST_ARM64_URL := https://aka.ms/vc14/vc_redist.arm64.exe
 
@@ -116,6 +122,26 @@ _download-typst:
 		echo "==> $(TYPST_OUT)"; \
 	fi
 
+# Download tinymist runtime sidecar for a given platform.
+# Usage: $(MAKE) _download-tinymist TINYMIST_ARCHIVE=<name> TINYMIST_OUT=<path> TINYMIST_SHA256=<hash>
+_download-tinymist:
+	@mkdir -p $(dir $(TINYMIST_OUT))
+	@if [ ! -f "$(TINYMIST_OUT)" ]; then \
+		test -n "$(TINYMIST_SHA256)" || { echo "ERROR: TINYMIST_SHA256 is required"; exit 1; }; \
+		echo "==> Downloading tinymist $(TINYMIST_VERSION) ($(TINYMIST_ARCHIVE))..."; \
+		TMP=$$(mktemp -d); \
+		curl -fsSL "$(TINYMIST_BASE)/$(TINYMIST_ARCHIVE)" -o "$$TMP/archive"; \
+		echo "$(TINYMIST_SHA256)  $$TMP/archive" | shasum -a 256 -c - || \
+			{ echo "ERROR: tinymist checksum verification failed!"; rm -rf "$$TMP"; exit 1; }; \
+		mkdir -p "$$TMP/out" && tar xf "$$TMP/archive" -C "$$TMP/out"; \
+		BIN=$$(find "$$TMP/out" -type f -name 'tinymist' | head -1); \
+		test -n "$$BIN" || { echo "ERROR: tinymist binary not found in archive"; rm -rf "$$TMP"; exit 1; }; \
+		cp "$$BIN" "$(TINYMIST_OUT)"; \
+		chmod +x "$(TINYMIST_OUT)"; \
+		rm -rf "$$TMP"; \
+		echo "==> $(TINYMIST_OUT)"; \
+	fi
+
 # Download Microsoft Visual C++ Redistributable for Windows Typst (MSVC build).
 # Usage: $(MAKE) _download-vc-redist VC_REDIST_URL=<url> VC_REDIST_OUT=<path>
 _download-vc-redist:
@@ -139,8 +165,12 @@ _build-macos-arm64: _frontend-embed
 		-o $(DIST)/_bin/presto-darwin-arm64 $(DESKTOP_SRC)/ ) & PID_GO=$$!; \
 	( $(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_DARWIN_ARM64) \
 		TYPST_OUT=$(DIST)/_bin/typst-darwin-arm64 ) & PID_TYPST=$$!; \
+	( $(MAKE) _download-tinymist TINYMIST_ARCHIVE=$(TINYMIST_DARWIN_ARM64) \
+		TINYMIST_SHA256=$(TINYMIST_DARWIN_ARM64_SHA256) \
+		TINYMIST_OUT=$(DIST)/_bin/tinymist-darwin-arm64 ) & PID_TINYMIST=$$!; \
 	wait $$PID_GO || exit 1; \
-	wait $$PID_TYPST || exit 1
+	wait $$PID_TYPST || exit 1; \
+	wait $$PID_TINYMIST || exit 1
 
 _build-macos-amd64: _frontend-embed
 	@mkdir -p $(DIST)/_bin
@@ -151,20 +181,25 @@ _build-macos-amd64: _frontend-embed
 		-o $(DIST)/_bin/presto-darwin-amd64 $(DESKTOP_SRC)/ ) & PID_GO=$$!; \
 	( $(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_DARWIN_AMD64) \
 		TYPST_OUT=$(DIST)/_bin/typst-darwin-amd64 ) & PID_TYPST=$$!; \
+	( $(MAKE) _download-tinymist TINYMIST_ARCHIVE=$(TINYMIST_DARWIN_AMD64) \
+		TINYMIST_SHA256=$(TINYMIST_DARWIN_AMD64_SHA256) \
+		TINYMIST_OUT=$(DIST)/_bin/tinymist-darwin-amd64 ) & PID_TINYMIST=$$!; \
 	wait $$PID_GO || exit 1; \
-	wait $$PID_TYPST || exit 1
+	wait $$PID_TYPST || exit 1; \
+	wait $$PID_TINYMIST || exit 1
 
 dist-macos-arm64: _build-macos-arm64
-	@$(MAKE) _bundle-app GOARCH=arm64 TYPST_BIN=$(DIST)/_bin/typst-darwin-arm64
+	@$(MAKE) _bundle-app GOARCH=arm64 TYPST_BIN=$(DIST)/_bin/typst-darwin-arm64 TINYMIST_BIN=$(DIST)/_bin/tinymist-darwin-arm64
 
 dist-macos-amd64: _build-macos-amd64
-	@$(MAKE) _bundle-app GOARCH=amd64 TYPST_BIN=$(DIST)/_bin/typst-darwin-amd64
+	@$(MAKE) _bundle-app GOARCH=amd64 TYPST_BIN=$(DIST)/_bin/typst-darwin-amd64 TINYMIST_BIN=$(DIST)/_bin/tinymist-darwin-amd64
 
 dist-macos-universal: _build-macos-arm64 _build-macos-amd64
 	@echo "==> Creating universal .app..."
 	@mkdir -p "$(DIST)/$(APP_NAME).app/Contents/MacOS"
 	@mkdir -p "$(DIST)/$(APP_NAME).app/Contents/Resources"
 	@mkdir -p "$(DIST)/$(APP_NAME).app/Contents/Resources/zh-Hans.lproj"
+	rm -rf "$(DIST)/$(APP_NAME).app/Contents/Resources/sidecars/tinymist"
 	lipo -create \
 		$(DIST)/_bin/presto-darwin-arm64 \
 		$(DIST)/_bin/presto-darwin-amd64 \
@@ -173,6 +208,10 @@ dist-macos-universal: _build-macos-arm64 _build-macos-amd64
 		$(DIST)/_bin/typst-darwin-arm64 \
 		$(DIST)/_bin/typst-darwin-amd64 \
 		-output "$(DIST)/$(APP_NAME).app/Contents/Resources/typst"
+	lipo -create \
+		$(DIST)/_bin/tinymist-darwin-arm64 \
+		$(DIST)/_bin/tinymist-darwin-amd64 \
+		-output "$(DIST)/$(APP_NAME).app/Contents/Resources/tinymist"
 	cp packaging/macos/Info.plist "$(DIST)/$(APP_NAME).app/Contents/"
 	cp packaging/macos/zh-Hans.lproj/InfoPlist.strings \
 		"$(DIST)/$(APP_NAME).app/Contents/Resources/zh-Hans.lproj/InfoPlist.strings"
@@ -190,9 +229,12 @@ _bundle-app:
 	@mkdir -p "$(DIST)/$(APP_NAME).app/Contents/MacOS"
 	@mkdir -p "$(DIST)/$(APP_NAME).app/Contents/Resources"
 	@mkdir -p "$(DIST)/$(APP_NAME).app/Contents/Resources/zh-Hans.lproj"
+	rm -rf "$(DIST)/$(APP_NAME).app/Contents/Resources/sidecars/tinymist"
 	cp $(DIST)/_bin/presto-darwin-$(GOARCH) \
 		"$(DIST)/$(APP_NAME).app/Contents/MacOS/$(APP_NAME)"
 	cp $(TYPST_BIN) "$(DIST)/$(APP_NAME).app/Contents/Resources/typst"
+	cp $(TINYMIST_BIN) "$(DIST)/$(APP_NAME).app/Contents/Resources/tinymist"
+	chmod +x "$(DIST)/$(APP_NAME).app/Contents/Resources/tinymist"
 	cp packaging/macos/Info.plist "$(DIST)/$(APP_NAME).app/Contents/"
 	cp packaging/macos/zh-Hans.lproj/InfoPlist.strings \
 		"$(DIST)/$(APP_NAME).app/Contents/Resources/zh-Hans.lproj/InfoPlist.strings"
