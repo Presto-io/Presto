@@ -85,7 +85,7 @@ export interface PreviewEvent {
 export type PreviewModeState =
   | { kind: 'fallback'; svgPages: string[]; label?: string }
   | { kind: 'starting'; sessionId?: string; fallbackSvgPages: string[] }
-  | { kind: 'embedded'; sessionId: string; dataPlaneUrl: string; fallbackSvgPages: string[] }
+  | { kind: 'embedded'; sessionId: string; dataPlaneUrl: string; fallbackSvgPages: string[]; reloadKey?: number }
   | { kind: 'error'; fallbackSvgPages: string[]; message: string };
 
 export interface GitHubRepo {

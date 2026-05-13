@@ -2,12 +2,16 @@ package main
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/mrered/presto/internal/preview"
 )
 
@@ -42,7 +46,8 @@ func TestPreviewRunnerBuildsTinymistArgs(t *testing.T) {
 		"preview",
 		"/tmp/main.typ",
 		"--no-open",
-		"--partial-rendering=true",
+		"--partial-rendering=false",
+		"--input=presto_fast_preview=true",
 		"--data-plane-host=127.0.0.1:23625",
 		"--control-plane-host=127.0.0.1:23626",
 	}
@@ -135,9 +140,123 @@ func TestPreviewRunnerStopsOldSessionBeforeNewDocumentIdentity(t *testing.T) {
 	}
 }
 
+func TestPreviewRunnerRewritesExistingSessionFileForContentUpdate(t *testing.T) {
+	runner := newPreviewRunner(preview.NewService(), "tinymist")
+	mainTypPath, cleanup, err := runner.writeSessionFile("", "#let doc = old")
+	if err != nil {
+		t.Fatalf("write initial session: %v", err)
+	}
+	defer cleanup()
+	workDir := runner.sessionWorkDir
+
+	nextMainTypPath, _, err := runner.writeSessionFile("", "#let doc = new")
+	if err != nil {
+		t.Fatalf("rewrite session: %v", err)
+	}
+	if nextMainTypPath != mainTypPath {
+		t.Fatalf("content update should reuse main.typ path: got %q want %q", nextMainTypPath, mainTypPath)
+	}
+	if runner.sessionWorkDir != workDir {
+		t.Fatalf("content update should reuse workdir: got %q want %q", runner.sessionWorkDir, workDir)
+	}
+	data, err := os.ReadFile(mainTypPath)
+	if err != nil {
+		t.Fatalf("read rewritten main.typ: %v", err)
+	}
+	if string(data) != "#let doc = new" {
+		t.Fatalf("main.typ = %q, want new content", string(data))
+	}
+}
+
 func TestPreviewRunnerStartTinymistReturnsStartError(t *testing.T) {
 	runner := newPreviewRunner(preview.NewService(), filepath.Join(t.TempDir(), "missing-tinymist"))
 	if err := runner.startTinymist(context.Background(), "/tmp/main.typ", 1, 2); err == nil {
 		t.Fatal("startTinymist should return start error for missing binary")
+	}
+}
+
+func TestWaitForPreviewDataPlaneWaitsUntilReady(t *testing.T) {
+	var ready atomic.Bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !ready.Load() {
+			http.Error(w, "starting", http.StatusServiceUnavailable)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	go func() {
+		time.Sleep(30 * time.Millisecond)
+		ready.Store(true)
+	}()
+
+	if err := waitForPreviewDataPlane(context.Background(), server.URL, time.Second, 10*time.Millisecond); err != nil {
+		t.Fatalf("waitForPreviewDataPlane returned error: %v", err)
+	}
+}
+
+func TestWaitForPreviewDataPlaneTimesOut(t *testing.T) {
+	port, err := allocateLocalPort()
+	if err != nil {
+		t.Fatalf("allocate port: %v", err)
+	}
+
+	err = waitForPreviewDataPlane(context.Background(), "http://127.0.0.1:"+portString(port), 50*time.Millisecond, 10*time.Millisecond)
+	if err == nil {
+		t.Fatal("waitForPreviewDataPlane should time out when data plane never listens")
+	}
+}
+
+func TestPreviewRunnerUpdateTinymistMemoryFileSendsControlPlaneUpdate(t *testing.T) {
+	gotMessage := make(chan map[string]interface{}, 1)
+	upgrader := websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool { return true },
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			t.Errorf("upgrade websocket: %v", err)
+			return
+		}
+		defer conn.Close()
+
+		var message map[string]interface{}
+		if err := conn.ReadJSON(&message); err != nil {
+			t.Errorf("read websocket json: %v", err)
+			return
+		}
+		gotMessage <- message
+	}))
+	defer server.Close()
+
+	controlURL := "ws" + server.URL[len("http"):]
+	conn, _, err := websocket.DefaultDialer.Dial(controlURL, nil)
+	if err != nil {
+		t.Fatalf("dial control websocket: %v", err)
+	}
+	defer conn.Close()
+
+	runner := newPreviewRunner(preview.NewService(), "tinymist")
+	runner.setControlPlane(controlURL, conn)
+
+	if err := runner.updateTinymistMemoryFile(context.Background(), "/tmp/main.typ", "#let doc = new", time.Second); err != nil {
+		t.Fatalf("updateTinymistMemoryFile returned error: %v", err)
+	}
+
+	select {
+	case got := <-gotMessage:
+		if got["event"] != "updateMemoryFiles" {
+			t.Fatalf("event = %v, want updateMemoryFiles", got["event"])
+		}
+		files, ok := got["files"].(map[string]interface{})
+		if !ok {
+			t.Fatalf("files = %#v, want object", got["files"])
+		}
+		if files["/tmp/main.typ"] != "#let doc = new" {
+			t.Fatalf("main.typ = %v, want updated source", files["/tmp/main.typ"])
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for control plane update")
 	}
 }

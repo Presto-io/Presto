@@ -49,6 +49,7 @@
     if (editor.pendingExternalLoad) {
       editor.pendingExternalLoad = false;
       autoDetectedOnce = false;
+      if (!editor.currentFilePath) resetPreviewDocumentKey();
       tryAutoDetectTemplate(editor.markdown);
       handleConvert(editor.markdown);
     }
@@ -68,13 +69,19 @@
   let previewScrollRatio = $state(0);
   let scrollSource: 'editor' | 'preview' | null = $state(null);
   let debounceTimer: ReturnType<typeof setTimeout>;
+  let previewRequestSeq = 0;
+  let residentPreviewInFlight = false;
+  let residentPreviewPending: { md: string; requestSeq: number } | null = null;
+  let unsavedPreviewDocumentKey = `unsaved-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const legacyPreviewDebounceMs = 500;
 
   type ResidentPreviewResult = {
+    version?: number;
+    Version?: number;
     events?: PreviewEvent[];
     svgPages?: string[];
     Events?: PreviewEvent[];
     SVGPages?: string[];
-    Version?: number;
   };
 
   // Resizable split pane
@@ -113,6 +120,14 @@
       clearTimeout(hideTimer);
       hideTimer = setTimeout(() => { hiddenButtonsVisible = false; }, 800);
     }
+  }
+
+  function resetPreviewDocumentKey() {
+    unsavedPreviewDocumentKey = `unsaved-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  }
+
+  function currentPreviewDocumentKey(): string {
+    return editor.currentFilePath || unsavedPreviewDocumentKey;
   }
 
   async function copyErrorText(text: string) {
@@ -229,6 +244,7 @@
     try {
       const example = await getExample(templateId);
       if (example) {
+        resetPreviewDocumentKey();
         editor.markdown = example;
         editor.exampleContent = example;
         editor.savedContent = example;
@@ -318,10 +334,11 @@
     return `${templateId}\n${markdown}`;
   }
 
-  async function refreshOutputInfo(markdown: string, templateId: string) {
+  async function refreshOutputInfo(markdown: string, templateId: string, shouldApply: () => boolean = () => true) {
     const info = window.go?.main?.App?.GetOutputInfo
       ? await window.go.main.App.GetOutputInfo(markdown, templateId)
       : await getOutputInfo(markdown, templateId);
+    if (!shouldApply()) return;
     editor.outputInfo = info;
     editor.outputInfoCacheKey = outputInfoCacheKey(markdown, templateId);
     editor.documentTitle = info.previewTitle || info.document?.title || '';
@@ -364,6 +381,7 @@
     editor.documentTitle = '';
     editor.savedContent = '';
     editor.exampleContent = '';
+    resetPreviewDocumentKey();
     clearEditorError('compile-error');
     clearEditorError('editor-action');
     window.go?.main?.App?.SetDirtyState?.(false, '');
@@ -400,6 +418,7 @@
       const savedPath = await window.go.main.App.SaveMarkdownAs(editor.markdown, defaultName);
       if (savedPath) {
         editor.currentFilePath = savedPath;
+        resetPreviewDocumentKey();
         editor.isDirty = false;
         window.go?.main?.App?.SetDirtyState?.(false, '');
         editor.savedContent = editor.markdown;
@@ -498,11 +517,19 @@
         sessionId: event.sessionId,
         dataPlaneUrl: event.dataPlaneUrl,
         fallbackSvgPages: editor.svgPages,
+        reloadKey: event.documentVersion,
       };
       return;
     }
 
     if (event.mode === 'starting') {
+      if (editor.previewMode.kind === 'embedded') {
+        editor.previewMode = {
+          ...editor.previewMode,
+          fallbackSvgPages: editor.svgPages,
+        };
+        return;
+      }
       editor.previewMode = {
         kind: 'starting',
         sessionId: event.sessionId || editor.previewSessionId || undefined,
@@ -529,23 +556,28 @@
     }
   }
 
-  async function runLegacyPreview(md: string) {
-    editor.typstSource = await convert(md, editor.selectedTemplate);
+  async function runLegacyPreview(md: string, shouldApply: () => boolean = () => true) {
+    const typstSource = await convert(md, editor.selectedTemplate);
+    if (!shouldApply()) return;
+    editor.typstSource = typstSource;
     // Compile to SVG for preview — use Wails binding when available
     // (Wails WebView strips HTTP headers/query params, so workDir gets lost via fetch)
-    if (window.go?.main?.App?.CompileSVG) {
-      syncFallbackPages(await window.go.main.App.CompileSVG(editor.typstSource, editor.documentDir));
-    } else {
-      syncFallbackPages(await compileSvg(editor.typstSource, editor.documentDir || undefined));
-    }
+    const pages = window.go?.main?.App?.CompileSVG
+      ? await window.go.main.App.CompileSVG(typstSource, editor.documentDir)
+      : await compileSvg(typstSource, editor.documentDir || undefined);
+    if (!shouldApply()) return;
+    syncFallbackPages(pages);
   }
 
-  async function runResidentPreview(md: string): Promise<boolean> {
-    editor.previewMode = {
-      kind: 'starting',
-      sessionId: editor.previewSessionId || undefined,
-      fallbackSvgPages: editor.svgPages,
-    };
+  async function runResidentPreview(md: string, shouldApply: () => boolean = () => true): Promise<boolean> {
+    const previousMode = editor.previewMode;
+    if (shouldApply() && previousMode.kind !== 'embedded') {
+      editor.previewMode = {
+        kind: 'starting',
+        sessionId: editor.previewSessionId || undefined,
+        fallbackSvgPages: editor.svgPages,
+      };
+    }
 
     let result: ResidentPreviewResult;
     if (window.go?.main?.App?.PreviewUpdate) {
@@ -553,16 +585,17 @@
         md,
         editor.selectedTemplate,
         editor.documentDir,
-        editor.currentFilePath || editor.documentTitle || '',
+        currentPreviewDocumentKey(),
       ) as unknown as ResidentPreviewResult;
     } else {
       result = await previewUpdate(
         md,
         editor.selectedTemplate,
         editor.documentDir || undefined,
-        editor.currentFilePath || editor.documentTitle || undefined,
+        currentPreviewDocumentKey(),
       );
     }
+    if (!shouldApply()) return true;
 
     const events = result.events ?? result.Events ?? [];
     for (const event of events) applyPreviewEvent(event);
@@ -573,11 +606,85 @@
       return true;
     }
 
-    return events.some((event) => Boolean(event.dataPlaneUrl && (event.kind === 'ready' || event.mode === 'embedded')));
+    const hasEmbeddedReady = events.some((event) => Boolean(
+      event.dataPlaneUrl && (event.kind === 'ready' || event.mode === 'embedded'),
+    ));
+    if (hasEmbeddedReady) return true;
+
+    const hasFallbackOrError = events.some((event) => (
+      event.kind === 'fallback' || event.kind === 'error' || event.mode === 'fallback'
+    ));
+    const embeddedSessionStillActive = previousMode.kind === 'embedded' || events.some((event) => event.mode === 'embedded');
+    return embeddedSessionStillActive && !hasFallbackOrError;
+  }
+
+  async function updatePreviewNow(md: string, isLatestPreviewRequest: () => boolean) {
+    if (!isLatestPreviewRequest()) return;
+    converting = true;
+    try {
+      let residentHandled = false;
+      try {
+        residentHandled = await runResidentPreview(md, isLatestPreviewRequest);
+      } catch (previewError) {
+        if (!isLatestPreviewRequest()) return;
+        console.warn('Resident preview update failed, using fallback preview:', previewError);
+        editor.previewRetryCount += 1;
+      }
+      if (!isLatestPreviewRequest()) return;
+      if (!residentHandled) {
+        await runLegacyPreview(md, isLatestPreviewRequest);
+      }
+      if (!isLatestPreviewRequest()) return;
+      await refreshOutputInfo(md, editor.selectedTemplate, isLatestPreviewRequest);
+      if (!isLatestPreviewRequest()) return;
+      clearEditorError('compile-error');
+    } catch (e) {
+      if (!isLatestPreviewRequest()) return;
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('Convert failed:', msg);
+      showEditorError(msg, {
+        groupKey: 'compile-error',
+        copyText: msg,
+        durationMs: 12000,
+        inlineInDebug: true,
+      });
+      // Wizard: detect image-related errors and hint about path rules
+      if (/image|图片|not found|file not|读取/.test(msg.toLowerCase())) {
+        setTimeout(() => triggerAction('image-error'), 500);
+      }
+    } finally {
+      if (isLatestPreviewRequest()) {
+        converting = false;
+      }
+    }
+  }
+
+  async function drainResidentPreviewQueue() {
+    if (residentPreviewInFlight) return;
+    residentPreviewInFlight = true;
+    try {
+      while (residentPreviewPending) {
+        const next = residentPreviewPending;
+        residentPreviewPending = null;
+        await updatePreviewNow(next.md, () => next.requestSeq === previewRequestSeq);
+      }
+    } finally {
+      residentPreviewInFlight = false;
+      if (residentPreviewPending) void drainResidentPreviewQueue();
+    }
+  }
+
+  function requestResidentPreview(md: string, requestSeq: number) {
+    residentPreviewPending = { md, requestSeq };
+    void drainResidentPreviewQueue();
   }
 
   async function handleConvert(md: string) {
+    const requestSeq = ++previewRequestSeq;
+    const isLatestPreviewRequest = () => requestSeq === previewRequestSeq;
+
     if (!editor.selectedTemplate || !md.trim()) {
+      residentPreviewPending = null;
       editor.outputInfo = null;
       editor.outputInfoCacheKey = '';
       editor.documentTitle = '';
@@ -591,38 +698,14 @@
     if (md.includes('![') && shouldShowPoint('image-path')) triggerAction('image-path');
 
     clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(async () => {
-      converting = true;
-      try {
-        let residentHandled = false;
-        try {
-          residentHandled = await runResidentPreview(md);
-        } catch (previewError) {
-          console.warn('Resident preview update failed, using fallback preview:', previewError);
-          editor.previewRetryCount += 1;
-        }
-        if (!residentHandled) {
-          await runLegacyPreview(md);
-        }
-        await refreshOutputInfo(md, editor.selectedTemplate);
-        clearEditorError('compile-error');
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        console.error('Convert failed:', msg);
-        showEditorError(msg, {
-          groupKey: 'compile-error',
-          copyText: msg,
-          durationMs: 12000,
-          inlineInDebug: true,
-        });
-        // Wizard: detect image-related errors and hint about path rules
-        if (/image|图片|not found|file not|读取/.test(msg.toLowerCase())) {
-          setTimeout(() => triggerAction('image-error'), 500);
-        }
-      } finally {
-        converting = false;
-      }
-    }, 500);
+    if (window.go?.main?.App?.PreviewUpdate) {
+      requestResidentPreview(md, requestSeq);
+      return;
+    }
+
+    debounceTimer = setTimeout(() => {
+      void updatePreviewNow(md, isLatestPreviewRequest);
+    }, legacyPreviewDebounceMs);
   }
 
   async function handleDownload() {

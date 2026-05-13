@@ -24,16 +24,16 @@ func findTinymistBinaryFrom(exeDir string, goos string, goarch string, lookPath 
 
 	if exeDir != "" {
 		for _, name := range candidates {
-			sidecar := filepath.Join(exeDir, "..", "Resources", "sidecars", "tinymist", goos+"-"+goarch, name)
-			if isRegularFile(sidecar) {
-				return sidecar
+			resources := filepath.Join(exeDir, "..", "Resources", name)
+			if isRegularFile(resources) {
+				return resources
 			}
 		}
 
 		for _, name := range candidates {
-			resources := filepath.Join(exeDir, "..", "Resources", name)
-			if isRegularFile(resources) {
-				return resources
+			sidecar := filepath.Join(exeDir, "..", "Resources", "sidecars", "tinymist", goos+"-"+goarch, name)
+			if isRegularFile(sidecar) {
+				return sidecar
 			}
 		}
 
