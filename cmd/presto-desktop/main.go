@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -32,18 +31,22 @@ import (
 )
 
 var (
-	version       string
-	startupURL    string
-	logger        *slog.Logger
-	verbose       bool
-	logFilePath   string
-	loggerLogFile *lumberjack.Logger
+	version           string
+	startupURL        string
+	logger            *slog.Logger
+	verbose           bool
+	logFilePath       string
+	migrateLegacy     bool
+	downloadTemplates bool
+	loggerLogFile     *lumberjack.Logger
 )
 
 func init() {
 	flag.BoolVar(&verbose, "verbose", false, "Enable verbose (debug) logging")
 	flag.BoolVar(&verbose, "v", false, "Enable verbose (debug) logging (shorthand)")
 	flag.StringVar(&logFilePath, "log-file", "", "Write logs to file path")
+	flag.BoolVar(&migrateLegacy, "migrate-legacy-data", false, "Migrate legacy app data and exit")
+	flag.BoolVar(&downloadTemplates, "download-templates", false, "Download official templates and exit")
 }
 
 //go:embed all:build
@@ -133,17 +136,28 @@ func (a *App) startup(ctx context.Context) {
 func main() {
 	flag.Parse()
 	initLogger()
-	if len(os.Args) > 1 && os.Args[1] == "--download-templates" {
-		downloadTemplatesAndExit()
+	dirs, err := appdata.ResolveDirs()
+	if err != nil {
+		log.Fatal("failed to resolve app data directories: ", err)
+	}
+	if migrateLegacy {
+		migrateLegacyDataAndExit(dirs)
 		return
 	}
-	// SEC-44: Check os.UserHomeDir error
-	home, err := os.UserHomeDir()
-	if err != nil {
-		log.Fatal("failed to get home directory: ", err)
+	if downloadTemplates {
+		downloadTemplatesAndExit(dirs)
+		return
 	}
-	prestoDir := filepath.Join(home, ".presto")
-	templatesDir := filepath.Join(prestoDir, "templates")
+	if result, err := appdata.MigrateLegacyOnce(dirs); err != nil {
+		logger.Warn("[presto] failed to migrate legacy app data", "error", err)
+	} else if result.Attempted && len(result.Migrated) > 0 {
+		logger.Info("[presto] migrated legacy app data", "items", strings.Join(result.Migrated, ","), "conflicts", strings.Join(result.Conflicts, ","))
+	}
+	if err := dirs.Ensure(); err != nil {
+		log.Fatal("failed to create app data directories: ", err)
+	}
+	prestoDir := dirs.DataDir
+	templatesDir := dirs.TemplatesDir()
 	if err := os.MkdirAll(templatesDir, 0755); err != nil {
 		log.Fatal("failed to create templates directory: ", err)
 	}
@@ -155,7 +169,7 @@ func main() {
 	logger.Info("[presto] using typst", "path", typstBin)
 	tinymistBin := findTinymistBinary()
 	logger.Info("[presto] using tinymist", "path", tinymistBin)
-	registry := template.NewRegistryCache(prestoDir)
+	registry := template.NewRegistryCache(dirs.CacheDir)
 	registry.RefreshAsync()
 	// SEC-40: Use os temp dir instead of $HOME to restrict file access
 	compiler := typst.NewCompilerWithRoot(os.TempDir())
@@ -225,9 +239,10 @@ func main() {
 			},
 		},
 		Windows: &windowsOptions.Options{
-			DisableWindowIcon: false,
-			Theme:             windowsOptions.Dark,
-			BackdropType:      windowsOptions.None,
+			DisableWindowIcon:   false,
+			Theme:               windowsOptions.Dark,
+			BackdropType:        windowsOptions.None,
+			WebviewUserDataPath: dirs.WebViewDataDir(),
 			CustomTheme: &windowsOptions.ThemeSettings{
 				DarkModeTitleBar:          windowsOptions.RGB(26, 27, 38),
 				DarkModeTitleBarInactive:  windowsOptions.RGB(31, 33, 51),

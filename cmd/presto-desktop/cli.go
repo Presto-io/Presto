@@ -3,14 +3,28 @@ package main
 import (
 	"log/slog"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/mrered/presto/internal/appdata"
 	"github.com/mrered/presto/internal/template"
 )
 
-func downloadTemplatesAndExit() {
+func migrateLegacyDataAndExit(dirs appdata.Dirs) {
+	result, err := appdata.MigrateLegacyOnce(dirs)
+	if err != nil {
+		logger.Warn("[Installer] Legacy data migration failed", "error", err)
+		os.Exit(0)
+	}
+	logger.Info("[Installer] Legacy data migration finished",
+		"attempted", result.Attempted,
+		"skipped", result.Skipped,
+		"migrated", strings.Join(result.Migrated, ","),
+		"conflicts", strings.Join(result.Conflicts, ","),
+		"message", result.Message)
+	os.Exit(0)
+}
+
+func downloadTemplatesAndExit(dirs appdata.Dirs) {
 	level := slog.LevelInfo
 	if verbose {
 		level = slog.LevelDebug
@@ -21,14 +35,21 @@ func downloadTemplatesAndExit() {
 
 	logger.Info("[Installer] Starting template download...")
 
-	home, err := os.UserHomeDir()
-	if err != nil {
-		logger.Error("[Installer] Failed to get user home directory", "error", err)
+	if result, err := appdata.MigrateLegacyOnce(dirs); err != nil {
+		logger.Warn("[Installer] Failed to migrate legacy app data", "error", err)
+	} else if result.Attempted {
+		logger.Info("[Installer] Legacy data migration checked",
+			"migrated", strings.Join(result.Migrated, ","),
+			"conflicts", strings.Join(result.Conflicts, ","),
+			"message", result.Message)
+	}
+	if err := dirs.Ensure(); err != nil {
+		logger.Error("[Installer] Failed to create app data directories", "error", err)
 		os.Exit(1)
 	}
 
-	prestoDir := filepath.Join(home, ".presto")
-	templatesDir := filepath.Join(prestoDir, "templates")
+	prestoDir := dirs.DataDir
+	templatesDir := dirs.TemplatesDir()
 	if err := os.MkdirAll(templatesDir, 0755); err != nil {
 		logger.Error("[Installer] Failed to create templates directory", "error", err)
 		os.Exit(1)
@@ -38,7 +59,7 @@ func downloadTemplatesAndExit() {
 	}
 
 	manager := template.NewManager(templatesDir)
-	registry := template.NewRegistryCache(prestoDir)
+	registry := template.NewRegistryCache(dirs.CacheDir)
 
 	reg := registry.Load()
 	if reg == nil {

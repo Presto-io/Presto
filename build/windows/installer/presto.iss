@@ -113,6 +113,7 @@ Name: "{group}\卸载 Presto"; Filename: "{uninstallexe}"; Tasks: startmenuicon
 
 [Run]
 Filename: "{tmp}\vc_redist.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "{cm:InstallingVCRuntime}"; Flags: runhidden waituntilterminated
+Filename: "{app}\{#PRODUCT_EXECUTABLE}"; Parameters: "--migrate-legacy-data"; StatusMsg: "Migrating existing Presto data..."; Flags: runhidden waituntilterminated
 Filename: "{app}\{#PRODUCT_EXECUTABLE}"; Description: "{cm:LaunchPresto}"; Flags: nowait postinstall skipifsilent
 
 [Registry]
@@ -140,15 +141,21 @@ Root: HKA; Subkey: "Software\Clients\Presto\Capabilities\FileAssociations"; Valu
 Root: HKA; Subkey: "Software\Clients\Presto\Capabilities\FileAssociations"; ValueType: string; ValueName: ".markdown"; ValueData: "Presto.Markdown"
 
 [UninstallDelete]
-Type: filesandordirs; Name: "{code:UserPrestoDir}"; Check: ShouldDeleteUserPrestoData
+Type: filesandordirs; Name: "{code:UserConfigDir}"; Check: ShouldDeleteUserPrestoData
+Type: filesandordirs; Name: "{code:UserLocalDataDir}"; Check: ShouldDeleteUserPrestoData
 
 [Code]
 var
   DeleteUserPrestoData: Boolean;
 
-function UserPrestoDir(Param: string): string;
+function UserConfigDir(Param: string): string;
 begin
-  Result := AddBackslash(GetEnv('USERPROFILE')) + '.presto';
+  Result := AddBackslash(ExpandConstant('{userappdata}')) + 'com.mrered.presto';
+end;
+
+function UserLocalDataDir(Param: string): string;
+begin
+  Result := AddBackslash(ExpandConstant('{localappdata}')) + 'com.mrered.presto';
 end;
 
 function StripOuterQuotes(Value: string): string;
@@ -192,17 +199,25 @@ end;
 
 function InitializeUninstall(): Boolean;
 var
-  DataDir: string;
+  ConfigDir: string;
+  LocalDataDir: string;
+  PathList: string;
 begin
   Result := True;
   DeleteUserPrestoData := False;
-  DataDir := UserPrestoDir('');
+  ConfigDir := UserConfigDir('');
+  LocalDataDir := UserLocalDataDir('');
 
-  if DirExists(DataDir) then begin
+  if DirExists(ConfigDir) or DirExists(LocalDataDir) then begin
+    PathList := '';
+    if DirExists(ConfigDir) then
+      PathList := PathList + ConfigDir + #13#10;
+    if DirExists(LocalDataDir) then
+      PathList := PathList + LocalDataDir + #13#10;
     DeleteUserPrestoData := MsgBox(
-      '是否同时删除 Presto 下载的模板文件和本地数据？' + #13#10 + #13#10 +
-      '路径：' + DataDir + #13#10 + #13#10 +
-      '选择“是”会删除模板、字体、注册中心缓存等文件；选择“否”会保留这些数据，重新安装后仍可使用。',
+      'Delete Presto settings, downloaded templates, fonts, cache, logs, and WebView data?' + #13#10 + #13#10 +
+      'Paths:' + #13#10 + PathList + #13#10 +
+      'Choose Yes to remove Presto-generated app data. Choose No to keep it for a later reinstall.',
       mbConfirmation,
       MB_YESNO
     ) = IDYES;

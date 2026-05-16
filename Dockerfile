@@ -52,8 +52,8 @@ RUN addgroup -S presto && adduser -S -G presto presto
 COPY --from=typst-downloader /usr/local/bin/typst /usr/local/bin/typst
 COPY --from=go-builder /bin/presto-server /usr/local/bin/
 
-# Create user data dir (overlaid by volume; server downloads templates at runtime)
-RUN mkdir -p /home/presto/.presto/fonts && chown -R presto:presto /home/presto/.presto
+# Create explicit app dirs for containers. These are intended to be mounted by users.
+RUN mkdir -p /config /data/fonts /cache /logs && chown -R presto:presto /config /data /cache /logs
 
 COPY --from=frontend-builder /app/build /srv/frontend
 
@@ -61,6 +61,10 @@ ENV PORT=8080
 ENV HOST=0.0.0.0
 ENV STATIC_DIR=/srv/frontend
 ENV HOME=/home/presto
+ENV PRESTO_CONFIG_DIR=/config
+ENV PRESTO_DATA_DIR=/data
+ENV PRESTO_CACHE_DIR=/cache
+ENV PRESTO_LOG_DIR=/logs
 EXPOSE 8080
 
 USER presto

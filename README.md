@@ -37,7 +37,7 @@ brew install --cask brewforge/more/presto
 ### Docker 部署（Web 端）
 
 ```bash
-mkdir -p .presto-data/fonts
+mkdir -p .presto-data/data/fonts .presto-data/config .presto-data/cache .presto-data/logs
 docker compose up -d
 ```
 
@@ -45,8 +45,8 @@ docker compose up -d
 
 默认的 `docker-compose.yml` 会持久化自定义字体目录：
 
-- 字体文件放在 `./.presto-data/fonts`，对应容器内路径 `/home/presto/.presto/fonts`。
-- Presto 服务端启动时会从 `/home/presto/.presto/fonts` 加载字体。
+- 字体文件放在 `./.presto-data/data/fonts`，对应容器内路径 `/data/fonts`。
+- Presto 服务端启动时会从 `/data/fonts` 加载字体。
 
 如果目录曾由 root 或其他用户创建，先修正权限，确保当前用户可以复制字体文件：
 
@@ -54,13 +54,13 @@ docker compose up -d
 sudo chown -R "$(id -u):$(id -g)" .presto-data
 ```
 
-Presto 服务端默认从 `/home/presto/.presto/fonts` 加载字体；本机直接运行 `presto-server` 时，对应路径是当前用户的 `~/.presto/fonts`。如果需要加载其他目录，可以通过 `FONT_PATHS` 环境变量覆盖，多个目录用冒号分隔，例如：
+Presto 服务端默认从应用数据目录的 `fonts` 子目录加载字体；Docker 中是 `/data/fonts`。如果需要加载其他目录，可以通过 `FONT_PATHS` 环境变量覆盖，多个目录用冒号分隔，例如：
 
 ```yaml
 services:
     presto:
         environment:
-            FONT_PATHS: /home/presto/.presto/fonts:/usr/share/fonts
+            FONT_PATHS: /data/fonts:/usr/share/fonts
 ```
 
 ## 平台支持

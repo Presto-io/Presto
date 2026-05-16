@@ -45,8 +45,8 @@ Presto 支持以下平台：
 - **Fedora/RHEL**: `sudo dnf install webkit2gtk3-devel`
 
 #### 文件权限
-- 确保 `~/.presto/templates` 目录可写
-- **解决方案**: `chmod 755 ~/.presto/templates`
+- 确保 Presto 应用数据目录下的 `templates` 目录可写
+- **解决方案**: 检查 `PRESTO_DATA_DIR` 或系统默认应用数据目录权限
 
 ## 已知问题
 
@@ -80,10 +80,10 @@ path := ".presto/templates/official"  // Windows 会失败
 
 Presto 在转换和预览 PDF 时会把字体目录传给 Typst。默认字体目录如下：
 
-- **本机服务端**: 当前用户的 `~/.presto/fonts`
-- **Docker Web 端**: 容器内的 `/home/presto/.presto/fonts`
+- **本机服务端**: 当前用户应用数据目录下的 `fonts`
+- **Docker Web 端**: 容器内的 `/data/fonts`
 
-Docker Compose 部署默认把本地目录 `./.presto-data/fonts` 挂载到 `/home/presto/.presto/fonts`。需要安装模板依赖字体时，把 `.ttf`、`.otf`、`.ttc` 或 `.otc` 字体文件放进 `./.presto-data/fonts`，然后重启 Presto 服务让字体列表重新扫描。
+Docker Compose 部署默认把本地目录 `./.presto-data/data` 挂载到 `/data`。需要安装模板依赖字体时，把 `.ttf`、`.otf`、`.ttc` 或 `.otc` 字体文件放进 `./.presto-data/data/fonts`，然后重启 Presto 服务让字体列表重新扫描。
 
 如果目录曾由 root 或其他用户创建，先修正权限，确保当前用户可以复制字体文件：
 
@@ -96,7 +96,7 @@ sudo chown -R "$(id -u):$(id -g)" .presto-data
 如果需要加载额外目录，可以设置 `FONT_PATHS` 环境变量覆盖默认值，多个目录用冒号分隔：
 
 ```bash
-FONT_PATHS="$HOME/.presto/fonts:/usr/share/fonts" presto-server
+FONT_PATHS="/path/to/presto-data/fonts:/usr/share/fonts" presto-server
 ```
 
 ## 日志文件位置
@@ -124,7 +124,7 @@ Presto 自动轮转日志文件以避免占用过多磁盘空间：
 **示例：**
 
 ```text
-~/.presto/logs/
+<PRESTO_LOG_DIR>/
 ├── presto.log              (当前日志，10MB 以内)
 ├── presto-2026-04-03T10-00-00.log  (轮转文件 1)
 ├── presto-2026-04-03T11-30-00.log  (轮转文件 2)

@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -28,13 +27,20 @@ func main() {
 		host = "127.0.0.1"
 	}
 
-	// SEC-44: Check os.UserHomeDir error
-	home, err := os.UserHomeDir()
+	dirs, err := appdata.ResolveDirs()
 	if err != nil {
-		log.Fatal("failed to get home directory: ", err)
+		log.Fatal("failed to resolve app data directories: ", err)
 	}
-	prestoDir := filepath.Join(home, ".presto")
-	templatesDir := filepath.Join(prestoDir, "templates")
+	if result, err := appdata.MigrateLegacyOnce(dirs); err != nil {
+		log.Printf("[presto] failed to migrate legacy app data: %v", err)
+	} else if result.Attempted && len(result.Migrated) > 0 {
+		log.Printf("[presto] migrated legacy app data: %s", strings.Join(result.Migrated, ","))
+	}
+	if err := dirs.Ensure(); err != nil {
+		log.Fatal("failed to create app data directories: ", err)
+	}
+	prestoDir := dirs.DataDir
+	templatesDir := dirs.TemplatesDir()
 	if err := os.MkdirAll(templatesDir, 0755); err != nil {
 		log.Fatal("failed to create templates directory: ", err)
 	}
@@ -54,9 +60,9 @@ func main() {
 		apiKey = hex.EncodeToString(b)
 	}
 
-	// Font paths: default to ~/.presto/fonts, can override with FONT_PATHS (colon-separated)
+	// Font paths: default to the Presto data dir, can override with FONT_PATHS (colon-separated)
 	// SEC-44: Check MkdirAll error
-	fontsDir := filepath.Join(prestoDir, "fonts")
+	fontsDir := dirs.FontsDir()
 	if err := os.MkdirAll(fontsDir, 0755); err != nil {
 		log.Fatal("failed to create fonts directory: ", err)
 	}
@@ -71,7 +77,7 @@ func main() {
 	}
 
 	// Registry cache for SHA256 verification of imported templates
-	registry := template.NewRegistryCache(prestoDir)
+	registry := template.NewRegistryCache(dirs.CacheDir)
 	registry.RefreshAsync()
 	manager := template.NewManager(templatesDir)
 	go installOfficialTemplatesOnStartup(manager, registry)

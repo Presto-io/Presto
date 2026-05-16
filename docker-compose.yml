@@ -5,6 +5,13 @@ services:
       - 127.0.0.1:8080:8080
     environment:
       PRESTO_INJECT_API_KEY: "true"
+      PRESTO_CONFIG_DIR: /config
+      PRESTO_DATA_DIR: /data
+      PRESTO_CACHE_DIR: /cache
+      PRESTO_LOG_DIR: /logs
     volumes:
-      - ./.presto-data/fonts:/home/presto/.presto/fonts
+      - ./.presto-data/config:/config
+      - ./.presto-data/data:/data
+      - ./.presto-data/cache:/cache
+      - ./.presto-data/logs:/logs
     restart: unless-stopped
