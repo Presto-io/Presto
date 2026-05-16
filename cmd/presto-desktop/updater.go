@@ -95,15 +95,34 @@ func (a *App) CheckForUpdate() (*UpdateInfo, error) {
 	return info, nil
 }
 
-// CheckAndNotifyUpdate checks for updates and notifies the frontend or shows a dialog.
+// CheckStartupUpdate checks for updates at launch and prompts only when an update exists.
+func (a *App) CheckStartupUpdate() {
+	info, err := a.CheckForUpdate()
+	if err != nil {
+		log.Printf("[desktop] startup update check failed: %v", err)
+		return
+	}
+	if info.HasUpdate {
+		a.promptForUpdate(info)
+	}
+}
+
+// CheckAndNotifyUpdate checks for updates and shows a dialog for the result.
 func (a *App) CheckAndNotifyUpdate() {
 	info, err := a.CheckForUpdate()
 	if err != nil {
 		log.Printf("[desktop] update check failed: %v", err)
+		if a.ctx != nil {
+			wailsRuntime.MessageDialog(a.ctx, wailsRuntime.MessageDialogOptions{
+				Type:    wailsRuntime.ErrorDialog,
+				Title:   "检查更新",
+				Message: fmt.Sprintf("检查更新失败：%v", err),
+			})
+		}
 		return
 	}
 	if info.HasUpdate {
-		wailsRuntime.EventsEmit(a.ctx, "menu:update-available", info)
+		a.promptForUpdate(info)
 	} else {
 		wailsRuntime.MessageDialog(a.ctx, wailsRuntime.MessageDialogOptions{
 			Type:    wailsRuntime.InfoDialog,
@@ -111,6 +130,50 @@ func (a *App) CheckAndNotifyUpdate() {
 			Message: "已是最新版本",
 		})
 	}
+}
+
+func (a *App) promptForUpdate(info *UpdateInfo) {
+	if a.ctx == nil || info == nil || !info.HasUpdate {
+		return
+	}
+
+	action := "下载并安装"
+	if info.DownloadURL == "" {
+		action = "查看发布页面"
+	}
+	result, err := wailsRuntime.MessageDialog(a.ctx, wailsRuntime.MessageDialogOptions{
+		Type:          wailsRuntime.InfoDialog,
+		Title:         "发现新版本",
+		Message:       fmt.Sprintf("Presto %s 已可用。\n当前版本：%s\n\n现在更新吗？", info.LatestVersion, info.CurrentVersion),
+		Buttons:       []string{action, "稍后"},
+		DefaultButton: "稍后",
+		CancelButton:  "稍后",
+	})
+	if err != nil {
+		log.Printf("[desktop] update prompt failed: %v", err)
+		return
+	}
+	if result != action {
+		return
+	}
+	if info.DownloadURL == "" {
+		if info.ReleaseURL != "" {
+			wailsRuntime.BrowserOpenURL(a.ctx, info.ReleaseURL)
+		}
+		return
+	}
+	go func() {
+		if err := a.DownloadAndInstallUpdate(info.DownloadURL); err != nil {
+			log.Printf("[desktop] update install failed: %v", err)
+			if a.ctx != nil {
+				wailsRuntime.MessageDialog(a.ctx, wailsRuntime.MessageDialogOptions{
+					Type:    wailsRuntime.ErrorDialog,
+					Title:   "更新失败",
+					Message: fmt.Sprintf("更新失败：%v", err),
+				})
+			}
+		}
+	}()
 }
 
 // DownloadAndInstallUpdate downloads the release asset and installs it in-place.

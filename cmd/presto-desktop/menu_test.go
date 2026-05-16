@@ -72,6 +72,34 @@ func requireTopLevelLabel(t *testing.T, item *menu.MenuItem, label string) {
 	}
 }
 
+func TestUpdateMenuStateWithoutNativeMenu(t *testing.T) {
+	app := &App{}
+
+	app.UpdateMenuState(true)
+	app.UpdateMenuState(false)
+}
+
+func TestUpdateMenuStateTogglesNativeMenuItems(t *testing.T) {
+	app := &App{}
+	buildMenuForPlatform(app, "windows")
+
+	app.UpdateMenuState(true)
+	if app.saveMenuItem.Disabled {
+		t.Fatal("save menu item should be enabled when content exists")
+	}
+	if app.exportMenuItem.Disabled {
+		t.Fatal("export menu item should be enabled when content exists")
+	}
+
+	app.UpdateMenuState(false)
+	if !app.saveMenuItem.Disabled {
+		t.Fatal("save menu item should be disabled when content is empty")
+	}
+	if !app.exportMenuItem.Disabled {
+		t.Fatal("export menu item should be disabled when content is empty")
+	}
+}
+
 func assertSharedFileMenu(t *testing.T, m *menu.Menu) {
 	t.Helper()
 	fileMenu := findSubmenu(m, "文件")

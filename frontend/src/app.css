@@ -42,8 +42,8 @@
 	--color-scrollbar-thumb: #3a3f5f;
 	--color-scrollbar-thumb-hover: #4d557d;
 
-	--font-ui: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-	--font-mono: 'JetBrains Mono', ui-monospace, monospace;
+	--font-ui: 'Inter', 'Segoe UI', 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
+	--font-mono: 'JetBrains Mono', 'Cascadia Mono', 'Cascadia Code', Consolas, 'Microsoft YaHei UI', 'Microsoft YaHei', ui-monospace, monospace;
 
 	--space-xs: 4px;
 	--space-sm: 8px;

@@ -39,7 +39,6 @@ func buildMenuForPlatform(app *App, platform string) *menu.Menu {
 	return appMenu
 }
 
-
 func addEditMenu(appMenu *menu.Menu, app *App) {
 	editMenu := appMenu.AddSubmenu("编辑")
 	editMenu.AddText("撤销", keys.CmdOrCtrl("z"), func(_ *menu.CallbackData) {
@@ -124,6 +123,12 @@ func addHelpMenu(appMenu *menu.Menu, app *App, includeAbout bool) {
 
 func (a *App) ShowAboutDialog() {
 	ver := a.GetVersion()
+	if a.ctx != nil {
+		wailsRuntime.EventsEmit(a.ctx, "app:show-about", map[string]string{
+			"version": ver,
+		})
+		return
+	}
 	wailsRuntime.MessageDialog(a.ctx, wailsRuntime.MessageDialogOptions{
 		Type:    wailsRuntime.InfoDialog,
 		Title:   "关于 Presto",
@@ -132,11 +137,16 @@ func (a *App) ShowAboutDialog() {
 }
 
 func (a *App) UpdateMenuState(hasContent bool) {
+	if a.saveMenuItem == nil && a.exportMenuItem == nil {
+		return
+	}
 	if a.saveMenuItem != nil {
 		a.saveMenuItem.Disabled = !hasContent
 	}
 	if a.exportMenuItem != nil {
 		a.exportMenuItem.Disabled = !hasContent
 	}
-	wailsRuntime.MenuUpdateApplicationMenu(a.ctx)
+	if a.ctx != nil {
+		wailsRuntime.MenuUpdateApplicationMenu(a.ctx)
+	}
 }

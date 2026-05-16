@@ -10,15 +10,18 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
 const compileTimeout = 60 * time.Second // SEC-12
 
 type Compiler struct {
-	Root      string   // root directory for typst path resolution
-	BinPath   string   // path to typst binary (empty = use PATH)
-	FontPaths []string // additional font directories for --font-path
+	Root           string          // root directory for typst path resolution
+	BinPath        string          // path to typst binary (empty = use PATH)
+	FontPaths      []string        // additional font directories for --font-path
+	AvailableFonts map[string]bool // cached typst font family names
+	fontMu         sync.Mutex
 }
 
 func NewCompiler() *Compiler {
@@ -38,6 +41,16 @@ func (c *Compiler) typstBin() string {
 		return c.BinPath
 	}
 	return "typst"
+}
+
+func (c *Compiler) availableFonts() map[string]bool {
+	c.fontMu.Lock()
+	defer c.fontMu.Unlock()
+	if c.AvailableFonts != nil {
+		return c.AvailableFonts
+	}
+	c.AvailableFonts = c.ListFonts()
+	return c.AvailableFonts
 }
 
 // ListFonts returns the set of available font family names.
@@ -106,6 +119,8 @@ func (c *Compiler) compileWithRoot(typFile, root string) (string, error) {
 // If workDir is non-empty, the temp .typ file is written there so relative
 // paths (e.g. images) resolve from the document's directory.
 func (c *Compiler) CompileString(typstSource, workDir string) ([]byte, error) {
+	typstSource = normalizeTypstFontFamilies(typstSource, c.availableFonts())
+
 	if workDir != "" {
 		// SEC-25: Use random suffix to avoid race conditions
 		typFile := filepath.Join(workDir, fmt.Sprintf(".presto-temp-%s.typ", randomSuffix()))
@@ -146,6 +161,8 @@ func (c *Compiler) CompileString(typstSource, workDir string) ([]byte, error) {
 // CompileToSVG compiles typst source to SVG pages.
 // If workDir is non-empty, relative paths resolve from that directory.
 func (c *Compiler) CompileToSVG(typstSource, workDir string) ([]string, error) {
+	typstSource = normalizeTypstFontFamilies(typstSource, c.availableFonts())
+
 	ctx, cancel := context.WithTimeout(context.Background(), compileTimeout)
 	defer cancel()
 

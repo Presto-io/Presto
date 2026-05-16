@@ -79,6 +79,26 @@ func TestFindTinymistBinaryFromPrefersResourcesBeforeBesideExecutable(t *testing
 	}
 }
 
+func TestFindTinymistBinaryFromFindsDevDistBinary(t *testing.T) {
+	exeDir := filepath.Join(t.TempDir(), "bin")
+	tinymistPath := filepath.Join(exeDir, "..", "dist", "tinymist.exe")
+	if err := os.MkdirAll(filepath.Dir(tinymistPath), 0755); err != nil {
+		t.Fatalf("create dist dir: %v", err)
+	}
+	if err := os.WriteFile(tinymistPath, []byte("stub"), 0755); err != nil {
+		t.Fatalf("write dist tinymist.exe: %v", err)
+	}
+
+	got := findTinymistBinaryFrom(exeDir, "windows", "amd64", func(name string) (string, error) {
+		t.Fatalf("lookPath should not be called when dev dist tinymist.exe exists, got %q", name)
+		return "", errors.New("unreachable")
+	})
+
+	if got != tinymistPath {
+		t.Fatalf("expected dev dist tinymist.exe path %q, got %q", tinymistPath, got)
+	}
+}
+
 func TestFindTinymistBinaryFromWindowsUsesPathExe(t *testing.T) {
 	want := filepath.Join("C:", "Tools", "tinymist.exe")
 

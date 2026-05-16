@@ -21,6 +21,10 @@
   #error ARG_TYPST_BINARY is required
 #endif
 
+#ifndef ARG_TINYMIST_BINARY
+  #error ARG_TINYMIST_BINARY is required
+#endif
+
 #ifndef ARG_VC_REDIST
   #error ARG_VC_REDIST is required
 #endif
@@ -40,6 +44,7 @@
 #define INFO_FILEVERSION ARG_FILE_VERSION
 #define PRODUCT_EXECUTABLE "Presto.exe"
 #define TYPST_EXECUTABLE "typst.exe"
+#define TINYMIST_EXECUTABLE "tinymist.exe"
 #define PRODUCT_URL "https://presto.mre.red"
 
 #if ARG_ARCH == "arm64"
@@ -104,6 +109,7 @@ Name: "startmenuicon"; Description: "{cm:CreateStartMenuShortcut}"; GroupDescrip
 [Files]
 Source: "{#ARG_BINARY}"; DestDir: "{app}"; DestName: "{#PRODUCT_EXECUTABLE}"; Flags: ignoreversion
 Source: "{#ARG_TYPST_BINARY}"; DestDir: "{app}"; DestName: "{#TYPST_EXECUTABLE}"; Flags: ignoreversion
+Source: "{#ARG_TINYMIST_BINARY}"; DestDir: "{app}"; DestName: "{#TINYMIST_EXECUTABLE}"; Flags: ignoreversion
 Source: "{#ARG_VC_REDIST}"; DestDir: "{tmp}"; DestName: "vc_redist.exe"; Flags: deleteafterinstall
 
 [Icons]

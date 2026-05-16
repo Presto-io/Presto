@@ -9,6 +9,7 @@ services:
       PRESTO_DATA_DIR: /data
       PRESTO_CACHE_DIR: /cache
       PRESTO_LOG_DIR: /logs
+      FONT_PATHS: /data/fonts:/usr/share/fonts
     volumes:
       - ./.presto-data/config:/config
       - ./.presto-data/data:/data

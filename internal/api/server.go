@@ -46,13 +46,15 @@ func NewServer(opts ServerOptions) http.Handler {
 	compiler := typst.NewCompilerWithRoot(compilerRoot)
 	compiler.BinPath = opts.TypstBin
 	compiler.FontPaths = opts.FontPaths
+	availableFonts := compiler.ListFonts()
+	compiler.AvailableFonts = availableFonts
 
 	s := &Server{
 		mux:            http.NewServeMux(),
 		manager:        template.NewManager(opts.TemplatesDir),
 		compiler:       compiler,
 		registry:       opts.Registry,
-		availableFonts: compiler.ListFonts(),
+		availableFonts: availableFonts,
 		skillManager:   skill.NewManager(),
 		previewService: preview.NewService(),
 	}

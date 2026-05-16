@@ -130,6 +130,7 @@ func (a *App) startup(ctx context.Context) {
 			logger.Warn("[startup] frontend ready timeout, proceeding anyway")
 		}
 		a.checkFirstLaunch()
+		go a.CheckStartupUpdate()
 	}()
 }
 
@@ -161,6 +162,11 @@ func main() {
 	if err := os.MkdirAll(templatesDir, 0755); err != nil {
 		log.Fatal("failed to create templates directory: ", err)
 	}
+	fontsDir := dirs.FontsDir()
+	if err := os.MkdirAll(fontsDir, 0755); err != nil {
+		log.Fatal("failed to create fonts directory: ", err)
+	}
+	fontPaths := appdata.ResolveFontPaths(fontsDir)
 	if err := appdata.MarkGenerated(prestoDir); err != nil {
 		logger.Warn("[presto] failed to mark generated app data", "error", err)
 	}
@@ -174,9 +180,12 @@ func main() {
 	// SEC-40: Use os temp dir instead of $HOME to restrict file access
 	compiler := typst.NewCompilerWithRoot(os.TempDir())
 	compiler.BinPath = typstBin
+	compiler.FontPaths = fontPaths
+	compiler.AvailableFonts = compiler.ListFonts()
 	apiHandler := api.NewServer(api.ServerOptions{
 		TemplatesDir: templatesDir,
 		TypstBin:     typstBin,
+		FontPaths:    fontPaths,
 		Registry:     registry,
 	})
 	frontendFS, _ := fs.Sub(assets, "build")

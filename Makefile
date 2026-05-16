@@ -2,7 +2,7 @@
        _build-macos-arm64 _build-macos-amd64 \
        dist-macos dist-macos-arm64 dist-macos-amd64 dist-macos-universal \
        dist-dmg dist-dmg-arm64 dist-dmg-amd64 dist-dmg-universal \
-       dist-windows dist-linux dist notarize inno windows-installer _inno-language _download-tinymist _download-vc-redist
+       dist-windows dist-linux dist notarize inno windows-installer _inno-language _download-typst _download-tinymist _download-vc-redist
 
 # ─── Config ──────────────────────────────────────────────
 APP_NAME     := Presto
@@ -33,10 +33,19 @@ TYPST_DARWIN_AMD64 := typst-x86_64-apple-darwin.tar.xz
 TYPST_WINDOWS_AMD64:= typst-x86_64-pc-windows-msvc.zip
 TYPST_LINUX_AMD64  := typst-x86_64-unknown-linux-musl.tar.xz
 TINYMIST_BASE := https://github.com/Myriad-Dreamin/tinymist/releases/download/v$(TINYMIST_VERSION)
+TINYMIST_CACHE_DIR := $(CACHE_DIR)/tinymist/$(TINYMIST_VERSION)
 TINYMIST_DARWIN_ARM64 := tinymist-aarch64-apple-darwin.tar.gz
 TINYMIST_DARWIN_AMD64 := tinymist-x86_64-apple-darwin.tar.gz
+TINYMIST_WINDOWS_AMD64 := tinymist-x86_64-pc-windows-msvc.zip
+TINYMIST_WINDOWS_ARM64 := tinymist-aarch64-pc-windows-msvc.zip
+TINYMIST_LINUX_AMD64 := tinymist-x86_64-unknown-linux-musl.tar.gz
+TINYMIST_LINUX_ARM64 := tinymist-aarch64-unknown-linux-musl.tar.gz
 TINYMIST_DARWIN_ARM64_SHA256 := 98d2f47e7973ff75c40e3716185385c8e7357a6a6f821771041565f222aac940
 TINYMIST_DARWIN_AMD64_SHA256 := ea0ed898ea6d0fec5ccf14468d5093949585189ee4cb440d6bbb250ea57206f4
+TINYMIST_WINDOWS_AMD64_SHA256 := 2c6433ce8fc5126252d5c78db3e2886d089cec7ccc5ed32f12c7b1847b534a34
+TINYMIST_WINDOWS_ARM64_SHA256 := 4a302734a2a6d6c4911404ca0c62f97ace706ebc62666b18090bc36031baaaa4
+TINYMIST_LINUX_AMD64_SHA256 := 6a7a2b525e9900f3718830f45a8337c5e35e55a54c8ccf7f84cd92209b924e9c
+TINYMIST_LINUX_ARM64_SHA256 := 7d85fcb2c60eaa7ed7160dd68f67917f462810a6f42b1940d297e603ddc1d2ab
 VC_REDIST_AMD64_URL := https://aka.ms/vc14/vc_redist.x64.exe
 VC_REDIST_ARM64_URL := https://aka.ms/vc14/vc_redist.arm64.exe
 
@@ -63,7 +72,9 @@ endif
 
 desktop: frontend
 ifeq ($(OS),Windows_NT)
-	@powershell -NoProfile -Command "Remove-Item -Recurse -Force '$(DESKTOP_EMBED)/_app' -ErrorAction SilentlyContinue"
+	@"$(MAKE)" _download-typst TYPST_ARCHIVE=$(TYPST_WINDOWS_AMD64) TYPST_OUT=$(DIST)/typst.exe
+	@"$(MAKE)" _download-tinymist TINYMIST_ARCHIVE=$(TINYMIST_WINDOWS_AMD64) TINYMIST_OUT=$(DIST)/tinymist.exe TINYMIST_SHA256=$(TINYMIST_WINDOWS_AMD64_SHA256)
+	@powershell -NoProfile -Command "if (Test-Path '$(DESKTOP_EMBED)/_app') { Remove-Item -Recurse -Force '$(DESKTOP_EMBED)/_app' }"
 	@powershell -NoProfile -Command "Copy-Item -Path 'frontend/build/*' -Destination '$(DESKTOP_EMBED)' -Recurse -Force"
 	go build -tags "$(WAILS_TAGS)" -ldflags "$(LDFLAGS)" -o $(DESKTOP_OUTPUT) $(DESKTOP_SRC)/
 else
@@ -100,9 +111,11 @@ dev:
 run-desktop:
 ifeq ($(OS),Windows_NT)
 	cd frontend && powershell -NoProfile -Command '$$env:VITE_MOCK="1"; $(NPM) run build'
-	@powershell -NoProfile -Command "Remove-Item -Recurse -Force '$(DESKTOP_EMBED)/_app' -ErrorAction SilentlyContinue"
+	@"$(MAKE)" _download-typst TYPST_ARCHIVE=$(TYPST_WINDOWS_AMD64) TYPST_OUT=$(DIST)/typst.exe
+	@"$(MAKE)" _download-tinymist TINYMIST_ARCHIVE=$(TINYMIST_WINDOWS_AMD64) TINYMIST_OUT=$(DIST)/tinymist.exe TINYMIST_SHA256=$(TINYMIST_WINDOWS_AMD64_SHA256)
+	@powershell -NoProfile -Command "if (Test-Path '$(DESKTOP_EMBED)/_app') { Remove-Item -Recurse -Force '$(DESKTOP_EMBED)/_app' }"
 	@powershell -NoProfile -Command "Copy-Item -Path 'frontend/build/*' -Destination '$(DESKTOP_EMBED)' -Recurse -Force"
-	@powershell -NoProfile -Command "Remove-Item -Recurse -Force '$(DESKTOP_EMBED)/mock' -ErrorAction SilentlyContinue"
+	@powershell -NoProfile -Command "if (Test-Path '$(DESKTOP_EMBED)/mock') { Remove-Item -Recurse -Force '$(DESKTOP_EMBED)/mock' }"
 	@powershell -NoProfile -Command "Copy-Item -Path 'frontend/mock' -Destination '$(DESKTOP_EMBED)' -Recurse -Force"
 	go build -tags "$(WAILS_TAGS)" -ldflags "$(LDFLAGS)" -o $(DESKTOP_OUTPUT) $(DESKTOP_SRC)/
 	@powershell -NoProfile -Command "Start-Process -FilePath '.\\$(DESKTOP_OUTPUT)' -NoNewWindow"
@@ -124,7 +137,7 @@ _frontend-embed:
 else
 _frontend-embed: frontend
 ifeq ($(OS),Windows_NT)
-	@powershell -NoProfile -Command "Remove-Item -Recurse -Force '$(DESKTOP_EMBED)/_app' -ErrorAction SilentlyContinue"
+	@powershell -NoProfile -Command "if (Test-Path '$(DESKTOP_EMBED)/_app') { Remove-Item -Recurse -Force '$(DESKTOP_EMBED)/_app' }"
 	@powershell -NoProfile -Command "Copy-Item -Path 'frontend/build/*' -Destination '$(DESKTOP_EMBED)' -Recurse -Force"
 else
 	rm -rf $(DESKTOP_EMBED)/_app
@@ -174,23 +187,45 @@ endif
 
 # Download tinymist runtime sidecar for a given platform.
 # Usage: $(MAKE) _download-tinymist TINYMIST_ARCHIVE=<name> TINYMIST_OUT=<path> TINYMIST_SHA256=<hash>
+ifeq ($(OS),Windows_NT)
+_download-tinymist:
+	@powershell -NoProfile -Command "New-Item -ItemType Directory -Force -Path (Split-Path -Parent '$(TINYMIST_OUT)') | Out-Null"
+	@powershell -NoProfile -Command 'if (-not (Test-Path "$(TINYMIST_OUT)")) { if ("$(TINYMIST_SHA256)" -eq "") { throw "ERROR: TINYMIST_SHA256 is required" }; $$cache = "$(TINYMIST_CACHE_DIR)/$(TINYMIST_ARCHIVE)"; New-Item -ItemType Directory -Force -Path (Split-Path -Parent $$cache) | Out-Null; if (-not (Test-Path $$cache)) { Write-Host "==> Downloading tinymist $(TINYMIST_VERSION) ($(TINYMIST_ARCHIVE))..."; & curl.exe -fL --retry 5 --retry-delay 2 --connect-timeout 30 --max-time 600 "$(TINYMIST_BASE)/$(TINYMIST_ARCHIVE)" -o $$cache; if ($$LASTEXITCODE -ne 0) { Remove-Item -LiteralPath $$cache -Force -ErrorAction SilentlyContinue; exit $$LASTEXITCODE } } else { Write-Host "==> Using cached tinymist archive $$cache" }; $$hash = (Get-FileHash -Algorithm SHA256 $$cache).Hash.ToLowerInvariant(); if ($$hash -ne "$(TINYMIST_SHA256)") { Remove-Item -LiteralPath $$cache -Force -ErrorAction SilentlyContinue; throw "ERROR: tinymist checksum verification failed!" }; $$tmp = Join-Path ([System.IO.Path]::GetTempPath()) ([System.IO.Path]::GetRandomFileName()); New-Item -ItemType Directory -Path $$tmp | Out-Null; try { if ("$(TINYMIST_ARCHIVE)" -like "*.zip") { Expand-Archive -LiteralPath $$cache -DestinationPath $$tmp -Force } else { & "$$env:SystemRoot\System32\tar.exe" -xf $$cache -C $$tmp; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE } }; $$bin = Get-ChildItem -LiteralPath $$tmp -Recurse -File | Where-Object { $$_.Name -eq "tinymist.exe" -or $$_.Name -eq "tinymist" } | Sort-Object @{Expression = { if ($$_.Name -eq "tinymist.exe") { 0 } else { 1 } }}, @{Expression = "Length"; Descending = $$true} | Select-Object -First 1; if (-not $$bin) { throw "tinymist binary not found in archive" }; Copy-Item -LiteralPath $$bin.FullName -Destination "$(TINYMIST_OUT)" -Force; $$outSig = -join ([System.IO.File]::ReadAllBytes("$(TINYMIST_OUT)")[0..1] | ForEach-Object { [char]$$_ }); if ("$(TINYMIST_OUT)" -like "*.exe" -and $$outSig -ne "MZ") { Remove-Item -LiteralPath "$(TINYMIST_OUT)" -Force; throw "extracted tinymist is not a Windows executable" }; Write-Host "==> $(TINYMIST_OUT)" } finally { Remove-Item -LiteralPath $$tmp -Recurse -Force -ErrorAction SilentlyContinue } }'
+else
 _download-tinymist:
 	@mkdir -p $(dir $(TINYMIST_OUT))
 	@if [ ! -f "$(TINYMIST_OUT)" ]; then \
 		test -n "$(TINYMIST_SHA256)" || { echo "ERROR: TINYMIST_SHA256 is required"; exit 1; }; \
-		echo "==> Downloading tinymist $(TINYMIST_VERSION) ($(TINYMIST_ARCHIVE))..."; \
+		mkdir -p "$(TINYMIST_CACHE_DIR)"; \
+		CACHE="$(TINYMIST_CACHE_DIR)/$(TINYMIST_ARCHIVE)"; \
+		if [ ! -f "$$CACHE" ]; then \
+			echo "==> Downloading tinymist $(TINYMIST_VERSION) ($(TINYMIST_ARCHIVE))..."; \
+			curl -fL "$(TINYMIST_BASE)/$(TINYMIST_ARCHIVE)" -o "$$CACHE.tmp" && mv "$$CACHE.tmp" "$$CACHE" || \
+			{ rm -f "$$CACHE.tmp"; exit 1; }; \
+		else \
+			echo "==> Using cached tinymist archive $$CACHE"; \
+		fi; \
 		TMP=$$(mktemp -d); \
-		curl -fsSL "$(TINYMIST_BASE)/$(TINYMIST_ARCHIVE)" -o "$$TMP/archive"; \
-		echo "$(TINYMIST_SHA256)  $$TMP/archive" | shasum -a 256 -c - || \
-			{ echo "ERROR: tinymist checksum verification failed!"; rm -rf "$$TMP"; exit 1; }; \
-		mkdir -p "$$TMP/out" && tar xf "$$TMP/archive" -C "$$TMP/out"; \
-		BIN=$$(find "$$TMP/out" -type f -name 'tinymist' | head -1); \
+		if command -v sha256sum >/dev/null 2>&1; then \
+			echo "$(TINYMIST_SHA256)  $$CACHE" | sha256sum -c - || \
+			{ echo "ERROR: tinymist checksum verification failed!"; rm -f "$$CACHE"; rm -rf "$$TMP"; exit 1; }; \
+		else \
+			echo "$(TINYMIST_SHA256)  $$CACHE" | shasum -a 256 -c - || \
+			{ echo "ERROR: tinymist checksum verification failed!"; rm -f "$$CACHE"; rm -rf "$$TMP"; exit 1; }; \
+		fi; \
+		if echo "$(TINYMIST_ARCHIVE)" | grep -q '\.zip$$'; then \
+			unzip -qo "$$CACHE" -d "$$TMP/out"; \
+		else \
+			mkdir -p "$$TMP/out" && tar xf "$$CACHE" -C "$$TMP/out"; \
+		fi; \
+		BIN=$$(find "$$TMP/out" -type f \( -name 'tinymist' -o -name 'tinymist.exe' \) | head -1); \
 		test -n "$$BIN" || { echo "ERROR: tinymist binary not found in archive"; rm -rf "$$TMP"; exit 1; }; \
 		cp "$$BIN" "$(TINYMIST_OUT)"; \
 		chmod +x "$(TINYMIST_OUT)"; \
 		rm -rf "$$TMP"; \
 		echo "==> $(TINYMIST_OUT)"; \
 	fi
+endif
 
 # Download Microsoft Visual C++ Redistributable for Windows Typst (MSVC build).
 # Usage: $(MAKE) _download-vc-redist VC_REDIST_URL=<url> VC_REDIST_OUT=<path>
@@ -368,10 +403,11 @@ dist-windows-amd64: _frontend-embed
 	@powershell -NoProfile -Command "New-Item -ItemType Directory -Force -Path '$(DIST)','$(DIST)\\_bin' | Out-Null"
 	@powershell -NoProfile -Command "Remove-Item -Force '$(DIST)\\$(APP_NAME)-$(VERSION)-windows.exe' -ErrorAction SilentlyContinue; if (Test-Path '$(DIST)\\$(APP_NAME)-$(VERSION)-windows.exe') { throw 'Cannot replace $(DIST)\\$(APP_NAME)-$(VERSION)-windows.exe. Close the running Presto app and retry.' }"
 	@"$(MAKE)" _download-typst TYPST_ARCHIVE=$(TYPST_WINDOWS_AMD64) TYPST_OUT=$(DIST)/typst.exe
+	@"$(MAKE)" _download-tinymist TINYMIST_ARCHIVE=$(TINYMIST_WINDOWS_AMD64) TINYMIST_OUT=$(DIST)/tinymist.exe TINYMIST_SHA256=$(TINYMIST_WINDOWS_AMD64_SHA256)
 	@"$(MAKE)" _download-vc-redist VC_REDIST_URL=$(VC_REDIST_AMD64_URL) VC_REDIST_OUT=$(DIST)/vc_redist.x64.exe
 	@cd $(DESKTOP_SRC) && go run github.com/tc-hib/go-winres@latest make --in winres.json
 	@powershell -NoProfile -Command '$$env:GOOS="windows"; $$env:GOARCH="amd64"; $$env:CGO_ENABLED="0"; & go build -tags "$(WAILS_TAGS)" -ldflags "$(LDFLAGS) -H windowsgui" -o "$(DIST)\\$(APP_NAME)-$(VERSION)-windows.exe" "$(DESKTOP_SRC)/"; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }'
-	@echo "==> $(DIST)/$(APP_NAME)-$(VERSION)-windows.exe + typst.exe + vc_redist.x64.exe"
+	@echo "==> $(DIST)/$(APP_NAME)-$(VERSION)-windows.exe + typst.exe + tinymist.exe + vc_redist.x64.exe"
 else
 dist-windows-amd64: _frontend-embed
 	@mkdir -p $(DIST) $(DIST)/_bin
@@ -384,12 +420,15 @@ dist-windows-amd64: _frontend-embed
 		-o "$(DIST)/$(APP_NAME)-$(VERSION)-windows.exe" $(DESKTOP_SRC)/ ) & PID_GO=$$!; \
 	( $(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_WINDOWS_AMD64) \
 		TYPST_OUT=$(DIST)/typst.exe ) & PID_TYPST=$$!; \
+	( $(MAKE) _download-tinymist TINYMIST_ARCHIVE=$(TINYMIST_WINDOWS_AMD64) \
+		TINYMIST_OUT=$(DIST)/tinymist.exe TINYMIST_SHA256=$(TINYMIST_WINDOWS_AMD64_SHA256) ) & PID_TINYMIST=$$!; \
 	( $(MAKE) _download-vc-redist VC_REDIST_URL=$(VC_REDIST_AMD64_URL) \
 		VC_REDIST_OUT=$(DIST)/vc_redist.x64.exe ) & PID_VC=$$!; \
 	wait $$PID_GO || exit 1; \
 	wait $$PID_TYPST || exit 1; \
+	wait $$PID_TINYMIST || exit 1; \
 	wait $$PID_VC || exit 1
-	@echo "==> $(DIST)/$(APP_NAME)-$(VERSION)-windows.exe + typst.exe + vc_redist.x64.exe"
+	@echo "==> $(DIST)/$(APP_NAME)-$(VERSION)-windows.exe + typst.exe + tinymist.exe + vc_redist.x64.exe"
 endif
 
 dist-windows: dist-windows-amd64
@@ -413,8 +452,9 @@ dist-linux-amd64: frontend
 			cp -r frontend/build/* cmd/presto-desktop/build/ && \
 			go build -tags "$(WAILS_TAGS)" -ldflags "$(LDFLAGS)" \
 				-o dist/$(APP_NAME)-$(VERSION)-linux $(DESKTOP_SRC)/'
-	@$(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_LINUX_AMD64) TYPST_OUT=$(DIST)/typst-linux
-	@echo "==> $(DIST)/$(APP_NAME)-$(VERSION)-linux + typst-linux"
+	@$(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_LINUX_AMD64) TYPST_OUT=$(DIST)/typst
+	@$(MAKE) _download-tinymist TINYMIST_ARCHIVE=$(TINYMIST_LINUX_AMD64) TINYMIST_OUT=$(DIST)/tinymist TINYMIST_SHA256=$(TINYMIST_LINUX_AMD64_SHA256)
+	@echo "==> $(DIST)/$(APP_NAME)-$(VERSION)-linux + typst + tinymist"
 
 dist-linux: dist-linux-amd64
 
@@ -467,13 +507,14 @@ endif
 ifeq ($(OS),Windows_NT)
 inno: dist-windows-amd64 _inno-language
 	@echo "==> Building Inno Setup installer..."
-	@powershell -NoProfile -Command '$$compiler = (Get-Command "$(INNO_COMPILER)" -ErrorAction SilentlyContinue).Source; if (-not $$compiler) { $$candidates = @("C:\Program Files (x86)\Inno Setup 6\ISCC.exe", "C:\Program Files\Inno Setup 6\ISCC.exe", "$$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"); $$compiler = $$candidates | Where-Object { Test-Path $$_ } | Select-Object -First 1 }; if (-not $$compiler) { throw "Inno Setup compiler not found. Install Inno Setup 6 or run make with INNO_COMPILER=C:\path\to\ISCC.exe" }; $$binaryPath = (Resolve-Path "$(DIST)\\$(APP_NAME)-$(VERSION)-windows.exe").Path; $$typstPath = (Resolve-Path "$(DIST)\\typst.exe").Path; $$vcRedistPath = (Resolve-Path "$(DIST)\\vc_redist.x64.exe").Path; $$outputDir = (Resolve-Path "$(DIST)").Path; & $$compiler "/DARG_VERSION=`"$(VERSION)`"" "/DARG_FILE_VERSION=`"$(VERSION_BASE).0`"" "/DARG_ARCH=`"amd64`"" "/DARG_BINARY=`"$$binaryPath`"" "/DARG_TYPST_BINARY=`"$$typstPath`"" "/DARG_VC_REDIST=`"$$vcRedistPath`"" "/DARG_OUTPUT_DIR=`"$$outputDir`"" "/DARG_OUTPUT_BASENAME=`"$(APP_NAME)-$(VERSION)-windows-amd64-installer`"" "build/windows/installer/presto.iss"; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }; if (-not (Test-Path "$(DIST)\\$(APP_NAME)-$(VERSION)-windows-amd64-installer.exe")) { throw "Inno Setup completed without creating the expected installer" }'
+	@powershell -NoProfile -Command '$$compiler = (Get-Command "$(INNO_COMPILER)" -ErrorAction SilentlyContinue).Source; if (-not $$compiler) { $$candidates = @("C:\Program Files (x86)\Inno Setup 6\ISCC.exe", "C:\Program Files\Inno Setup 6\ISCC.exe", "$$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"); $$compiler = $$candidates | Where-Object { Test-Path $$_ } | Select-Object -First 1 }; if (-not $$compiler) { throw "Inno Setup compiler not found. Install Inno Setup 6 or run make with INNO_COMPILER=C:\path\to\ISCC.exe" }; $$binaryPath = (Resolve-Path "$(DIST)\\$(APP_NAME)-$(VERSION)-windows.exe").Path; $$typstPath = (Resolve-Path "$(DIST)\\typst.exe").Path; $$tinymistPath = (Resolve-Path "$(DIST)\\tinymist.exe").Path; $$vcRedistPath = (Resolve-Path "$(DIST)\\vc_redist.x64.exe").Path; $$outputDir = (Resolve-Path "$(DIST)").Path; & $$compiler "/DARG_VERSION=`"$(VERSION)`"" "/DARG_FILE_VERSION=`"$(VERSION_BASE).0`"" "/DARG_ARCH=`"amd64`"" "/DARG_BINARY=`"$$binaryPath`"" "/DARG_TYPST_BINARY=`"$$typstPath`"" "/DARG_TINYMIST_BINARY=`"$$tinymistPath`"" "/DARG_VC_REDIST=`"$$vcRedistPath`"" "/DARG_OUTPUT_DIR=`"$$outputDir`"" "/DARG_OUTPUT_BASENAME=`"$(APP_NAME)-$(VERSION)-windows-amd64-installer`"" "build/windows/installer/presto.iss"; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }; if (-not (Test-Path "$(DIST)\\$(APP_NAME)-$(VERSION)-windows-amd64-installer.exe")) { throw "Inno Setup completed without creating the expected installer" }'
 	@echo "==> Installer created: $(DIST)/$(APP_NAME)-$(VERSION)-windows-amd64-installer.exe"
 else
 inno: dist-windows-amd64 _inno-language
 	@echo "==> Building Inno Setup installer..."
 	@BINARY_PATH="$$(command -v cygpath >/dev/null 2>&1 && cygpath -w "$(PWD)/$(DIST)/$(APP_NAME)-$(VERSION)-windows.exe" || printf '%s' "$(PWD)/$(DIST)/$(APP_NAME)-$(VERSION)-windows.exe")"; \
 	TYPST_PATH="$$(command -v cygpath >/dev/null 2>&1 && cygpath -w "$(PWD)/$(DIST)/typst.exe" || printf '%s' "$(PWD)/$(DIST)/typst.exe")"; \
+	TINYMIST_PATH="$$(command -v cygpath >/dev/null 2>&1 && cygpath -w "$(PWD)/$(DIST)/tinymist.exe" || printf '%s' "$(PWD)/$(DIST)/tinymist.exe")"; \
 	VC_REDIST_PATH="$$(command -v cygpath >/dev/null 2>&1 && cygpath -w "$(PWD)/$(DIST)/vc_redist.x64.exe" || printf '%s' "$(PWD)/$(DIST)/vc_redist.x64.exe")"; \
 	OUTPUT_DIR="$$(command -v cygpath >/dev/null 2>&1 && cygpath -w "$(PWD)/$(DIST)" || printf '%s' "$(PWD)/$(DIST)")"; \
 	$(INNO_COMPILER) \
@@ -482,6 +523,7 @@ inno: dist-windows-amd64 _inno-language
 		"/DARG_ARCH=\"amd64\"" \
 		"/DARG_BINARY=\"$$BINARY_PATH\"" \
 		"/DARG_TYPST_BINARY=\"$$TYPST_PATH\"" \
+		"/DARG_TINYMIST_BINARY=\"$$TINYMIST_PATH\"" \
 		"/DARG_VC_REDIST=\"$$VC_REDIST_PATH\"" \
 		"/DARG_OUTPUT_DIR=\"$$OUTPUT_DIR\"" \
 		"/DARG_OUTPUT_BASENAME=\"$(APP_NAME)-$(VERSION)-windows-amd64-installer\"" \

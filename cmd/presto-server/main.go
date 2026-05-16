@@ -60,7 +60,7 @@ func main() {
 		apiKey = hex.EncodeToString(b)
 	}
 
-	// Font paths: default to the Presto data dir, can override with FONT_PATHS (colon-separated)
+	// Font paths: default to the Presto data dir; FONT_PATHS can add more directories.
 	// SEC-44: Check MkdirAll error
 	fontsDir := dirs.FontsDir()
 	if err := os.MkdirAll(fontsDir, 0755); err != nil {
@@ -69,12 +69,7 @@ func main() {
 	if err := appdata.MarkGenerated(prestoDir); err != nil {
 		log.Printf("[presto] failed to mark generated app data: %v", err)
 	}
-	var fontPaths []string
-	if fp := os.Getenv("FONT_PATHS"); fp != "" {
-		fontPaths = strings.Split(fp, ":")
-	} else {
-		fontPaths = []string{fontsDir}
-	}
+	fontPaths := appdata.ResolveFontPaths(fontsDir)
 
 	// Registry cache for SHA256 verification of imported templates
 	registry := template.NewRegistryCache(dirs.CacheDir)

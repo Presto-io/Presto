@@ -25,6 +25,29 @@ func TestFindTypstBinaryFromWindowsPrefersBundledExe(t *testing.T) {
 	}
 }
 
+func TestFindTypstBinaryFromWindowsUsesDevDistExe(t *testing.T) {
+	exeDir := filepath.Join(t.TempDir(), "bin")
+	if err := os.MkdirAll(exeDir, 0755); err != nil {
+		t.Fatalf("create exe dir: %v", err)
+	}
+	typstPath := filepath.Join(exeDir, "..", "dist", "typst.exe")
+	if err := os.MkdirAll(filepath.Dir(typstPath), 0755); err != nil {
+		t.Fatalf("create dist dir: %v", err)
+	}
+	if err := os.WriteFile(typstPath, []byte("stub"), 0755); err != nil {
+		t.Fatalf("write dist typst.exe: %v", err)
+	}
+
+	got := findTypstBinaryFrom(exeDir, "windows", func(name string) (string, error) {
+		t.Fatalf("lookPath should not be called when dev dist typst.exe exists, got %q", name)
+		return "", errors.New("unreachable")
+	})
+
+	if got != typstPath {
+		t.Fatalf("expected dev dist typst.exe path %q, got %q", typstPath, got)
+	}
+}
+
 func TestFindTypstBinaryFromWindowsUsesPathExe(t *testing.T) {
 	want := filepath.Join("C:", "Tools", "typst.exe")
 

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import { onMount, onDestroy } from 'svelte';
-	import { FileText, Maximize2, Minus, X } from 'lucide-svelte';
+	import { ExternalLink, FileText, Maximize2, Minus, RefreshCw, X } from 'lucide-svelte';
 	import WizardOverlay from '$lib/components/wizard/WizardOverlay.svelte';
 	import DownloadProgressBar from '$lib/components/DownloadProgressBar.svelte';
 	import FirstLaunchBanner from '$lib/components/FirstLaunchBanner.svelte';
@@ -17,6 +17,8 @@
 	let isShowcase = $derived($page.url.pathname.startsWith('/showcase'));
 	let showEmbeddedMenu = $state(false);
 	let isWindowsDesktop = $state(false);
+	let showAbout = $state(false);
+	let appVersion = $state(__APP_VERSION__);
 
 	type MenuAction =
 		| 'new'
@@ -106,6 +108,38 @@
 		}
 	}
 
+	async function loadAppVersion() {
+		if (!window.go?.main?.App?.GetVersion) return;
+		try {
+			appVersion = await window.go.main.App.GetVersion();
+		} catch {
+			// Keep the build-time version as a quiet fallback.
+		}
+	}
+
+	async function openAbout(version?: string) {
+		if (version) appVersion = version;
+		await loadAppVersion();
+		showAbout = true;
+	}
+
+	function closeAbout() {
+		showAbout = false;
+	}
+
+	function openExternal(url: string) {
+		if (window.runtime?.BrowserOpenURL) {
+			window.runtime.BrowserOpenURL(url);
+		} else {
+			window.open(url, '_blank', 'noopener,noreferrer');
+		}
+	}
+
+	function checkUpdateFromAbout() {
+		closeAbout();
+		void window.go?.main?.App?.CheckAndNotifyUpdate?.();
+	}
+
 	function emitPageMenuAction(action: MenuAction) {
 		const event = new CustomEvent<MenuAction>('presto:menu-action', {
 			detail: action,
@@ -132,7 +166,7 @@
 
 		if (!item.href) return;
 		if (item.href === 'about:presto') {
-			void window.go?.main?.App?.ShowAboutDialog?.();
+			void openAbout();
 			return;
 		}
 		if (item.href === 'update:presto') {
@@ -281,6 +315,8 @@
 		// Skip all event registration in showcase mode
 		if (isShowcase) return;
 
+		void loadAppVersion();
+
 		// Register drag handlers on window in capture phase
 		// — runs before any child component (including CodeMirror) can intercept
 		window.addEventListener('dragenter', handleDragEnter, true);
@@ -295,6 +331,9 @@
 			// App notification events from Go backend
 			window.runtime.EventsOn('app:notification', (data: any) => {
 				notificationStore.show(data.message, data.type || 'info');
+			});
+			window.runtime.EventsOn('app:show-about', (data: any) => {
+				void openAbout(data?.version);
 			});
 			// URL scheme: presto://install/{name} → navigate to template detail page
 			// Hot start: event pushed from Go via SingleInstanceLock
@@ -363,6 +402,7 @@
 		window.removeEventListener('focus', notificationStore.flushPending);
 		window.runtime?.EventsOff?.('native-file-drop');
 		window.runtime?.EventsOff?.('native-file-open');
+		window.runtime?.EventsOff?.('app:show-about');
 	});
 </script>
 
@@ -436,6 +476,73 @@
 		<button class="dialog-btn" onclick={fileRouter.confirmCancel}>取消</button>
 	</div>
 </dialog>
+{/if}
+
+{#if showAbout}
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div
+		class="about-overlay"
+		role="presentation"
+		tabindex="-1"
+		onclick={closeAbout}
+		onkeydown={(event) => { if (event.key === 'Escape') closeAbout(); }}
+	>
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div
+			class="about-modal"
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="about-title"
+			tabindex="-1"
+			onclick={(event) => event.stopPropagation()}
+			onkeydown={(event) => event.stopPropagation()}
+		>
+			<button type="button" class="about-close" aria-label="关闭" title="关闭" onclick={closeAbout}>
+				<X size={15} />
+			</button>
+
+			<div class="about-head">
+				<div class="about-mark" aria-hidden="true">P</div>
+				<div class="about-title-block">
+					<h2 id="about-title">Presto</h2>
+					<p>Markdown 转 Typst 转 PDF</p>
+				</div>
+			</div>
+
+			<div class="about-info-grid">
+				<div class="about-info-row">
+					<span>版本</span>
+					<strong>{appVersion}</strong>
+				</div>
+				<div class="about-info-row">
+					<span>排版引擎</span>
+					<strong>Typst</strong>
+				</div>
+				<div class="about-info-row">
+					<span>实时预览</span>
+					<strong>Tinymist</strong>
+				</div>
+				<div class="about-info-row">
+					<span>许可证</span>
+					<strong>MIT</strong>
+				</div>
+			</div>
+
+			<div class="about-footer">
+				<div class="about-copyright">© 2024-2026 Presto-io</div>
+				<div class="about-actions">
+					<button type="button" class="about-action" onclick={checkUpdateFromAbout}>
+						<RefreshCw size={14} />
+						检查更新
+					</button>
+					<button type="button" class="about-action" onclick={() => openExternal('https://github.com/Presto-io/Presto')}>
+						<ExternalLink size={14} />
+						GitHub
+					</button>
+				</div>
+			</div>
+		</div>
+	</div>
 {/if}
 
 <style>
@@ -646,5 +753,161 @@
 		background: var(--color-accent);
 		color: var(--color-bg);
 		border-color: var(--color-accent);
+	}
+	.about-overlay {
+		position: fixed;
+		inset: 0;
+		z-index: 9800;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 24px;
+		background: var(--color-backdrop);
+	}
+	.about-modal {
+		position: relative;
+		width: min(456px, 100%);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		background: var(--color-bg-elevated);
+		color: var(--color-text);
+		box-shadow: var(--shadow-md);
+		padding: 22px;
+		font-family: var(--font-ui);
+	}
+	.about-close {
+		position: absolute;
+		top: 10px;
+		right: 10px;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 30px;
+		height: 30px;
+		border-radius: var(--radius-sm);
+		background: transparent;
+		color: var(--color-muted);
+	}
+	.about-close:hover,
+	.about-close:focus-visible {
+		background: var(--color-surface-hover);
+		color: var(--color-text-bright);
+	}
+	.about-head {
+		display: grid;
+		grid-template-columns: 54px 1fr;
+		gap: 14px;
+		align-items: center;
+		padding-right: 28px;
+	}
+	.about-mark {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 54px;
+		height: 54px;
+		border-radius: var(--radius-md);
+		background: var(--color-accent-bg);
+		border: 1px solid var(--color-accent-border);
+		color: var(--color-accent-hover);
+		font-size: 24px;
+		font-weight: 600;
+	}
+	.about-title-block h2 {
+		margin: 0;
+		color: var(--color-text-bright);
+		font-size: 24px;
+		font-weight: 600;
+		line-height: 1.15;
+		letter-spacing: 0;
+	}
+	.about-title-block p {
+		margin: 5px 0 0;
+		color: var(--color-muted);
+		font-size: 12px;
+	}
+	.about-info-grid {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 8px;
+		margin-top: 20px;
+	}
+	.about-info-row {
+		min-height: 62px;
+		padding: 10px 12px;
+		border: 1px solid var(--color-border-subtle);
+		border-radius: var(--radius-sm);
+		background: var(--color-surface);
+	}
+	.about-info-row span,
+	.about-copyright {
+		display: block;
+		color: var(--color-muted);
+		font-size: 11px;
+	}
+	.about-info-row strong {
+		display: block;
+		margin-top: 5px;
+		color: var(--color-text-bright);
+		font-size: 13px;
+		font-weight: 500;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.about-footer {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+		margin-top: 18px;
+		padding-top: 16px;
+		border-top: 1px solid var(--color-border);
+	}
+	.about-actions {
+		display: flex;
+		gap: 8px;
+		flex-wrap: wrap;
+		justify-content: flex-end;
+	}
+	.about-action {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 7px;
+		min-height: 32px;
+		padding: 0 11px;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-sm);
+		background: var(--color-surface);
+		color: var(--color-text);
+		font-size: 12px;
+	}
+	.about-action:hover,
+	.about-action:focus-visible {
+		background: var(--color-surface-hover);
+		color: var(--color-text-bright);
+	}
+	@media (max-width: 520px) {
+		.about-overlay {
+			padding: 14px;
+		}
+		.about-modal {
+			padding: 18px;
+		}
+		.about-info-grid {
+			grid-template-columns: 1fr;
+		}
+		.about-footer {
+			align-items: flex-start;
+			flex-direction: column;
+		}
+		.about-actions {
+			width: 100%;
+			justify-content: stretch;
+		}
+		.about-action {
+			flex: 1;
+		}
 	}
 </style>

@@ -36,6 +36,11 @@ func findTypstBinaryFrom(exeDir string, goos string, lookPath func(string) (stri
 			if isRegularFile(beside) {
 				return beside
 			}
+
+			devDist := filepath.Join(exeDir, "..", "dist", name)
+			if isRegularFile(devDist) {
+				return devDist
+			}
 		}
 	}
 

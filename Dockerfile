@@ -43,13 +43,43 @@ RUN apk add --no-cache curl && \
     tar -xJ --strip-components=1 -C /usr/local/bin/ < /tmp/typst.tar.xz && \
     rm /tmp/typst.tar.xz
 
-# Stage 4: Final image (target platform)
+# Stage 4: Download tinymist for target arch
+FROM --platform=$BUILDPLATFORM alpine:3.21 AS tinymist-downloader
+ARG TARGETARCH
+ARG TINYMIST_VERSION=0.14.18
+ARG TINYMIST_SHA256_AMD64=""
+ARG TINYMIST_SHA256_ARM64=""
+RUN apk add --no-cache curl tar && \
+    if [ "$TARGETARCH" = "arm64" ]; then \
+      TINYMIST_TRIPLE="aarch64-unknown-linux-musl"; \
+      EXPECTED_SHA256="$TINYMIST_SHA256_ARM64"; \
+    else \
+      TINYMIST_TRIPLE="x86_64-unknown-linux-musl"; \
+      EXPECTED_SHA256="$TINYMIST_SHA256_AMD64"; \
+    fi && \
+    curl -sSL "https://github.com/Myriad-Dreamin/tinymist/releases/download/v${TINYMIST_VERSION}/tinymist-${TINYMIST_TRIPLE}.tar.gz" \
+      -o /tmp/tinymist.tar.gz && \
+    if [ -n "$EXPECTED_SHA256" ]; then \
+      echo "${EXPECTED_SHA256}  /tmp/tinymist.tar.gz" | sha256sum -c -; \
+    else \
+      echo "WARNING: No SHA256 checksum provided for tinymist binary. Set TINYMIST_SHA256_AMD64/ARM64 build args."; \
+    fi && \
+    mkdir -p /tmp/tinymist && \
+    tar -xzf /tmp/tinymist.tar.gz -C /tmp/tinymist && \
+    TINYMIST_BIN="$(find /tmp/tinymist -type f -name tinymist | head -n 1)" && \
+    test -n "$TINYMIST_BIN" && \
+    cp "$TINYMIST_BIN" /usr/local/bin/tinymist && \
+    chmod +x /usr/local/bin/tinymist && \
+    rm -rf /tmp/tinymist /tmp/tinymist.tar.gz
+
+# Stage 5: Final image (target platform)
 FROM alpine:3.21
 
 # SEC-21: Create non-root user
 RUN addgroup -S presto && adduser -S -G presto presto
 
 COPY --from=typst-downloader /usr/local/bin/typst /usr/local/bin/typst
+COPY --from=tinymist-downloader /usr/local/bin/tinymist /usr/local/bin/tinymist
 COPY --from=go-builder /bin/presto-server /usr/local/bin/
 
 # Create explicit app dirs for containers. These are intended to be mounted by users.

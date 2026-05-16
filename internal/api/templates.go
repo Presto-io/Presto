@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/mrered/presto/internal/template"
+	"github.com/mrered/presto/internal/typst"
 )
 
 // isValidGitHubName validates GitHub owner/repo name format (SEC-17).
@@ -72,7 +73,7 @@ func (s *Server) handleListTemplates(w http.ResponseWriter, r *http.Request) {
 			Keywords:    t.Manifest.Keywords,
 		}
 		for _, f := range t.Manifest.RequiredFonts {
-			if !s.availableFonts[f.Name] {
+			if !typst.HasCompatibleFont(f.Name, s.availableFonts) {
 				info.MissingFonts = append(info.MissingFonts, missingFont{
 					Name:        f.Name,
 					DisplayName: f.DisplayName,

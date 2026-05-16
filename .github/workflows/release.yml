@@ -14,6 +14,7 @@ env:
   GO_VERSION: '1.26.3'
   NODE_VERSION: '22'
   TYPST_VERSION: '0.14.2'
+  TINYMIST_VERSION: '0.14.18'
 
 jobs:
   verify-tag-source:
@@ -186,11 +187,15 @@ jobs:
             cc: gcc
             typst_archive: typst-x86_64-pc-windows-msvc.zip
             typst_sha256: "51353994ac83218c3497052e89b2c432c53b9d4439cdc1b361e2ea4798ebfc13"
+            tinymist_archive: tinymist-x86_64-pc-windows-msvc.zip
+            tinymist_sha256: "2c6433ce8fc5126252d5c78db3e2886d089cec7ccc5ed32f12c7b1847b534a34"
             vc_redist_url: https://aka.ms/vc14/vc_redist.x64.exe
           - goarch: arm64
             cc: aarch64-w64-mingw32-gcc
             typst_archive: typst-aarch64-pc-windows-msvc.zip
             typst_sha256: "1c4aaa0de000ab1787dda354c34f4fa1fe3c2525d3d038e692a3d7daa333d551"
+            tinymist_archive: tinymist-aarch64-pc-windows-msvc.zip
+            tinymist_sha256: "4a302734a2a6d6c4911404ca0c62f97ace706ebc62666b18090bc36031baaaa4"
             vc_redist_url: https://aka.ms/vc14/vc_redist.arm64.exe
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -296,6 +301,18 @@ jobs:
           unzip -qo typst.zip -d typst-tmp
           find typst-tmp -name 'typst.exe' | head -1 | xargs -I{} cp {} dist/typst.exe
 
+      - name: Download tinymist
+        run: |
+          curl -sL "https://github.com/Myriad-Dreamin/tinymist/releases/download/v${{ env.TINYMIST_VERSION }}/${{ matrix.tinymist_archive }}" -o tinymist.zip
+          EXPECTED_HASH="${{ matrix.tinymist_sha256 }}"
+          echo "${EXPECTED_HASH}  tinymist.zip" | sha256sum -c - || {
+            echo "ERROR: tinymist checksum verification failed!"
+            echo "If upgrading the version, update the tinymist_sha256 in the matrix."
+            exit 1
+          }
+          unzip -qo tinymist.zip -d tinymist-tmp
+          find tinymist-tmp -name 'tinymist.exe' | head -1 | xargs -I{} cp {} dist/tinymist.exe
+
       - name: Download Visual C++ Redistributable
         shell: powershell
         run: |
@@ -306,6 +323,7 @@ jobs:
         run: |
           $binaryPath = (Resolve-Path "dist/Presto.exe").Path
           $typstPath = (Resolve-Path "dist/typst.exe").Path
+          $tinymistPath = (Resolve-Path "dist/tinymist.exe").Path
           $vcRedistPath = (Resolve-Path "dist/vc_redist.exe").Path
           $outputDir = (Resolve-Path "dist").Path
           $outputBaseName = "Presto-${env:VERSION}-windows-${{ matrix.goarch }}-installer"
@@ -316,6 +334,7 @@ jobs:
             "/DARG_ARCH=""${{ matrix.goarch }}""" `
             "/DARG_BINARY=""$binaryPath""" `
             "/DARG_TYPST_BINARY=""$typstPath""" `
+            "/DARG_TINYMIST_BINARY=""$tinymistPath""" `
             "/DARG_VC_REDIST=""$vcRedistPath""" `
             "/DARG_OUTPUT_DIR=""$outputDir""" `
             "/DARG_OUTPUT_BASENAME=""$outputBaseName""" `
@@ -340,9 +359,13 @@ jobs:
           - goarch: amd64
             runner: ubuntu-22.04
             typst_archive: typst-x86_64-unknown-linux-musl.tar.xz
+            tinymist_archive: tinymist-x86_64-unknown-linux-musl.tar.gz
+            tinymist_sha256: "6a7a2b525e9900f3718830f45a8337c5e35e55a54c8ccf7f84cd92209b924e9c"
           - goarch: arm64
             runner: ubuntu-22.04-arm
             typst_archive: typst-aarch64-unknown-linux-musl.tar.xz
+            tinymist_archive: tinymist-aarch64-unknown-linux-musl.tar.gz
+            tinymist_sha256: "7d85fcb2c60eaa7ed7160dd68f67917f462810a6f42b1940d297e603ddc1d2ab"
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -378,10 +401,13 @@ jobs:
       - name: Download typst
         run: make _download-typst TYPST_ARCHIVE=${{ matrix.typst_archive }} TYPST_OUT=dist/typst
 
+      - name: Download tinymist
+        run: make _download-tinymist TINYMIST_ARCHIVE=${{ matrix.tinymist_archive }} TINYMIST_OUT=dist/tinymist TINYMIST_SHA256=${{ matrix.tinymist_sha256 }}
+
       - name: Package
         run: |
           cd dist
-          tar czf "Presto-${{ env.VERSION }}-linux-${{ matrix.goarch }}.tar.gz" Presto typst
+          tar czf "Presto-${{ env.VERSION }}-linux-${{ matrix.goarch }}.tar.gz" Presto typst tinymist
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
@@ -398,9 +424,11 @@ jobs:
           - platform: linux/amd64
             runner: ubuntu-latest
             typst_sha256: a6044cbad2a954deb921167e257e120ac0a16b20339ec01121194ff9d394996d
+            tinymist_sha256: 6a7a2b525e9900f3718830f45a8337c5e35e55a54c8ccf7f84cd92209b924e9c
           - platform: linux/arm64
             runner: ubuntu-24.04-arm
             typst_sha256: 491b101aa40a3a7ea82a3f8a6232cabb4e6a7e233810082e5ac812d43fdcd47a
+            tinymist_sha256: 7d85fcb2c60eaa7ed7160dd68f67917f462810a6f42b1940d297e603ddc1d2ab
     runs-on: ${{ matrix.runner }}
     env:
       REGISTRY_IMAGE: ghcr.io/${{ github.repository_owner }}/presto
@@ -441,6 +469,8 @@ jobs:
           build-args: |
             TYPST_SHA256_AMD64=${{ matrix.typst_sha256 }}
             TYPST_SHA256_ARM64=${{ matrix.typst_sha256 }}
+            TINYMIST_SHA256_AMD64=${{ matrix.tinymist_sha256 }}
+            TINYMIST_SHA256_ARM64=${{ matrix.tinymist_sha256 }}
             SKIP_FRONTEND_BUILD=true
           outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
 

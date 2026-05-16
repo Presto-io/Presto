@@ -43,6 +43,13 @@ func findTinymistBinaryFrom(exeDir string, goos string, goarch string, lookPath 
 				return beside
 			}
 		}
+
+		for _, name := range candidates {
+			devDist := filepath.Join(exeDir, "..", "dist", name)
+			if isRegularFile(devDist) {
+				return devDist
+			}
+		}
 	}
 
 	for _, name := range candidates {
