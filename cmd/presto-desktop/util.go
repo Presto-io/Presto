@@ -53,5 +53,15 @@ func (a *App) ImportBatchZip(filePath string) (*api.BatchImportResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read ZIP failed: %w", err)
 	}
-	return api.ProcessBatchZip(data, a.manager, a.registry)
+	capabilities := a.releaseCapabilities()
+	options := api.TemplateImportOptions{}
+	if !capabilities.OnlineTemplateStore && capabilities.LocalTemplateImport {
+		reg, err := api.LoadBuiltinRegistrySnapshot(a.manager.BuiltinTemplatesDir)
+		if err != nil {
+			return nil, fmt.Errorf("official template registry snapshot unavailable: %w", err)
+		}
+		options.OfficialOnly = true
+		options.AllowlistRegistry = reg
+	}
+	return api.ProcessBatchZipWithOptions(data, a.manager, a.registry, options)
 }

@@ -50,6 +50,10 @@ var markdownExts = map[string]bool{
 // ProcessBatchZip processes ZIP data: extracts templates and markdown files.
 // Shared by the HTTP handler and the desktop Wails binding.
 func ProcessBatchZip(zipData []byte, mgr *template.Manager, registry *template.RegistryCache) (*BatchImportResult, error) {
+	return ProcessBatchZipWithOptions(zipData, mgr, registry, TemplateImportOptions{})
+}
+
+func ProcessBatchZipWithOptions(zipData []byte, mgr *template.Manager, registry *template.RegistryCache, opts TemplateImportOptions) (*BatchImportResult, error) {
 	zr, err := zip.NewReader(bytes.NewReader(zipData), int64(len(zipData)))
 	if err != nil {
 		return nil, fmt.Errorf("invalid ZIP file: %w", err)
@@ -67,6 +71,9 @@ func ProcessBatchZip(zipData []byte, mgr *template.Manager, registry *template.R
 	templateRootSet := make(map[string]bool)
 	for _, root := range templateRoots {
 		templateRootSet[root] = true
+	}
+	if err := rejectRuntimeUpdateEntries(zr, templateRootSet); err != nil {
+		return nil, err
 	}
 
 	// Create a temp directory to extract non-template files (markdown, images, etc.)
@@ -138,15 +145,18 @@ func ProcessBatchZip(zipData []byte, mgr *template.Manager, registry *template.R
 
 		if mgr.Exists(name) {
 			// Always overwrite for batch import
-			if err := mgr.Uninstall(name); err != nil {
+			if err := uninstallUserTemplateIfPresent(mgr, name); err != nil {
 				log.Printf("[batch] import: failed to uninstall %q: %v", name, err)
 				continue
 			}
 			status = "overwritten"
 		}
 
-		result, err := importTemplateFromZipDir(zr, root, name, mgr, registry)
+		result, err := importTemplateFromZipDir(zr, root, name, mgr, registry, opts)
 		if err != nil {
+			if opts.OfficialOnly {
+				return nil, fmt.Errorf("failed to import template %q: %w", name, err)
+			}
 			log.Printf("[batch] import: failed to import template %q: %v", name, err)
 			continue
 		}
@@ -233,7 +243,7 @@ func (s *Server) handleBatchImportZip(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := ProcessBatchZip(data, s.manager, s.registry)
+	result, err := ProcessBatchZipWithOptions(data, s.manager, s.registry, s.importOptions)
 	if err != nil {
 		log.Printf("[batch] import: %v", err)
 		writeJSONError(w, "batch import failed", http.StatusBadRequest) // SEC-35

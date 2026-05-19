@@ -45,6 +45,37 @@ type importResult struct {
 	Verified    string   `json:"verified"` // "verified" | "not_in_registry" | "pending" | "mismatch"
 }
 
+type TemplateImportOptions struct {
+	OfficialOnly      bool
+	AllowlistRegistry *template.Registry
+}
+
+func LoadBuiltinRegistrySnapshot(builtinTemplatesDir string) (*template.Registry, error) {
+	if builtinTemplatesDir == "" {
+		return nil, fmt.Errorf("builtin registry snapshot not configured")
+	}
+	data, err := os.ReadFile(filepath.Join(builtinTemplatesDir, "registry.json"))
+	if err != nil {
+		return nil, err
+	}
+	var reg template.Registry
+	if err := json.Unmarshal(data, &reg); err != nil {
+		return nil, err
+	}
+	return &reg, nil
+}
+
+func portableTemplateImportOptions(builtinTemplatesDir string) TemplateImportOptions {
+	reg, err := LoadBuiltinRegistrySnapshot(builtinTemplatesDir)
+	if err != nil {
+		log.Printf("[templates] portable registry snapshot unavailable: %v", err)
+	}
+	return TemplateImportOptions{
+		OfficialOnly:      true,
+		AllowlistRegistry: reg,
+	}
+}
+
 func (s *Server) handleImportTemplate(w http.ResponseWriter, r *http.Request) {
 	// SEC-11: Limit request body
 	r.Body = http.MaxBytesReader(w, r.Body, maxZIPUploadSize)
@@ -98,6 +129,12 @@ func (s *Server) handleImportTemplate(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, "ZIP must contain at least one manifest.json", http.StatusBadRequest)
 		return
 	}
+	rootSet := templateRootSet(roots)
+	if err := rejectRuntimeUpdateEntries(zr, rootSet); err != nil {
+		writeJSONError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	importOptions := s.importOptions
 
 	// Pre-scan: read manifests and detect conflicts
 	type templateEntry struct {
@@ -138,7 +175,7 @@ func (s *Server) handleImportTemplate(w http.ResponseWriter, r *http.Request) {
 		if s.manager.Exists(name) {
 			switch onConflict {
 			case "overwrite":
-				if err := s.manager.Uninstall(name); err != nil {
+				if err := uninstallUserTemplateIfPresent(s.manager, name); err != nil {
 					log.Printf("[templates] import: uninstall %q for overwrite failed: %v", name, err)
 					writeJSONError(w, fmt.Sprintf("failed to remove existing template %q", name), http.StatusInternalServerError)
 					return
@@ -155,10 +192,10 @@ func (s *Server) handleImportTemplate(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		result, err := importTemplateFromZipDir(zr, entry.root, name, s.manager, s.registry)
+		result, err := importTemplateFromZipDir(zr, entry.root, name, s.manager, s.registry, importOptions)
 		if err != nil {
 			log.Printf("[templates] import: failed for root %q: %v", entry.root, err)
-			writeJSONError(w, "import failed", http.StatusBadRequest) // SEC-35
+			writeJSONError(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		imported = append(imported, *result)
@@ -167,6 +204,47 @@ func (s *Server) handleImportTemplate(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[templates] imported %d template(s) from ZIP", len(imported))
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(imported)
+}
+
+func uninstallUserTemplateIfPresent(mgr *template.Manager, name string) error {
+	if mgr == nil {
+		return fmt.Errorf("template manager not configured")
+	}
+	safeName := filepath.Base(name)
+	if safeName != name || strings.Contains(name, "..") {
+		return fmt.Errorf("invalid template name")
+	}
+	if _, err := os.Lstat(filepath.Join(mgr.TemplatesDir, safeName)); err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	return mgr.Uninstall(safeName)
+}
+
+func templateRootSet(roots []string) map[string]bool {
+	set := make(map[string]bool, len(roots))
+	for _, root := range roots {
+		set[root] = true
+	}
+	return set
+}
+
+func rejectRuntimeUpdateEntries(zr *zip.Reader, roots map[string]bool) error {
+	for _, f := range zr.File {
+		if skipZipEntry(f) {
+			continue
+		}
+		base := strings.ToLower(path.Base(f.Name))
+		switch base {
+		case "typst", "typst.exe", "tinymist", "tinymist.exe":
+			if !isInsideTemplateRoot(f.Name, roots) {
+				return fmt.Errorf("runtime updates are not supported by template ZIP import")
+			}
+		}
+	}
+	return nil
 }
 
 // readManifestFromZip reads and parses manifest.json from a ZIP directory.
@@ -249,7 +327,7 @@ func filesInPrefix(zr *zip.Reader, prefix string) []*zip.File {
 // importTemplateFromZipDir installs a single template from a ZIP directory.
 // installName allows overriding the name from manifest (for rename-on-conflict).
 // If registry is non-nil, the binary's SHA256 is verified against the registry.
-func importTemplateFromZipDir(zr *zip.Reader, prefix string, installName string, mgr *template.Manager, registry *template.RegistryCache) (*importResult, error) {
+func importTemplateFromZipDir(zr *zip.Reader, prefix string, installName string, mgr *template.Manager, registry *template.RegistryCache, opts TemplateImportOptions) (*importResult, error) {
 	files := filesInPrefix(zr, prefix)
 
 	var manifestData []byte
@@ -337,7 +415,13 @@ func importTemplateFromZipDir(zr *zip.Reader, prefix string, installName string,
 	hash := sha256.Sum256(binData)
 	actualSHA256 := hex.EncodeToString(hash[:])
 	verified := template.VerifyNotInRegistry
-	if registry != nil {
+	if opts.OfficialOnly {
+		verified, err = verifyOfficialTemplateOverlay(opts.AllowlistRegistry, manifest.Name, actualSHA256)
+		if err != nil {
+			os.RemoveAll(tplDir)
+			return nil, err
+		}
+	} else if registry != nil {
 		verified = registry.VerifySHA256(manifest.Name, actualSHA256)
 	}
 	if verified == template.VerifyMismatch {
@@ -362,4 +446,27 @@ func importTemplateFromZipDir(zr *zip.Reader, prefix string, installName string,
 		Keywords:    manifest.Keywords,
 		Verified:    string(verified),
 	}, nil
+}
+
+func verifyOfficialTemplateOverlay(reg *template.Registry, name string, actualSHA256 string) (template.VerifyResult, error) {
+	if reg == nil {
+		return template.VerifyNotInRegistry, fmt.Errorf("official template registry snapshot is required")
+	}
+	for _, entry := range reg.Templates {
+		if entry.Name != name {
+			continue
+		}
+		if entry.Trust != "official" {
+			return template.VerifyNotInRegistry, fmt.Errorf("template %q is not an official template", name)
+		}
+		info, ok := entry.Platforms[template.Platform()]
+		if !ok || info.SHA256 == "" {
+			return template.VerifyNotInRegistry, fmt.Errorf("official template %q is not available for this platform", name)
+		}
+		if info.SHA256 != actualSHA256 {
+			return template.VerifyMismatch, fmt.Errorf("checksum mismatch for official template %q", name)
+		}
+		return template.VerifyMatched, nil
+	}
+	return template.VerifyNotInRegistry, fmt.Errorf("template %q is not an official template", name)
 }

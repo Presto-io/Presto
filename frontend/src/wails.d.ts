@@ -1,3 +1,14 @@
+interface BatchImportResult {
+	templates: { name: string; displayName: string; status: string }[];
+	markdownFiles: {
+		name: string;
+		content: string;
+		detectedTemplate?: string;
+		workDir?: string;
+	}[];
+	workDir?: string;
+}
+
 interface WailsApp {
 	GetOutputInfo: (markdown: string, templateId: string) => Promise<{
 		schemaVersion: number;
@@ -35,7 +46,7 @@ interface WailsApp {
 		tinymistPath: string;
 		fallbackMessage?: string;
 	}>;
-	ImportBatchZip: (filePath: string) => Promise<any>;
+	ImportBatchZip: (filePath: string) => Promise<BatchImportResult>;
 	SaveMarkdown: (content: string, filePath: string) => Promise<void>;
 	SaveMarkdownAs: (content: string, defaultFilename: string) => Promise<string>;
 	SaveFile: (b64Data: string, defaultFilename: string) => Promise<void>;
