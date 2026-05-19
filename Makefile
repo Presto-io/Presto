@@ -21,9 +21,9 @@ LDFLAGS      := -s -w -X main.version=$(VERSION)
 PORTABLE_LDFLAGS := $(LDFLAGS) -X main.releaseChannel=portable
 PORTABLE_FRONTEND_ENV := VITE_PRESTO_CHANNEL=portable
 # Release matrix contract: default Presto-$(VERSION)-macOS-$(1).dmg remains unchanged.
-# Portable additions: Presto-$(VERSION)-portable-macOS-$(arch).dmg,
-# Presto-$(VERSION)-portable-windows-$(arch).exe target with ZIP fallback until
-# single-file embedding lands, and Presto-$(VERSION)-portable-linux-$(arch).AppImage.
+# Portable additions: Presto-$(VERSION)-portable-macOS-$(1).dmg,
+# Presto-$(VERSION)-portable-windows-amd64.exe target with ZIP fallback until
+# single-file embedding lands, and Presto-$(VERSION)-portable-linux-amd64.AppImage.
 DIST         := dist
 DESKTOP_SRC  := ./cmd/presto-desktop
 DESKTOP_EMBED:= cmd/presto-desktop/build
@@ -154,6 +154,10 @@ else
 endif
 endif
 
+ifdef SKIP_FRONTEND
+_frontend-embed-portable:
+	@echo "==> Portable frontend pre-built (SKIP_FRONTEND=1), skipping..."
+else
 _frontend-embed-portable:
 	cd frontend && $(PORTABLE_FRONTEND_ENV) $(NPM) run build
 ifeq ($(OS),Windows_NT)
@@ -162,6 +166,7 @@ ifeq ($(OS),Windows_NT)
 else
 	rm -rf $(DESKTOP_EMBED)/_app
 	cp -r frontend/build/* $(DESKTOP_EMBED)/
+endif
 endif
 
 # Download typst binary for a given platform
