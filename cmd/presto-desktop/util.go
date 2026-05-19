@@ -25,6 +25,10 @@ func (a *App) IsVerbose() bool {
 	return verbose
 }
 
+func (a *App) GetCapabilities() ReleaseCapabilities {
+	return normalizeReleaseCapabilities(a.capabilities)
+}
+
 func (a *App) SetWindowTitle(title string) {
 	if runtime.GOOS == "windows" {
 		wailsRuntime.WindowSetTitle(a.ctx, title)

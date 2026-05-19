@@ -57,6 +57,7 @@ type App struct {
 	manager         *template.Manager
 	compiler        *typst.Compiler
 	registry        *template.RegistryCache
+	capabilities    ReleaseCapabilities
 	previewService  *preview.Service
 	previewRunner   *previewRunner
 	saveMenuItem    *menu.MenuItem
@@ -95,11 +96,12 @@ func (h *spaFallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	http.NotFound(w, r)
 }
 
-func NewApp(manager *template.Manager, compiler *typst.Compiler, registry *template.RegistryCache, previewService *preview.Service, previewRunner *previewRunner) *App {
+func NewApp(manager *template.Manager, compiler *typst.Compiler, registry *template.RegistryCache, capabilities ReleaseCapabilities, previewService *preview.Service, previewRunner *previewRunner) *App {
 	return &App{
 		manager:        manager,
 		compiler:       compiler,
 		registry:       registry,
+		capabilities:   normalizeReleaseCapabilities(capabilities),
 		previewService: previewService,
 		previewRunner:  previewRunner,
 	}
@@ -175,6 +177,7 @@ func main() {
 	logger.Info("[presto] using typst", "path", typstBin)
 	tinymistBin := findTinymistBinary()
 	logger.Info("[presto] using tinymist", "path", tinymistBin)
+	capabilities := currentReleaseCapabilities()
 	registry := template.NewRegistryCache(dirs.CacheDir)
 	registry.RefreshAsync()
 	// SEC-40: Use os temp dir instead of $HOME to restrict file access
@@ -187,12 +190,13 @@ func main() {
 		TypstBin:     typstBin,
 		FontPaths:    fontPaths,
 		Registry:     registry,
+		Capabilities: toAPIReleaseCapabilities(capabilities),
 	})
 	frontendFS, _ := fs.Sub(assets, "build")
 	handler := &spaFallbackHandler{api: apiHandler, assets: frontendFS}
 	previewService := preview.NewService()
 	previewRunner := newPreviewRunner(previewService, tinymistBin)
-	app := NewApp(manager, compiler, registry, previewService, previewRunner)
+	app := NewApp(manager, compiler, registry, capabilities, previewService, previewRunner)
 	var appMenu *menu.Menu
 	if runtime.GOOS != "windows" {
 		appMenu = buildMenu(app)

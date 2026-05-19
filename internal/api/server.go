@@ -20,9 +20,45 @@ type Server struct {
 	manager        *template.Manager
 	compiler       *typst.Compiler
 	registry       *template.RegistryCache
+	capabilities   ReleaseCapabilities
 	availableFonts map[string]bool // cached from typst fonts at startup
 	skillManager   *skill.SkillManager
 	previewService *preview.Service
+}
+
+type ReleaseCapabilities struct {
+	ReleaseChannel       string `json:"releaseChannel"`
+	OnlineRegistry       bool   `json:"onlineRegistry"`
+	OnlineTemplateStore  bool   `json:"onlineTemplateStore"`
+	OnlineSkillStore     bool   `json:"onlineSkillStore"`
+	TemplateAutoUpdate   bool   `json:"templateAutoUpdate"`
+	FirstLaunchBootstrap bool   `json:"firstLaunchBootstrap"`
+	AppUpdateCheck       bool   `json:"appUpdateCheck"`
+	ExternalBrowserLinks bool   `json:"externalBrowserLinks"`
+	LocalTemplateImport  bool   `json:"localTemplateImport"`
+	PackagedRuntimes     bool   `json:"packagedRuntimes"`
+}
+
+func defaultReleaseCapabilities() ReleaseCapabilities {
+	return ReleaseCapabilities{
+		ReleaseChannel:       "slim",
+		OnlineRegistry:       true,
+		OnlineTemplateStore:  true,
+		OnlineSkillStore:     true,
+		TemplateAutoUpdate:   true,
+		FirstLaunchBootstrap: true,
+		AppUpdateCheck:       true,
+		ExternalBrowserLinks: true,
+		LocalTemplateImport:  true,
+		PackagedRuntimes:     false,
+	}
+}
+
+func normalizeReleaseCapabilities(capabilities ReleaseCapabilities) ReleaseCapabilities {
+	if capabilities.ReleaseChannel == "" {
+		return defaultReleaseCapabilities()
+	}
+	return capabilities
 }
 
 // ServerOptions configures the API server.
@@ -34,6 +70,7 @@ type ServerOptions struct {
 	InjectAPIKey bool     // inject API key into static HTML only for trusted local deployments
 	FontPaths    []string // additional font directories for typst
 	Registry     *template.RegistryCache
+	Capabilities ReleaseCapabilities
 }
 
 func NewServer(opts ServerOptions) http.Handler {
@@ -54,6 +91,7 @@ func NewServer(opts ServerOptions) http.Handler {
 		manager:        template.NewManager(opts.TemplatesDir),
 		compiler:       compiler,
 		registry:       opts.Registry,
+		capabilities:   normalizeReleaseCapabilities(opts.Capabilities),
 		availableFonts: availableFonts,
 		skillManager:   skill.NewManager(),
 		previewService: preview.NewService(),
