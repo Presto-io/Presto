@@ -78,6 +78,20 @@ jobs:
           path: cmd/presto-desktop/build/
           retention-days: 1
 
+      - name: Build portable frontend
+        run: cd frontend && VITE_PRESTO_CHANNEL=portable npm run build
+
+      - name: Embed portable frontend into desktop build dir
+        run: |
+          rm -rf cmd/presto-desktop/build/*
+          cp -r frontend/build/* cmd/presto-desktop/build/
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: frontend-build-portable
+          path: cmd/presto-desktop/build/
+          retention-days: 1
+
   # ── macOS: arm64 + amd64 ─────────────────────────────────
   build-macos:
     needs: build-frontend
@@ -160,6 +174,30 @@ jobs:
           DMG_FILE="dist/Presto-${{ env.VERSION }}-macOS-${{ matrix.goarch }}.dmg"
           make notarize DMG_PATH="$DMG_FILE"
 
+      - name: Clear embedded frontend for portable build
+        run: rm -rf cmd/presto-desktop/build/*
+
+      - name: Download portable frontend
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: frontend-build-portable
+          path: cmd/presto-desktop/build/
+
+      - name: Build portable DMG
+        env:
+          MACOSX_DEPLOYMENT_TARGET: '11.0'
+        run: make dist-dmg-portable-${{ matrix.goarch }} VERSION=${{ env.VERSION }} SKIP_FRONTEND=1
+
+      - name: Notarize portable DMG
+        if: ${{ env.CODESIGN_IDENTITY != '' }}
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          DMG_FILE="dist/Presto-${{ env.VERSION }}-portable-macOS-${{ matrix.goarch }}.dmg"
+          make notarize DMG_PATH="$DMG_FILE"
+
       - name: Cleanup keychain
         if: always()
         run: |
@@ -170,7 +208,9 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: dist-macos-${{ matrix.goarch }}
-          path: dist/Presto-${{ env.VERSION }}-macOS-${{ matrix.goarch }}.dmg
+          path: |
+            dist/Presto-${{ env.VERSION }}-macOS-${{ matrix.goarch }}.dmg
+            dist/Presto-${{ env.VERSION }}-portable-macOS-${{ matrix.goarch }}.dmg
 
   # ── Windows: amd64 + arm64 ─────────────────────────────────
   build-windows:
@@ -344,10 +384,31 @@ jobs:
             exit $LASTEXITCODE
           }
 
+      - name: Clear embedded frontend for portable build
+        if: matrix.goarch == 'amd64'
+        run: rm -rf cmd/presto-desktop/build/*
+
+      - name: Download portable frontend
+        if: matrix.goarch == 'amd64'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: frontend-build-portable
+          path: cmd/presto-desktop/build/
+
+      - name: Build portable Windows fallback bundle
+        if: matrix.goarch == 'amd64'
+        run: make dist-windows-portable-amd64 VERSION=${{ env.VERSION }} SKIP_FRONTEND=1
+
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: dist-windows-${{ matrix.goarch }}
           path: dist/*-windows-${{ matrix.goarch }}-installer.exe
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: matrix.goarch == 'amd64'
+        with:
+          name: dist-windows-portable-${{ matrix.goarch }}
+          path: dist/Presto-${{ env.VERSION }}-portable-windows-${{ matrix.goarch }}.zip
 
   # ── Linux: amd64 + arm64 (native runners, no cross-compilation) ──
   build-linux:
@@ -409,10 +470,41 @@ jobs:
           cd dist
           tar czf "Presto-${{ env.VERSION }}-linux-${{ matrix.goarch }}.tar.gz" Presto typst tinymist
 
+      - name: Clear embedded frontend for portable build
+        if: matrix.goarch == 'amd64'
+        run: rm -rf cmd/presto-desktop/build/*
+
+      - name: Download portable frontend
+        if: matrix.goarch == 'amd64'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: frontend-build-portable
+          path: cmd/presto-desktop/build/
+
+      - name: Install appimagetool
+        if: matrix.goarch == 'amd64'
+        run: |
+          sudo curl -fsSL \
+            https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage \
+            -o /usr/local/bin/appimagetool
+          sudo chmod +x /usr/local/bin/appimagetool
+
+      - name: Build portable Linux AppImage
+        if: matrix.goarch == 'amd64'
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: '1'
+        run: make dist-linux-portable-amd64 VERSION=${{ env.VERSION }} SKIP_FRONTEND=1
+
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: dist-linux-${{ matrix.goarch }}
           path: dist/Presto-${{ env.VERSION }}-linux-${{ matrix.goarch }}.tar.gz
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: matrix.goarch == 'amd64'
+        with:
+          name: dist-linux-portable-${{ matrix.goarch }}
+          path: dist/Presto-${{ env.VERSION }}-portable-linux-${{ matrix.goarch }}.AppImage
 
   # ── Docker: per-arch native build ───────────────────────────
   build-docker:
@@ -541,6 +633,29 @@ jobs:
 
       - name: Extract version
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Guard release asset matrix
+        run: |
+          cd dist
+          expected=(
+            "Presto-${{ env.VERSION }}-macOS-arm64.dmg"
+            "Presto-${{ env.VERSION }}-macOS-amd64.dmg"
+            "Presto-${{ env.VERSION }}-windows-amd64-installer.exe"
+            "Presto-${{ env.VERSION }}-windows-arm64-installer.exe"
+            "Presto-${{ env.VERSION }}-linux-amd64.tar.gz"
+            "Presto-${{ env.VERSION }}-linux-arm64.tar.gz"
+            "Presto-${{ env.VERSION }}-portable-macOS-arm64.dmg"
+            "Presto-${{ env.VERSION }}-portable-macOS-amd64.dmg"
+            "Presto-${{ env.VERSION }}-portable-windows-amd64.zip"
+            "Presto-${{ env.VERSION }}-portable-linux-amd64.AppImage"
+          )
+          for file in "${expected[@]}"; do
+            test -f "$file" || {
+              echo "::error::Missing release asset: $file"
+              ls -la
+              exit 1
+            }
+          done
 
       - name: Generate checksums
         run: |
