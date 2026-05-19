@@ -145,10 +145,6 @@ func ProcessBatchZipWithOptions(zipData []byte, mgr *template.Manager, registry 
 
 		if mgr.Exists(name) {
 			// Always overwrite for batch import
-			if err := uninstallUserTemplateIfPresent(mgr, name); err != nil {
-				log.Printf("[batch] import: failed to uninstall %q: %v", name, err)
-				continue
-			}
 			status = "overwritten"
 		}
 

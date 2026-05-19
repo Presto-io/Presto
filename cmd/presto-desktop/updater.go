@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	updateReleaseAPIURL      = "https://api.github.com/repos/Presto-io/Presto-Homepage/releases/latest"
+	updateReleaseAPIURL      = "https://api.github.com/repos/Presto-io/Presto/releases/latest"
 	updateChecksumsAssetName = "checksums.txt"
 	maxUpdateAPIBodyBytes    = 2 * 1024 * 1024
 	maxUpdateChecksumBytes   = 1024 * 1024
@@ -270,7 +270,7 @@ func parseUpdateAssetURL(rawURL string) (repo, tag, filename string, err error) 
 	if len(parts) != 6 || parts[0] != "Presto-io" || parts[2] != "releases" || parts[3] != "download" {
 		return "", "", "", fmt.Errorf("URL must point to a Presto-io GitHub release asset")
 	}
-	if parts[1] != "Presto-Homepage" && parts[1] != "Presto" {
+	if parts[1] != "Presto" {
 		return "", "", "", fmt.Errorf("repo is not allowed")
 	}
 	if parts[4] == "" || parts[5] == "" || parts[5] == "." || parts[5] == ".." || strings.Contains(parts[5], string(filepath.Separator)) {

@@ -9,13 +9,13 @@ import (
 
 func TestParseUpdateAssetURLAllowsExpectedReleaseAsset(t *testing.T) {
 	filename := testUpdateFilename()
-	rawURL := fmt.Sprintf("https://github.com/Presto-io/Presto-Homepage/releases/download/v1.2.3/%s", filename)
+	rawURL := fmt.Sprintf("https://github.com/Presto-io/Presto/releases/download/v1.2.3/%s", filename)
 
 	repo, tag, gotFilename, err := parseUpdateAssetURL(rawURL)
 	if err != nil {
 		t.Fatalf("parseUpdateAssetURL returned error: %v", err)
 	}
-	if repo != "Presto-Homepage" || tag != "v1.2.3" || gotFilename != filename {
+	if repo != "Presto" || tag != "v1.2.3" || gotFilename != filename {
 		t.Fatalf("unexpected parse result: repo=%q tag=%q filename=%q", repo, tag, gotFilename)
 	}
 }
@@ -23,11 +23,12 @@ func TestParseUpdateAssetURLAllowsExpectedReleaseAsset(t *testing.T) {
 func TestParseUpdateAssetURLRejectsUntrustedSources(t *testing.T) {
 	filename := testUpdateFilename()
 	tests := []string{
-		fmt.Sprintf("http://github.com/Presto-io/Presto-Homepage/releases/download/v1.2.3/%s", filename),
-		fmt.Sprintf("https://example.com/Presto-io/Presto-Homepage/releases/download/v1.2.3/%s", filename),
+		fmt.Sprintf("http://github.com/Presto-io/Presto/releases/download/v1.2.3/%s", filename),
+		fmt.Sprintf("https://example.com/Presto-io/Presto/releases/download/v1.2.3/%s", filename),
 		fmt.Sprintf("https://github.com/Presto-io/Other/releases/download/v1.2.3/%s", filename),
-		"https://github.com/Presto-io/Presto-Homepage/releases/tag/v1.2.3",
-		"https://github.com/Presto-io/Presto-Homepage/releases/download/v1.2.3/..",
+		fmt.Sprintf("https://github.com/Presto-io/Presto-Homepage/releases/download/v1.2.3/%s", filename),
+		"https://github.com/Presto-io/Presto/releases/tag/v1.2.3",
+		"https://github.com/Presto-io/Presto/releases/download/v1.2.3/..",
 	}
 
 	for _, rawURL := range tests {
@@ -100,7 +101,7 @@ func TestPortableCapabilitiesDisableUpdateChecks(t *testing.T) {
 		t.Fatalf("disabled update check should return current as latest: %+v", info)
 	}
 
-	err = app.DownloadAndInstallUpdate("https://github.com/Presto-io/Presto-Homepage/releases/download/v1.2.3/" + testUpdateFilename())
+	err = app.DownloadAndInstallUpdate("https://github.com/Presto-io/Presto/releases/download/v1.2.3/" + testUpdateFilename())
 	if err == nil || !strings.Contains(err.Error(), "online updates are disabled in this release channel") {
 		t.Fatalf("expected disabled update install error, got %v", err)
 	}

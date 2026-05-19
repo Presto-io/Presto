@@ -171,20 +171,18 @@ func (s *Server) handleImportTemplate(w http.ResponseWriter, r *http.Request) {
 	imported := make([]importResult, 0, len(entries))
 	for _, entry := range entries {
 		name := entry.manifest.Name
+		statusName := name
 
 		if s.manager.Exists(name) {
 			switch onConflict {
 			case "overwrite":
-				if err := uninstallUserTemplateIfPresent(s.manager, name); err != nil {
-					log.Printf("[templates] import: uninstall %q for overwrite failed: %v", name, err)
-					writeJSONError(w, fmt.Sprintf("failed to remove existing template %q", name), http.StatusInternalServerError)
-					return
-				}
+				statusName = name
 			case "skip":
 				log.Printf("[templates] import: skipping existing template %q", name)
 				continue
 			case "rename":
 				name = s.manager.UniqueTemplateName(name)
+				statusName = name
 				log.Printf("[templates] import: auto-renaming to %q", name)
 			default:
 				writeJSONError(w, fmt.Sprintf("template %q already exists", name), http.StatusConflict)
@@ -198,6 +196,7 @@ func (s *Server) handleImportTemplate(w http.ResponseWriter, r *http.Request) {
 			writeJSONError(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		result.Name = statusName
 		imported = append(imported, *result)
 	}
 
@@ -331,7 +330,6 @@ func importTemplateFromZipDir(zr *zip.Reader, prefix string, installName string,
 	files := filesInPrefix(zr, prefix)
 
 	var manifestData []byte
-	var binaryFile *zip.File
 
 	for _, f := range files {
 		base := path.Base(f.Name)
@@ -345,21 +343,20 @@ func importTemplateFromZipDir(zr *zip.Reader, prefix string, installName string,
 			if err != nil {
 				return nil, fmt.Errorf("failed to read manifest.json")
 			}
-		} else if binaryFile == nil {
-			binaryFile = f
 		}
 	}
 
 	if manifestData == nil {
 		return nil, fmt.Errorf("no manifest.json found in %q", prefix)
 	}
-	if binaryFile == nil {
-		return nil, fmt.Errorf("no binary file found alongside manifest.json in %q", prefix)
-	}
 
 	manifest, err := template.ParseManifest(manifestData)
 	if err != nil {
 		return nil, fmt.Errorf("invalid manifest.json: %v", err)
+	}
+	binaryFile := findExpectedTemplateBinary(files, manifest.Name)
+	if binaryFile == nil {
+		return nil, fmt.Errorf("missing expected template binary %q", expectedTemplateBinaryName(manifest.Name))
 	}
 
 	// Use installName (may differ from manifest name for rename-on-conflict)
@@ -371,7 +368,6 @@ func importTemplateFromZipDir(zr *zip.Reader, prefix string, installName string,
 		return nil, fmt.Errorf("invalid template name in manifest")
 	}
 
-	// SEC-06: Verify resolved path is within TemplatesDir
 	tplDir := filepath.Join(mgr.TemplatesDir, name)
 	absTemplatesDir, _ := filepath.Abs(mgr.TemplatesDir)
 	absTplDir, _ := filepath.Abs(tplDir)
@@ -379,9 +375,19 @@ func importTemplateFromZipDir(zr *zip.Reader, prefix string, installName string,
 		return nil, fmt.Errorf("template directory escapes base")
 	}
 
-	if err := os.MkdirAll(tplDir, 0700); err != nil {
-		return nil, fmt.Errorf("failed to create template directory")
+	if err := os.MkdirAll(mgr.TemplatesDir, 0700); err != nil {
+		return nil, fmt.Errorf("failed to create templates directory")
 	}
+	stageDir, err := os.MkdirTemp(mgr.TemplatesDir, ".import-"+name+"-*")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create staged template directory")
+	}
+	stageCommitted := false
+	defer func() {
+		if !stageCommitted {
+			os.RemoveAll(stageDir)
+		}
+	}()
 
 	// Update manifest name if it was renamed
 	if name != manifest.Name {
@@ -392,14 +398,11 @@ func importTemplateFromZipDir(zr *zip.Reader, prefix string, installName string,
 		}
 	}
 
-	if err := os.WriteFile(filepath.Join(tplDir, "manifest.json"), manifestData, 0600); err != nil { // SEC-45
+	if err := os.WriteFile(filepath.Join(stageDir, "manifest.json"), manifestData, 0600); err != nil { // SEC-45
 		return nil, fmt.Errorf("failed to write manifest")
 	}
 
-	binaryName := fmt.Sprintf("presto-template-%s", name)
-	if runtime.GOOS == "windows" {
-		binaryName += ".exe"
-	}
+	binaryName := expectedTemplateBinaryName(name)
 	rc, err := binaryFile.Open()
 	if err != nil {
 		return nil, fmt.Errorf("failed to read binary from ZIP")
@@ -418,22 +421,23 @@ func importTemplateFromZipDir(zr *zip.Reader, prefix string, installName string,
 	if opts.OfficialOnly {
 		verified, err = verifyOfficialTemplateOverlay(opts.AllowlistRegistry, manifest.Name, actualSHA256)
 		if err != nil {
-			os.RemoveAll(tplDir)
 			return nil, err
 		}
 	} else if registry != nil {
 		verified = registry.VerifySHA256(manifest.Name, actualSHA256)
 	}
 	if verified == template.VerifyMismatch {
-		// Clean up the directory we already created
-		os.RemoveAll(tplDir)
 		return nil, fmt.Errorf("SHA256 mismatch for template %q: binary may have been tampered with", manifest.Name)
 	}
 
-	binaryPath := filepath.Join(tplDir, binaryName)
+	binaryPath := filepath.Join(stageDir, binaryName)
 	if err := os.WriteFile(binaryPath, binData, 0755); err != nil {
 		return nil, fmt.Errorf("failed to write binary")
 	}
+	if err := replaceUserTemplateDir(tplDir, stageDir); err != nil {
+		return nil, fmt.Errorf("failed to install template: %w", err)
+	}
+	stageCommitted = true
 
 	log.Printf("[templates] imported template %q from ZIP (prefix=%q)", name, prefix)
 
@@ -446,6 +450,62 @@ func importTemplateFromZipDir(zr *zip.Reader, prefix string, installName string,
 		Keywords:    manifest.Keywords,
 		Verified:    string(verified),
 	}, nil
+}
+
+func expectedTemplateBinaryName(name string) string {
+	binaryName := fmt.Sprintf("presto-template-%s", name)
+	if runtime.GOOS == "windows" {
+		binaryName += ".exe"
+	}
+	return binaryName
+}
+
+func findExpectedTemplateBinary(files []*zip.File, manifestName string) *zip.File {
+	expected := expectedTemplateBinaryName(manifestName)
+	for _, f := range files {
+		if skipZipEntry(f) {
+			continue
+		}
+		if path.Base(f.Name) == expected {
+			return f
+		}
+	}
+	return nil
+}
+
+func replaceUserTemplateDir(targetDir, stageDir string) error {
+	info, err := os.Lstat(targetDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return os.Rename(stageDir, targetDir)
+		}
+		return fmt.Errorf("stat existing template: %w", err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("refusing to replace symlink: %s", filepath.Base(targetDir))
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("existing template path is not a directory: %s", targetDir)
+	}
+
+	backupDir := filepath.Join(
+		filepath.Dir(targetDir),
+		fmt.Sprintf(".%s-backup-%d", filepath.Base(targetDir), os.Getpid()),
+	)
+	if err := os.Rename(targetDir, backupDir); err != nil {
+		return fmt.Errorf("backup existing template: %w", err)
+	}
+	if err := os.Rename(stageDir, targetDir); err != nil {
+		restoreErr := os.Rename(backupDir, targetDir)
+		if restoreErr != nil {
+			return fmt.Errorf("activate staged template: %w; restore failed: %v", err, restoreErr)
+		}
+		return fmt.Errorf("activate staged template: %w", err)
+	}
+	if err := os.RemoveAll(backupDir); err != nil {
+		log.Printf("[templates] failed to remove replaced template backup %q: %v", backupDir, err)
+	}
+	return nil
 }
 
 func verifyOfficialTemplateOverlay(reg *template.Registry, name string, actualSHA256 string) (template.VerifyResult, error) {

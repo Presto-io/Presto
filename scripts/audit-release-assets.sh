@@ -14,23 +14,43 @@ fail() {
 
 [[ -d "${dist_dir}" ]] || fail "dist directory not found: ${dist_dir}"
 
-required_patterns=(
-  "Presto-*-macOS-*.dmg"
-  "Presto-*-windows-*-installer.exe"
-  "Presto-*-linux-*.tar.gz"
-  "Presto-*-portable-macOS-*.dmg"
-  "Presto-*-portable-windows-*"
-  "Presto-*-portable-linux-*"
-)
-
-for pattern in "${required_patterns[@]}"; do
+require_match() {
+  local label="$1"
+  local pattern="$2"
+  local allow_portable="${3:-yes}"
   shopt -s nullglob
-  matches=("${dist_dir}"/${pattern})
+  local matches=("${dist_dir}"/${pattern})
   shopt -u nullglob
-  if [[ "${#matches[@]}" -eq 0 ]]; then
-    fail "missing release artifact matching ${pattern}"
+  if [[ "${allow_portable}" == "no" ]]; then
+    local filtered=()
+    local asset
+    for asset in "${matches[@]}"; do
+      [[ "$(basename "${asset}")" == *-portable-* ]] && continue
+      filtered+=("${asset}")
+    done
+    matches=("${filtered[@]}")
   fi
-done
+  if [[ "${#matches[@]}" -eq 0 ]]; then
+    fail "missing ${label} release artifact matching ${pattern}"
+  fi
+}
+
+require_match "default macOS" "Presto-*-macOS-*.dmg" "no"
+require_match "default Windows installer" "Presto-*-windows-*-installer.exe" "no"
+require_match "default Linux" "Presto-*-linux-*.tar.gz" "no"
+require_match "portable macOS" "Presto-*-portable-macOS-*.dmg"
+require_match "portable Windows ZIP fallback" "Presto-*-portable-windows-*.zip"
+
+if [[ "${ALLOW_PORTABLE_TAR_FALLBACK:-0}" == "1" ]]; then
+  shopt -s nullglob
+  portable_linux_appimages=("${dist_dir}"/Presto-*-portable-linux-*.AppImage)
+  shopt -u nullglob
+  if [[ "${#portable_linux_appimages[@]}" -eq 0 ]]; then
+    require_match "portable Linux explicit tar fallback" "Presto-*-portable-linux-*.tar.gz"
+  fi
+else
+  require_match "portable Linux AppImage" "Presto-*-portable-linux-*.AppImage"
+fi
 
 checksums="${dist_dir}/checksums.txt"
 [[ -f "${checksums}" ]] || fail "missing checksums.txt in ${dist_dir}"

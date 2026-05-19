@@ -437,11 +437,13 @@ jobs:
           - goarch: amd64
             runner: ubuntu-22.04
             typst_archive: typst-x86_64-unknown-linux-musl.tar.xz
+            typst_sha256: "a6044cbad2a954deb921167e257e120ac0a16b20339ec01121194ff9d394996d"
             tinymist_archive: tinymist-x86_64-unknown-linux-musl.tar.gz
             tinymist_sha256: "6a7a2b525e9900f3718830f45a8337c5e35e55a54c8ccf7f84cd92209b924e9c"
           - goarch: arm64
             runner: ubuntu-22.04-arm
             typst_archive: typst-aarch64-unknown-linux-musl.tar.xz
+            typst_sha256: "491b101aa40a3a7ea82a3f8a6232cabb4e6a7e233810082e5ac812d43fdcd47a"
             tinymist_archive: tinymist-aarch64-unknown-linux-musl.tar.gz
             tinymist_sha256: "7d85fcb2c60eaa7ed7160dd68f67917f462810a6f42b1940d297e603ddc1d2ab"
     runs-on: ${{ matrix.runner }}
@@ -486,7 +488,7 @@ jobs:
             ./cmd/presto-desktop/
 
       - name: Download typst
-        run: make _download-typst TYPST_ARCHIVE=${{ matrix.typst_archive }} TYPST_OUT=dist/typst
+        run: make _download-typst TYPST_ARCHIVE=${{ matrix.typst_archive }} TYPST_OUT=dist/typst TYPST_SHA256=${{ matrix.typst_sha256 }} REQUIRE_TYPST_SHA256=1
 
       - name: Download tinymist
         run: make _download-tinymist TINYMIST_ARCHIVE=${{ matrix.tinymist_archive }} TINYMIST_OUT=dist/tinymist TINYMIST_SHA256=${{ matrix.tinymist_sha256 }}

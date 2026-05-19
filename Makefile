@@ -41,6 +41,10 @@ TYPST_DARWIN_ARM64 := typst-aarch64-apple-darwin.tar.xz
 TYPST_DARWIN_AMD64 := typst-x86_64-apple-darwin.tar.xz
 TYPST_WINDOWS_AMD64:= typst-x86_64-pc-windows-msvc.zip
 TYPST_LINUX_AMD64  := typst-x86_64-unknown-linux-musl.tar.xz
+TYPST_DARWIN_ARM64_SHA256 := 470aa49a2298d20b65c119a10e4ff8808550453e0cb4d85625b89caf0cedf048
+TYPST_DARWIN_AMD64_SHA256 := 4e91d8e1e33ab164f949c5762e01ee3faa585c8615a2a6bd5e3677fa8506b249
+TYPST_WINDOWS_AMD64_SHA256 := 51353994ac83218c3497052e89b2c432c53b9d4439cdc1b361e2ea4798ebfc13
+TYPST_LINUX_AMD64_SHA256 := a6044cbad2a954deb921167e257e120ac0a16b20339ec01121194ff9d394996d
 TINYMIST_BASE := https://github.com/Myriad-Dreamin/tinymist/releases/download/v$(TINYMIST_VERSION)
 TINYMIST_CACHE_DIR := $(CACHE_DIR)/tinymist/$(TINYMIST_VERSION)
 TINYMIST_DARWIN_ARM64 := tinymist-aarch64-apple-darwin.tar.gz
@@ -81,7 +85,7 @@ endif
 
 desktop: frontend
 ifeq ($(OS),Windows_NT)
-	@"$(MAKE)" _download-typst TYPST_ARCHIVE=$(TYPST_WINDOWS_AMD64) TYPST_OUT=$(DIST)/typst.exe
+	@"$(MAKE)" _download-typst TYPST_ARCHIVE=$(TYPST_WINDOWS_AMD64) TYPST_OUT=$(DIST)/typst.exe TYPST_SHA256=$(TYPST_WINDOWS_AMD64_SHA256)
 	@"$(MAKE)" _download-tinymist TINYMIST_ARCHIVE=$(TINYMIST_WINDOWS_AMD64) TINYMIST_OUT=$(DIST)/tinymist.exe TINYMIST_SHA256=$(TINYMIST_WINDOWS_AMD64_SHA256)
 	@powershell -NoProfile -Command "if (Test-Path '$(DESKTOP_EMBED)/_app') { Remove-Item -Recurse -Force '$(DESKTOP_EMBED)/_app' }"
 	@powershell -NoProfile -Command "Copy-Item -Path 'frontend/build/*' -Destination '$(DESKTOP_EMBED)' -Recurse -Force"
@@ -120,7 +124,7 @@ dev:
 run-desktop:
 ifeq ($(OS),Windows_NT)
 	cd frontend && powershell -NoProfile -Command '$$env:VITE_MOCK="1"; $(NPM) run build'
-	@"$(MAKE)" _download-typst TYPST_ARCHIVE=$(TYPST_WINDOWS_AMD64) TYPST_OUT=$(DIST)/typst.exe
+	@"$(MAKE)" _download-typst TYPST_ARCHIVE=$(TYPST_WINDOWS_AMD64) TYPST_OUT=$(DIST)/typst.exe TYPST_SHA256=$(TYPST_WINDOWS_AMD64_SHA256)
 	@"$(MAKE)" _download-tinymist TINYMIST_ARCHIVE=$(TINYMIST_WINDOWS_AMD64) TINYMIST_OUT=$(DIST)/tinymist.exe TINYMIST_SHA256=$(TINYMIST_WINDOWS_AMD64_SHA256)
 	@powershell -NoProfile -Command "if (Test-Path '$(DESKTOP_EMBED)/_app') { Remove-Item -Recurse -Force '$(DESKTOP_EMBED)/_app' }"
 	@powershell -NoProfile -Command "Copy-Item -Path 'frontend/build/*' -Destination '$(DESKTOP_EMBED)' -Recurse -Force"
@@ -176,7 +180,7 @@ ifeq ($(OS),Windows_NT)
 _download-typst:
 	@powershell -NoProfile -Command "New-Item -ItemType Directory -Force -Path (Split-Path -Parent '$(TYPST_OUT)') | Out-Null"
 	@powershell -NoProfile -Command '$$out = "$(TYPST_OUT)"; $$cache = "$(TYPST_CACHE_DIR)/$(TYPST_ARCHIVE)"; New-Item -ItemType Directory -Force -Path (Split-Path -Parent $$cache) | Out-Null; if (Test-Path $$out) { $$sig = -join ([System.IO.File]::ReadAllBytes($$out)[0..1] | ForEach-Object { [char]$$_ }); if ($$sig -ne "MZ") { if ("$(TYPST_ARCHIVE)" -like "*.zip" -and $$sig -eq "PK" -and -not (Test-Path $$cache)) { Move-Item -LiteralPath $$out -Destination $$cache -Force; Write-Host "==> Recovered cached typst archive $$cache" } else { Remove-Item -LiteralPath $$out -Force } } }'
-	@powershell -NoProfile -Command 'if (-not (Test-Path "$(TYPST_OUT)")) { $$cache = "$(TYPST_CACHE_DIR)/$(TYPST_ARCHIVE)"; New-Item -ItemType Directory -Force -Path (Split-Path -Parent $$cache) | Out-Null; if (-not (Test-Path $$cache)) { Write-Host "==> Downloading typst $(TYPST_VERSION) ($(TYPST_ARCHIVE))..."; & curl.exe -fL --retry 5 --retry-delay 2 --connect-timeout 30 --max-time 600 "$(TYPST_BASE)/$(TYPST_ARCHIVE)" -o $$cache; if ($$LASTEXITCODE -ne 0) { Remove-Item -LiteralPath $$cache -Force -ErrorAction SilentlyContinue; exit $$LASTEXITCODE } } else { Write-Host "==> Using cached typst archive $$cache" }; if ("$(TYPST_SHA256)" -ne "") { $$hash = (Get-FileHash -Algorithm SHA256 $$cache).Hash.ToLowerInvariant(); if ($$hash -ne "$(TYPST_SHA256)") { Remove-Item -LiteralPath $$cache -Force -ErrorAction SilentlyContinue; throw "ERROR: typst checksum verification failed!" } }; $$tmp = Join-Path ([System.IO.Path]::GetTempPath()) ([System.IO.Path]::GetRandomFileName()); New-Item -ItemType Directory -Path $$tmp | Out-Null; try { if ("$(TYPST_ARCHIVE)" -like "*.zip") { Expand-Archive -LiteralPath $$cache -DestinationPath $$tmp -Force } else { & "$$env:SystemRoot\System32\tar.exe" -xf $$cache -C $$tmp; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE } }; $$bin = Get-ChildItem -LiteralPath $$tmp -Recurse -File | Where-Object { $$_.Name -eq "typst.exe" -or $$_.Name -eq "typst" } | Sort-Object @{Expression = { if ($$_.Name -eq "typst.exe") { 0 } else { 1 } }}, @{Expression = "Length"; Descending = $$true} | Select-Object -First 1; if (-not $$bin) { throw "typst binary not found in archive" }; Copy-Item -LiteralPath $$bin.FullName -Destination "$(TYPST_OUT)" -Force; $$outSig = -join ([System.IO.File]::ReadAllBytes("$(TYPST_OUT)")[0..1] | ForEach-Object { [char]$$_ }); if ("$(TYPST_OUT)" -like "*.exe" -and $$outSig -ne "MZ") { Remove-Item -LiteralPath "$(TYPST_OUT)" -Force; throw "extracted typst is not a Windows executable" }; Write-Host "==> $(TYPST_OUT)" } finally { Remove-Item -LiteralPath $$tmp -Recurse -Force -ErrorAction SilentlyContinue } }'
+	@powershell -NoProfile -Command 'if (-not (Test-Path "$(TYPST_OUT)")) { if ("$(REQUIRE_TYPST_SHA256)" -eq "1" -and "$(TYPST_SHA256)" -eq "") { throw "ERROR: TYPST_SHA256 is required" }; $$cache = "$(TYPST_CACHE_DIR)/$(TYPST_ARCHIVE)"; New-Item -ItemType Directory -Force -Path (Split-Path -Parent $$cache) | Out-Null; if (-not (Test-Path $$cache)) { Write-Host "==> Downloading typst $(TYPST_VERSION) ($(TYPST_ARCHIVE))..."; & curl.exe -fL --retry 5 --retry-delay 2 --connect-timeout 30 --max-time 600 "$(TYPST_BASE)/$(TYPST_ARCHIVE)" -o $$cache; if ($$LASTEXITCODE -ne 0) { Remove-Item -LiteralPath $$cache -Force -ErrorAction SilentlyContinue; exit $$LASTEXITCODE } } else { Write-Host "==> Using cached typst archive $$cache" }; if ("$(TYPST_SHA256)" -ne "") { $$hash = (Get-FileHash -Algorithm SHA256 $$cache).Hash.ToLowerInvariant(); if ($$hash -ne "$(TYPST_SHA256)") { Remove-Item -LiteralPath $$cache -Force -ErrorAction SilentlyContinue; throw "ERROR: typst checksum verification failed!" } }; $$tmp = Join-Path ([System.IO.Path]::GetTempPath()) ([System.IO.Path]::GetRandomFileName()); New-Item -ItemType Directory -Path $$tmp | Out-Null; try { if ("$(TYPST_ARCHIVE)" -like "*.zip") { Expand-Archive -LiteralPath $$cache -DestinationPath $$tmp -Force } else { & "$$env:SystemRoot\System32\tar.exe" -xf $$cache -C $$tmp; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE } }; $$bin = Get-ChildItem -LiteralPath $$tmp -Recurse -File | Where-Object { $$_.Name -eq "typst.exe" -or $$_.Name -eq "typst" } | Sort-Object @{Expression = { if ($$_.Name -eq "typst.exe") { 0 } else { 1 } }}, @{Expression = "Length"; Descending = $$true} | Select-Object -First 1; if (-not $$bin) { throw "typst binary not found in archive" }; Copy-Item -LiteralPath $$bin.FullName -Destination "$(TYPST_OUT)" -Force; $$outSig = -join ([System.IO.File]::ReadAllBytes("$(TYPST_OUT)")[0..1] | ForEach-Object { [char]$$_ }); if ("$(TYPST_OUT)" -like "*.exe" -and $$outSig -ne "MZ") { Remove-Item -LiteralPath "$(TYPST_OUT)" -Force; throw "extracted typst is not a Windows executable" }; Write-Host "==> $(TYPST_OUT)" } finally { Remove-Item -LiteralPath $$tmp -Recurse -Force -ErrorAction SilentlyContinue } }'
 else
 _download-typst:
 	@mkdir -p $(dir $(TYPST_OUT))
@@ -190,7 +194,8 @@ _download-typst:
 		else \
 			echo "==> Using cached typst archive $$CACHE"; \
 		fi; \
-		TMP=$$(mktemp -d); \
+			test "$(REQUIRE_TYPST_SHA256)" != "1" -o -n "$(TYPST_SHA256)" || { echo "ERROR: TYPST_SHA256 is required"; exit 1; }; \
+			TMP=$$(mktemp -d); \
 		if [ -n "$(TYPST_SHA256)" ]; then \
 			echo "$(TYPST_SHA256)  $$CACHE" | shasum -a 256 -c - || \
 			{ echo "ERROR: typst checksum verification failed!"; rm -f "$$CACHE"; rm -rf "$$TMP"; exit 1; }; \
@@ -278,8 +283,8 @@ _build-macos-arm64: _frontend-embed
 		CGO_LDFLAGS="-framework UniformTypeIdentifiers" \
 		go build -tags "$(WAILS_TAGS)" -ldflags "$(LDFLAGS)" \
 		-o $(DIST)/_bin/presto-darwin-arm64 $(DESKTOP_SRC)/ ) & PID_GO=$$!; \
-	( $(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_DARWIN_ARM64) \
-		TYPST_OUT=$(DIST)/_bin/typst-darwin-arm64 ) & PID_TYPST=$$!; \
+		( $(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_DARWIN_ARM64) \
+			TYPST_OUT=$(DIST)/_bin/typst-darwin-arm64 TYPST_SHA256=$(TYPST_DARWIN_ARM64_SHA256) REQUIRE_TYPST_SHA256=1 ) & PID_TYPST=$$!; \
 	( $(MAKE) _download-tinymist TINYMIST_ARCHIVE=$(TINYMIST_DARWIN_ARM64) \
 		TINYMIST_SHA256=$(TINYMIST_DARWIN_ARM64_SHA256) \
 		TINYMIST_OUT=$(DIST)/_bin/tinymist-darwin-arm64 ) & PID_TINYMIST=$$!; \
@@ -294,8 +299,8 @@ _build-macos-amd64: _frontend-embed
 		CGO_LDFLAGS="-framework UniformTypeIdentifiers" \
 		go build -tags "$(WAILS_TAGS)" -ldflags "$(LDFLAGS)" \
 		-o $(DIST)/_bin/presto-darwin-amd64 $(DESKTOP_SRC)/ ) & PID_GO=$$!; \
-	( $(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_DARWIN_AMD64) \
-		TYPST_OUT=$(DIST)/_bin/typst-darwin-amd64 ) & PID_TYPST=$$!; \
+		( $(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_DARWIN_AMD64) \
+			TYPST_OUT=$(DIST)/_bin/typst-darwin-amd64 TYPST_SHA256=$(TYPST_DARWIN_AMD64_SHA256) REQUIRE_TYPST_SHA256=1 ) & PID_TYPST=$$!; \
 	( $(MAKE) _download-tinymist TINYMIST_ARCHIVE=$(TINYMIST_DARWIN_AMD64) \
 		TINYMIST_SHA256=$(TINYMIST_DARWIN_AMD64_SHA256) \
 		TINYMIST_OUT=$(DIST)/_bin/tinymist-darwin-amd64 ) & PID_TINYMIST=$$!; \
@@ -408,8 +413,8 @@ _build-macos-portable-arm64: _frontend-embed-portable
 		CGO_LDFLAGS="-framework UniformTypeIdentifiers" \
 		go build -tags "$(WAILS_TAGS)" -ldflags "$(PORTABLE_LDFLAGS)" \
 		-o $(DIST)/_bin/presto-portable-darwin-arm64 $(DESKTOP_SRC)/ ) & PID_GO=$$!; \
-	( $(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_DARWIN_ARM64) \
-		TYPST_OUT=$(DIST)/_bin/typst-darwin-arm64 ) & PID_TYPST=$$!; \
+		( $(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_DARWIN_ARM64) \
+			TYPST_OUT=$(DIST)/_bin/typst-darwin-arm64 TYPST_SHA256=$(TYPST_DARWIN_ARM64_SHA256) REQUIRE_TYPST_SHA256=1 ) & PID_TYPST=$$!; \
 	( $(MAKE) _download-tinymist TINYMIST_ARCHIVE=$(TINYMIST_DARWIN_ARM64) \
 		TINYMIST_SHA256=$(TINYMIST_DARWIN_ARM64_SHA256) \
 		TINYMIST_OUT=$(DIST)/_bin/tinymist-darwin-arm64 ) & PID_TINYMIST=$$!; \
@@ -424,8 +429,8 @@ _build-macos-portable-amd64: _frontend-embed-portable
 		CGO_LDFLAGS="-framework UniformTypeIdentifiers" \
 		go build -tags "$(WAILS_TAGS)" -ldflags "$(PORTABLE_LDFLAGS)" \
 		-o $(DIST)/_bin/presto-portable-darwin-amd64 $(DESKTOP_SRC)/ ) & PID_GO=$$!; \
-	( $(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_DARWIN_AMD64) \
-		TYPST_OUT=$(DIST)/_bin/typst-darwin-amd64 ) & PID_TYPST=$$!; \
+		( $(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_DARWIN_AMD64) \
+			TYPST_OUT=$(DIST)/_bin/typst-darwin-amd64 TYPST_SHA256=$(TYPST_DARWIN_AMD64_SHA256) REQUIRE_TYPST_SHA256=1 ) & PID_TYPST=$$!; \
 	( $(MAKE) _download-tinymist TINYMIST_ARCHIVE=$(TINYMIST_DARWIN_AMD64) \
 		TINYMIST_SHA256=$(TINYMIST_DARWIN_AMD64_SHA256) \
 		TINYMIST_OUT=$(DIST)/_bin/tinymist-darwin-amd64 ) & PID_TINYMIST=$$!; \
@@ -505,7 +510,7 @@ ifeq ($(OS),Windows_NT)
 dist-windows-amd64: _frontend-embed
 	@powershell -NoProfile -Command "New-Item -ItemType Directory -Force -Path '$(DIST)','$(DIST)\\_bin' | Out-Null"
 	@powershell -NoProfile -Command "Remove-Item -Force '$(DIST)\\$(APP_NAME)-$(VERSION)-windows.exe' -ErrorAction SilentlyContinue; if (Test-Path '$(DIST)\\$(APP_NAME)-$(VERSION)-windows.exe') { throw 'Cannot replace $(DIST)\\$(APP_NAME)-$(VERSION)-windows.exe. Close the running Presto app and retry.' }"
-	@"$(MAKE)" _download-typst TYPST_ARCHIVE=$(TYPST_WINDOWS_AMD64) TYPST_OUT=$(DIST)/typst.exe
+	@"$(MAKE)" _download-typst TYPST_ARCHIVE=$(TYPST_WINDOWS_AMD64) TYPST_OUT=$(DIST)/typst.exe TYPST_SHA256=$(TYPST_WINDOWS_AMD64_SHA256) REQUIRE_TYPST_SHA256=1
 	@"$(MAKE)" _download-tinymist TINYMIST_ARCHIVE=$(TINYMIST_WINDOWS_AMD64) TINYMIST_OUT=$(DIST)/tinymist.exe TINYMIST_SHA256=$(TINYMIST_WINDOWS_AMD64_SHA256)
 	@"$(MAKE)" _download-vc-redist VC_REDIST_URL=$(VC_REDIST_AMD64_URL) VC_REDIST_OUT=$(DIST)/vc_redist.x64.exe
 	@cd $(DESKTOP_SRC) && go run github.com/tc-hib/go-winres@latest make --in winres.json
@@ -521,8 +526,8 @@ dist-windows-amd64: _frontend-embed
 		CC=x86_64-w64-mingw32-gcc \
 		go build -tags "$(WAILS_TAGS)" -ldflags "$(LDFLAGS) -H windowsgui" \
 		-o "$(DIST)/$(APP_NAME)-$(VERSION)-windows.exe" $(DESKTOP_SRC)/ ) & PID_GO=$$!; \
-	( $(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_WINDOWS_AMD64) \
-		TYPST_OUT=$(DIST)/typst.exe ) & PID_TYPST=$$!; \
+		( $(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_WINDOWS_AMD64) \
+			TYPST_OUT=$(DIST)/typst.exe TYPST_SHA256=$(TYPST_WINDOWS_AMD64_SHA256) REQUIRE_TYPST_SHA256=1 ) & PID_TYPST=$$!; \
 	( $(MAKE) _download-tinymist TINYMIST_ARCHIVE=$(TINYMIST_WINDOWS_AMD64) \
 		TINYMIST_OUT=$(DIST)/tinymist.exe TINYMIST_SHA256=$(TINYMIST_WINDOWS_AMD64_SHA256) ) & PID_TINYMIST=$$!; \
 	( $(MAKE) _download-vc-redist VC_REDIST_URL=$(VC_REDIST_AMD64_URL) \
@@ -542,7 +547,7 @@ dist-windows: dist-windows-amd64
 ifeq ($(OS),Windows_NT)
 dist-windows-portable-amd64: _frontend-embed-portable
 	@powershell -NoProfile -Command "New-Item -ItemType Directory -Force -Path '$(DIST)','$(DIST)\\_portable-windows-amd64' | Out-Null"
-	@"$(MAKE)" _download-typst TYPST_ARCHIVE=$(TYPST_WINDOWS_AMD64) TYPST_OUT=$(DIST)/typst.exe
+	@"$(MAKE)" _download-typst TYPST_ARCHIVE=$(TYPST_WINDOWS_AMD64) TYPST_OUT=$(DIST)/typst.exe TYPST_SHA256=$(TYPST_WINDOWS_AMD64_SHA256) REQUIRE_TYPST_SHA256=1
 	@"$(MAKE)" _download-tinymist TINYMIST_ARCHIVE=$(TINYMIST_WINDOWS_AMD64) TINYMIST_OUT=$(DIST)/tinymist.exe TINYMIST_SHA256=$(TINYMIST_WINDOWS_AMD64_SHA256)
 	@cd $(DESKTOP_SRC) && go run github.com/tc-hib/go-winres@latest make --in winres.json
 	@powershell -NoProfile -Command '$$env:GOOS="windows"; $$env:GOARCH="amd64"; $$env:CGO_ENABLED="0"; & go build -tags "$(WAILS_TAGS)" -ldflags "$(PORTABLE_LDFLAGS) -H windowsgui" -o "$(DIST)\\_portable-windows-amd64\\$(APP_NAME).exe" "$(DESKTOP_SRC)/"; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }'
@@ -561,8 +566,8 @@ dist-windows-portable-amd64: _frontend-embed-portable
 		CC=x86_64-w64-mingw32-gcc \
 		go build -tags "$(WAILS_TAGS)" -ldflags "$(PORTABLE_LDFLAGS) -H windowsgui" \
 		-o "$(DIST)/_portable-windows-amd64/$(APP_NAME).exe" $(DESKTOP_SRC)/ ) & PID_GO=$$!; \
-	( $(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_WINDOWS_AMD64) \
-		TYPST_OUT=$(DIST)/_portable-windows-amd64/typst.exe ) & PID_TYPST=$$!; \
+		( $(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_WINDOWS_AMD64) \
+			TYPST_OUT=$(DIST)/_portable-windows-amd64/typst.exe TYPST_SHA256=$(TYPST_WINDOWS_AMD64_SHA256) REQUIRE_TYPST_SHA256=1 ) & PID_TYPST=$$!; \
 	( $(MAKE) _download-tinymist TINYMIST_ARCHIVE=$(TINYMIST_WINDOWS_AMD64) \
 		TINYMIST_OUT=$(DIST)/_portable-windows-amd64/tinymist.exe TINYMIST_SHA256=$(TINYMIST_WINDOWS_AMD64_SHA256) ) & PID_TINYMIST=$$!; \
 	wait $$PID_GO || exit 1; \
@@ -594,7 +599,7 @@ dist-linux-amd64: frontend
 			cp -r frontend/build/* cmd/presto-desktop/build/ && \
 			go build -tags "$(WAILS_TAGS)" -ldflags "$(LDFLAGS)" \
 				-o dist/$(APP_NAME)-$(VERSION)-linux $(DESKTOP_SRC)/'
-	@$(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_LINUX_AMD64) TYPST_OUT=$(DIST)/typst
+	@$(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_LINUX_AMD64) TYPST_OUT=$(DIST)/typst TYPST_SHA256=$(TYPST_LINUX_AMD64_SHA256) REQUIRE_TYPST_SHA256=1
 	@$(MAKE) _download-tinymist TINYMIST_ARCHIVE=$(TINYMIST_LINUX_AMD64) TINYMIST_OUT=$(DIST)/tinymist TINYMIST_SHA256=$(TINYMIST_LINUX_AMD64_SHA256)
 	@echo "==> $(DIST)/$(APP_NAME)-$(VERSION)-linux + typst + tinymist"
 
@@ -618,7 +623,7 @@ dist-linux-portable-amd64: _frontend-embed-portable
 			cp -r frontend/build/* cmd/presto-desktop/build/ && \
 			go build -tags "$(WAILS_TAGS)" -ldflags "$(PORTABLE_LDFLAGS)" \
 				-o dist/_appimage/$(APP_NAME).AppDir/usr/bin/$(APP_NAME) $(DESKTOP_SRC)/'
-	@$(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_LINUX_AMD64) TYPST_OUT=$(DIST)/_appimage/$(APP_NAME).AppDir/usr/bin/typst
+	@$(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_LINUX_AMD64) TYPST_OUT=$(DIST)/_appimage/$(APP_NAME).AppDir/usr/bin/typst TYPST_SHA256=$(TYPST_LINUX_AMD64_SHA256) REQUIRE_TYPST_SHA256=1
 	@$(MAKE) _download-tinymist TINYMIST_ARCHIVE=$(TINYMIST_LINUX_AMD64) TINYMIST_OUT=$(DIST)/_appimage/$(APP_NAME).AppDir/usr/bin/tinymist TINYMIST_SHA256=$(TINYMIST_LINUX_AMD64_SHA256)
 	bash packaging/release/portable-templates.sh "$(DIST)/_appimage/$(APP_NAME).AppDir/usr/share/presto"
 	cp -R "$(DIST)/_appimage/$(APP_NAME).AppDir/usr/share/presto/templates" "$(DIST)/_appimage/$(APP_NAME).AppDir/usr/bin/templates"

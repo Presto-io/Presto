@@ -157,7 +157,11 @@ func main() {
 		migrateLegacyDataAndExit(dirs)
 		return
 	}
+	capabilities := currentReleaseCapabilities()
 	if downloadTemplates {
+		if !capabilities.OnlineRegistry || !capabilities.OnlineTemplateStore {
+			log.Fatal("download-templates is disabled in this release channel")
+		}
 		downloadTemplatesAndExit(dirs)
 		return
 	}
@@ -182,7 +186,6 @@ func main() {
 	if err := appdata.MarkGenerated(prestoDir); err != nil {
 		logger.Warn("[presto] failed to mark generated app data", "error", err)
 	}
-	capabilities := currentReleaseCapabilities()
 	exeDir := ""
 	if exePath, err := os.Executable(); err == nil {
 		if resolved, err := filepath.EvalSymlinks(exePath); err == nil {
