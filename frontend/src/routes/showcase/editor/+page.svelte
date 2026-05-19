@@ -3,7 +3,6 @@
   import { page } from '$app/stores';
   import Editor from '$lib/components/Editor.svelte';
   import Preview from '$lib/components/Preview.svelte';
-  import DOMPurify from 'dompurify';
   import { Download, Settings, FolderOpen, Layers, Loader } from 'lucide-svelte';
   import { gongwenExample, jiaoanExample } from '$lib/showcase/presets';
   import gongwenPage1 from '$lib/showcase/svg/gongwen-page-1.svg?raw';
@@ -25,7 +24,9 @@
   let error = $state('');
 
   const REGISTRY_BASE = 'https://presto.c-1o.top/templates';
-  const FETCH_INIT: RequestInit = { cache: 'no-store' };
+  const REGISTRY_FETCH_INIT: RequestInit = { cache: 'default' };
+  const PREVIEW_FETCH_INIT: RequestInit = { cache: 'force-cache' };
+  let loadSeq = 0;
 
   function applyLocalPreset(id: string) {
     const local = localPresets[id];
@@ -37,17 +38,47 @@
     return true;
   }
 
+  async function fetchPreviewPage(id: string, pageNumber: number, versionToken: string): Promise<string | null> {
+    const svgRes = await fetch(`${REGISTRY_BASE}/${id}/preview-${pageNumber}.svg${versionToken}`, PREVIEW_FETCH_INIT);
+    if (!svgRes.ok) return null;
+    return svgRes.text();
+  }
+
+  function queueRemainingPreviewPages(id: string, versionToken: string, seq: number) {
+    requestAnimationFrame(() => {
+      void loadRemainingPreviewPages(id, versionToken, seq);
+    });
+  }
+
+  async function loadRemainingPreviewPages(id: string, versionToken: string, seq: number) {
+    const pages = [...svgPages];
+    for (let i = 2; i <= 5; i++) {
+      try {
+        const svg = await fetchPreviewPage(id, i, versionToken);
+        if (seq !== loadSeq) return;
+        if (!svg) break;
+        pages[i - 1] = svg;
+        svgPages = pages.filter(Boolean);
+      } catch {
+        break;
+      }
+    }
+  }
+
   async function loadFromRegistry(id: string) {
+    const seq = ++loadSeq;
     loading = true;
     error = '';
+    svgPages = [];
 
     try {
       const [exampleRes, manifestRes] = await Promise.all([
-        fetch(`${REGISTRY_BASE}/${id}/example.md`, FETCH_INIT),
-        fetch(`${REGISTRY_BASE}/${id}/manifest.json`, FETCH_INIT),
+        fetch(`${REGISTRY_BASE}/${id}/example.md`, REGISTRY_FETCH_INIT),
+        fetch(`${REGISTRY_BASE}/${id}/manifest.json`, REGISTRY_FETCH_INIT),
       ]);
 
       if (!exampleRes.ok) throw new Error(`模板 "${id}" 未找到`);
+      if (seq !== loadSeq) return;
 
       editorValue = await exampleRes.text();
       const manifest = manifestRes.ok ? await manifestRes.json() : null;
@@ -59,23 +90,16 @@
         templateName = id;
       }
 
-      const svgs: string[] = [];
-      for (let i = 1; i <= 5; i++) {
-        try {
-          const svgRes = await fetch(`${REGISTRY_BASE}/${id}/preview-${i}.svg${versionToken}`, FETCH_INIT);
-          if (!svgRes.ok) break;
-          const svg = await svgRes.text();
-          svgs.push(DOMPurify.sanitize(svg, {
-            USE_PROFILES: { svg: true, svgFilters: true },
-            ADD_TAGS: ['use'],
-            ADD_ATTR: ['xlink:href', 'clip-path', 'fill-rule', 'transform'],
-          }));
-        } catch {
-          break;
-        }
+      const firstSvg = await fetchPreviewPage(id, 1, versionToken);
+      if (seq !== loadSeq) return;
+      if (firstSvg) {
+        svgPages = [firstSvg];
+        queueRemainingPreviewPages(id, versionToken, seq);
+      } else {
+        svgPages = [];
       }
-      svgPages = svgs;
     } catch (e) {
+      if (seq !== loadSeq) return;
       if (!applyLocalPreset(id)) {
         error = e instanceof Error ? e.message : String(e);
         editorValue = '';
@@ -83,7 +107,9 @@
         templateName = id;
       }
     } finally {
-      loading = false;
+      if (seq === loadSeq) {
+        loading = false;
+      }
     }
   }
 

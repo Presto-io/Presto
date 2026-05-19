@@ -216,7 +216,7 @@ func main() {
 	compiler := typst.NewCompilerWithRoot(os.TempDir())
 	compiler.BinPath = typstBin
 	compiler.FontPaths = fontPaths
-	compiler.AvailableFonts = compiler.ListFonts()
+	compiler.WarmFontsAsync()
 	apiHandler := api.NewServer(api.ServerOptions{
 		TemplatesDir:        templatesDir,
 		BuiltinTemplatesDir: builtinTemplatesDir,

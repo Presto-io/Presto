@@ -16,13 +16,23 @@
     onscroll?: (ratio: number) => void;
   } = $props();
 
+  const sanitizedSvgCache = new Map<string, string>();
+
   // SEC-04: Sanitize SVG to prevent XSS via <script>, <foreignObject>, event handlers
   function sanitizeSvg(svg: string): string {
-    return DOMPurify.sanitize(svg, {
+    const cached = sanitizedSvgCache.get(svg);
+    if (cached !== undefined) return cached;
+
+    const sanitized = DOMPurify.sanitize(svg, {
       USE_PROFILES: { svg: true, svgFilters: true },
       ADD_TAGS: ['use'],
       ADD_ATTR: ['xlink:href', 'clip-path', 'fill-rule', 'transform'],
     });
+    if (sanitizedSvgCache.size > 24) {
+      sanitizedSvgCache.clear();
+    }
+    sanitizedSvgCache.set(svg, sanitized);
+    return sanitized;
   }
 
   let container: HTMLDivElement;

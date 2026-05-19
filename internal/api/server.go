@@ -22,7 +22,6 @@ type Server struct {
 	registry       *template.RegistryCache
 	capabilities   ReleaseCapabilities
 	importOptions  TemplateImportOptions
-	availableFonts map[string]bool // cached from typst fonts at startup
 	skillManager   *skill.SkillManager
 	previewService *preview.Service
 }
@@ -85,8 +84,7 @@ func NewServer(opts ServerOptions) http.Handler {
 	compiler := typst.NewCompilerWithRoot(compilerRoot)
 	compiler.BinPath = opts.TypstBin
 	compiler.FontPaths = opts.FontPaths
-	availableFonts := compiler.ListFonts()
-	compiler.AvailableFonts = availableFonts
+	compiler.WarmFontsAsync()
 
 	capabilities := normalizeReleaseCapabilities(opts.Capabilities)
 	importOptions := TemplateImportOptions{}
@@ -101,7 +99,6 @@ func NewServer(opts ServerOptions) http.Handler {
 		registry:       opts.Registry,
 		capabilities:   capabilities,
 		importOptions:  importOptions,
-		availableFonts: availableFonts,
 		skillManager:   skill.NewManager(),
 		previewService: preview.NewService(),
 	}

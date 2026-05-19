@@ -53,6 +53,25 @@ func (c *Compiler) availableFonts() map[string]bool {
 	return c.AvailableFonts
 }
 
+func (c *Compiler) WarmFontsAsync() {
+	go c.availableFonts()
+}
+
+func (c *Compiler) CachedFonts() map[string]bool {
+	if !c.fontMu.TryLock() {
+		return nil
+	}
+	defer c.fontMu.Unlock()
+	if c.AvailableFonts == nil {
+		return nil
+	}
+	fonts := make(map[string]bool, len(c.AvailableFonts))
+	for name, ok := range c.AvailableFonts {
+		fonts[name] = ok
+	}
+	return fonts
+}
+
 // ListFonts returns the set of available font family names.
 func (c *Compiler) ListFonts() map[string]bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

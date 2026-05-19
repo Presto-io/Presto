@@ -63,6 +63,7 @@ func (s *Server) handleListTemplates(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result := make([]templateInfo, 0, len(templates))
+	availableFonts := s.compiler.CachedFonts()
 	for _, t := range templates {
 		info := templateInfo{
 			Name:        t.Manifest.Name,
@@ -73,13 +74,15 @@ func (s *Server) handleListTemplates(w http.ResponseWriter, r *http.Request) {
 			Builtin:     t.Builtin,
 			Keywords:    t.Manifest.Keywords,
 		}
-		for _, f := range t.Manifest.RequiredFonts {
-			if !typst.HasCompatibleFont(f.Name, s.availableFonts) {
-				info.MissingFonts = append(info.MissingFonts, missingFont{
-					Name:        f.Name,
-					DisplayName: f.DisplayName,
-					URL:         f.URL,
-				})
+		if len(availableFonts) > 0 {
+			for _, f := range t.Manifest.RequiredFonts {
+				if !typst.HasCompatibleFont(f.Name, availableFonts) {
+					info.MissingFonts = append(info.MissingFonts, missingFont{
+						Name:        f.Name,
+						DisplayName: f.DisplayName,
+						URL:         f.URL,
+					})
+				}
 			}
 		}
 		result = append(result, info)
