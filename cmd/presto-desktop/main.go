@@ -4,11 +4,13 @@ import (
 	"context"
 	"embed"
 	"flag"
+	"fmt"
 	"io/fs"
 	"log"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -180,16 +182,24 @@ func main() {
 	if err := appdata.MarkGenerated(prestoDir); err != nil {
 		logger.Warn("[presto] failed to mark generated app data", "error", err)
 	}
-	typstBin := findTypstBinary()
-	logger.Info("[presto] using typst", "path", typstBin)
-	tinymistBin := findTinymistBinary()
-	logger.Info("[presto] using tinymist", "path", tinymistBin)
 	capabilities := currentReleaseCapabilities()
+	exeDir := ""
+	if exePath, err := os.Executable(); err == nil {
+		if resolved, err := filepath.EvalSymlinks(exePath); err == nil {
+			exePath = resolved
+		}
+		exeDir = filepath.Dir(exePath)
+	}
+	if err := validatePortablePackagedRuntimes(capabilities, exeDir, runtime.GOOS, runtime.GOARCH); err != nil {
+		log.Fatal(err)
+	}
+	typstBin := findTypstBinaryFrom(exeDir, dirs.DataDir, runtime.GOOS, exec.LookPath)
+	logger.Info("[presto] using typst", "path", typstBin)
+	tinymistBin := findTinymistBinaryFrom(exeDir, dirs.DataDir, runtime.GOOS, runtime.GOARCH, exec.LookPath)
+	logger.Info("[presto] using tinymist", "path", tinymistBin)
 	builtinTemplatesDir := ""
 	if capabilities.PackagedRuntimes || capabilities.ReleaseChannel == "portable" {
-		if exePath, err := os.Executable(); err == nil {
-			builtinTemplatesDir = template.ResolveBuiltinTemplatesDir(filepath.Dir(exePath), runtime.GOOS)
-		}
+		builtinTemplatesDir = template.ResolveBuiltinTemplatesDir(exeDir, runtime.GOOS)
 	}
 	manager := template.NewManagerWithBuiltin(templatesDir, builtinTemplatesDir)
 	var registry *template.RegistryCache
@@ -308,4 +318,17 @@ func main() {
 	if err != nil {
 		println("Error:", err.Error())
 	}
+}
+
+func validatePortablePackagedRuntimes(capabilities ReleaseCapabilities, exeDir string, goos string, goarch string) error {
+	if !capabilities.PackagedRuntimes {
+		return nil
+	}
+	if findPackagedTypstBinary(exeDir, goos) == "" {
+		return fmt.Errorf("portable packaged runtime missing: typst")
+	}
+	if findPackagedTinymistBinary(exeDir, goos, goarch) == "" {
+		return fmt.Errorf("portable packaged runtime missing: tinymist")
+	}
+	return nil
 }

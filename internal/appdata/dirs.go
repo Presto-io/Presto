@@ -101,6 +101,10 @@ func (d Dirs) FontsDir() string {
 	return filepath.Join(d.DataDir, "fonts")
 }
 
+func (d Dirs) RuntimesDir() string {
+	return filepath.Join(d.DataDir, "runtimes")
+}
+
 func (d Dirs) WebViewDataDir() string {
 	return filepath.Join(d.CacheDir, "WebView2")
 }

@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -18,7 +19,7 @@ func TestFindTinymistBinaryFromPrefersBundledSidecar(t *testing.T) {
 		t.Fatalf("write sidecar: %v", err)
 	}
 
-	got := findTinymistBinaryFrom(exeDir, "darwin", "arm64", func(name string) (string, error) {
+	got := findTinymistBinaryFrom(exeDir, "", "darwin", "arm64", func(name string) (string, error) {
 		t.Fatalf("lookPath should not be called when bundled sidecar exists, got %q", name)
 		return "", errors.New("unreachable")
 	})
@@ -45,7 +46,7 @@ func TestFindTinymistBinaryFromPrefersResourcesBeforeSidecar(t *testing.T) {
 		t.Fatalf("write sidecar tinymist: %v", err)
 	}
 
-	got := findTinymistBinaryFrom(exeDir, "darwin", "arm64", func(name string) (string, error) {
+	got := findTinymistBinaryFrom(exeDir, "", "darwin", "arm64", func(name string) (string, error) {
 		t.Fatalf("lookPath should not be called when resources tinymist exists, got %q", name)
 		return "", errors.New("unreachable")
 	})
@@ -69,7 +70,7 @@ func TestFindTinymistBinaryFromPrefersResourcesBeforeBesideExecutable(t *testing
 		t.Fatalf("write beside tinymist: %v", err)
 	}
 
-	got := findTinymistBinaryFrom(exeDir, "darwin", "arm64", func(name string) (string, error) {
+	got := findTinymistBinaryFrom(exeDir, "", "darwin", "arm64", func(name string) (string, error) {
 		t.Fatalf("lookPath should not be called when resources tinymist exists, got %q", name)
 		return "", errors.New("unreachable")
 	})
@@ -89,7 +90,7 @@ func TestFindTinymistBinaryFromFindsDevDistBinary(t *testing.T) {
 		t.Fatalf("write dist tinymist.exe: %v", err)
 	}
 
-	got := findTinymistBinaryFrom(exeDir, "windows", "amd64", func(name string) (string, error) {
+	got := findTinymistBinaryFrom(exeDir, "", "windows", "amd64", func(name string) (string, error) {
 		t.Fatalf("lookPath should not be called when dev dist tinymist.exe exists, got %q", name)
 		return "", errors.New("unreachable")
 	})
@@ -102,7 +103,7 @@ func TestFindTinymistBinaryFromFindsDevDistBinary(t *testing.T) {
 func TestFindTinymistBinaryFromWindowsUsesPathExe(t *testing.T) {
 	want := filepath.Join("C:", "Tools", "tinymist.exe")
 
-	got := findTinymistBinaryFrom("", "windows", "amd64", func(name string) (string, error) {
+	got := findTinymistBinaryFrom("", "", "windows", "amd64", func(name string) (string, error) {
 		if name == "tinymist.exe" {
 			return want, nil
 		}
@@ -114,8 +115,54 @@ func TestFindTinymistBinaryFromWindowsUsesPathExe(t *testing.T) {
 	}
 }
 
+func TestFindTinymistBinaryFromPackagedResourceBeatsUserDataRuntime(t *testing.T) {
+	exeDir := t.TempDir()
+	dataDir := t.TempDir()
+	packaged := filepath.Join(exeDir, "..", "Resources", "tinymist")
+	userRuntime := filepath.Join(dataDir, "runtimes", "tinymist", "v2.0.0", "darwin-arm64", "tinymist")
+	for _, p := range []string{packaged, userRuntime} {
+		if err := os.MkdirAll(filepath.Dir(p), 0755); err != nil {
+			t.Fatalf("create dir: %v", err)
+		}
+		if err := os.WriteFile(p, []byte("stub"), 0755); err != nil {
+			t.Fatalf("write runtime: %v", err)
+		}
+	}
+
+	got := findTinymistBinaryFrom(exeDir, dataDir, "darwin", "arm64", func(name string) (string, error) {
+		t.Fatalf("lookPath should not be called when packaged tinymist exists, got %q", name)
+		return "", errors.New("unreachable")
+	})
+
+	if got != packaged {
+		t.Fatalf("expected packaged tinymist %q, got %q", packaged, got)
+	}
+}
+
+func TestFindTinymistBinaryFromUserDataRuntimeBeatsPath(t *testing.T) {
+	dataDir := t.TempDir()
+	userRuntime := filepath.Join(dataDir, "runtimes", "tinymist", "v2.0.0", runtime.GOOS+"-"+runtime.GOARCH, "tinymist")
+	if runtime.GOOS == "windows" {
+		userRuntime += ".exe"
+	}
+	if err := os.MkdirAll(filepath.Dir(userRuntime), 0755); err != nil {
+		t.Fatalf("create runtime dir: %v", err)
+	}
+	if err := os.WriteFile(userRuntime, []byte("stub"), 0755); err != nil {
+		t.Fatalf("write user runtime: %v", err)
+	}
+
+	got := findTinymistBinaryFrom("", dataDir, runtime.GOOS, runtime.GOARCH, func(name string) (string, error) {
+		return filepath.Join("PATH", name), nil
+	})
+
+	if got != userRuntime {
+		t.Fatalf("expected user data runtime %q, got %q", userRuntime, got)
+	}
+}
+
 func TestFindTinymistBinaryFromWindowsDoesNotBypassErrDot(t *testing.T) {
-	got := findTinymistBinaryFrom("", "windows", "amd64", func(name string) (string, error) {
+	got := findTinymistBinaryFrom("", "", "windows", "amd64", func(name string) (string, error) {
 		if name == "tinymist.exe" {
 			return `.\tinymist.exe`, exec.ErrDot
 		}
