@@ -20,6 +20,7 @@ CHANNEL      ?= slim
 LDFLAGS      := -s -w -X main.version=$(VERSION)
 PORTABLE_LDFLAGS := $(LDFLAGS) -X main.releaseChannel=portable
 PORTABLE_FRONTEND_ENV := VITE_PRESTO_CHANNEL=portable
+PORTABLE_LINUX_BUILD ?= docker
 # Release matrix contract: default Presto-$(VERSION)-macOS-$(1).dmg remains unchanged.
 # Portable additions: Presto-$(VERSION)-portable-macOS-$(1).dmg,
 # Presto-$(VERSION)-portable-windows-amd64.exe target with ZIP fallback until
@@ -607,22 +608,29 @@ dist-linux: dist-linux-amd64
 
 dist-linux-portable-amd64: _frontend-embed-portable
 	@mkdir -p $(DIST)
-	@command -v docker >/dev/null 2>&1 || \
-		{ echo "Error: Docker not found. Linux portable builds require Docker."; exit 1; }
 	@rm -rf "$(DIST)/_appimage"
 	@mkdir -p "$(DIST)/_appimage/$(APP_NAME).AppDir/usr/bin" "$(DIST)/_appimage/$(APP_NAME).AppDir/usr/share/presto"
-	docker run --rm \
-		-v "$(PWD)":/src \
-		-w /src \
-		-e GOOS=linux -e GOARCH=amd64 -e CGO_ENABLED=1 \
-		golang:1.26.3 \
-		bash -c '\
-			apt-get update -qq && \
-			apt-get install -y -qq libgtk-3-dev libwebkit2gtk-4.0-dev pkg-config > /dev/null 2>&1 && \
-			rm -rf cmd/presto-desktop/build/_app && \
-			cp -r frontend/build/* cmd/presto-desktop/build/ && \
-			go build -tags "$(WAILS_TAGS)" -ldflags "$(PORTABLE_LDFLAGS)" \
-				-o dist/_appimage/$(APP_NAME).AppDir/usr/bin/$(APP_NAME) $(DESKTOP_SRC)/'
+	@if [ "$(PORTABLE_LINUX_BUILD)" = "native" ]; then \
+		rm -rf cmd/presto-desktop/build/_app && \
+		cp -r frontend/build/* cmd/presto-desktop/build/ && \
+		GOOS=linux GOARCH=amd64 CGO_ENABLED=1 go build -tags "$(WAILS_TAGS)" -ldflags "$(PORTABLE_LDFLAGS)" \
+			-o dist/_appimage/$(APP_NAME).AppDir/usr/bin/$(APP_NAME) $(DESKTOP_SRC)/; \
+	else \
+		command -v docker >/dev/null 2>&1 || \
+			{ echo "Error: Docker not found. Linux portable builds require Docker."; exit 1; }; \
+		docker run --rm \
+			-v "$(PWD)":/src \
+			-w /src \
+			-e GOOS=linux -e GOARCH=amd64 -e CGO_ENABLED=1 \
+			golang:1.26.3 \
+			bash -c '\
+				apt-get update -qq && \
+				apt-get install -y -qq libgtk-3-dev libwebkit2gtk-4.0-dev pkg-config > /dev/null 2>&1 && \
+				rm -rf cmd/presto-desktop/build/_app && \
+				cp -r frontend/build/* cmd/presto-desktop/build/ && \
+				go build -tags "$(WAILS_TAGS)" -ldflags "$(PORTABLE_LDFLAGS)" \
+					-o dist/_appimage/$(APP_NAME).AppDir/usr/bin/$(APP_NAME) $(DESKTOP_SRC)/'; \
+	fi
 	@$(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_LINUX_AMD64) TYPST_OUT=$(DIST)/_appimage/$(APP_NAME).AppDir/usr/bin/typst TYPST_SHA256=$(TYPST_LINUX_AMD64_SHA256) REQUIRE_TYPST_SHA256=1
 	@$(MAKE) _download-tinymist TINYMIST_ARCHIVE=$(TINYMIST_LINUX_AMD64) TINYMIST_OUT=$(DIST)/_appimage/$(APP_NAME).AppDir/usr/bin/tinymist TINYMIST_SHA256=$(TINYMIST_LINUX_AMD64_SHA256)
 	bash packaging/release/portable-templates.sh "$(DIST)/_appimage/$(APP_NAME).AppDir/usr/share/presto"

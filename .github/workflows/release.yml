@@ -521,7 +521,7 @@ jobs:
         if: matrix.goarch == 'amd64'
         env:
           APPIMAGE_EXTRACT_AND_RUN: '1'
-        run: make dist-linux-portable-amd64 VERSION=${{ env.VERSION }} SKIP_FRONTEND=1
+        run: make dist-linux-portable-amd64 VERSION=${{ env.VERSION }} SKIP_FRONTEND=1 PORTABLE_LINUX_BUILD=native
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
