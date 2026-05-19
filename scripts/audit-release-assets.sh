@@ -37,7 +37,9 @@ require_match() {
 
 require_match "default macOS" "Presto-*-macOS-*.dmg" "no"
 require_match "default Windows installer" "Presto-*-windows-amd64-installer.exe" "no"
+require_match "default Windows arm64 installer" "Presto-*-windows-arm64-installer.exe" "no"
 require_match "default Linux" "Presto-*-linux-amd64.tar.gz" "no"
+require_match "default Linux arm64" "Presto-*-linux-arm64.tar.gz" "no"
 require_match "portable macOS" "Presto-*-portable-macOS-*.dmg"
 require_match "portable Windows ZIP" "Presto-*-portable-windows-amd64.zip"
 
@@ -68,8 +70,8 @@ allowed_asset() {
     Presto-*-portable-linux-amd64.AppImage) return 0 ;;
     Presto-*-portable-linux-amd64.tar.gz) [[ "${ALLOW_PORTABLE_TAR_FALLBACK:-0}" == "1" ]] ;;
     Presto-*-macOS-*.dmg) [[ "${basename}" != *-portable-* ]] ;;
-    Presto-*-windows-amd64-installer.exe) [[ "${basename}" != *-portable-* ]] ;;
-    Presto-*-linux-amd64.tar.gz) [[ "${basename}" != *-portable-* ]] ;;
+    Presto-*-windows-amd64-installer.exe | Presto-*-windows-arm64-installer.exe) [[ "${basename}" != *-portable-* ]] ;;
+    Presto-*-linux-amd64.tar.gz | Presto-*-linux-arm64.tar.gz) [[ "${basename}" != *-portable-* ]] ;;
     *) return 1 ;;
   esac
 }
