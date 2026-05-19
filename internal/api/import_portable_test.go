@@ -201,6 +201,20 @@ func TestZipImportRequiresExpectedTemplateBinaryName(t *testing.T) {
 	}
 }
 
+func TestRootLevelTemplateZipDoesNotExposeTemplateBinaryAsWorkAsset(t *testing.T) {
+	zipData := makeTemplateZip(t, "", "gongwen", []byte("official template binary"), nil)
+	result, err := ProcessBatchZipWithOptions(zipData, template.NewManager(t.TempDir()), nil, TemplateImportOptions{})
+	if err != nil {
+		t.Fatalf("root-level template import failed: %v", err)
+	}
+	if len(result.Templates) != 1 {
+		t.Fatalf("imported templates = %d, want 1", len(result.Templates))
+	}
+	if result.WorkDir != "" {
+		t.Fatalf("root-level template binary should not be exposed as work asset, workDir = %q", result.WorkDir)
+	}
+}
+
 func TestZipImportMissingExpectedTemplateBinaryFails(t *testing.T) {
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)

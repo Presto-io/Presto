@@ -263,7 +263,8 @@ func isInsideTemplateRoot(filePath string, roots map[string]bool) bool {
 	if roots[""] {
 		// If root-level has manifest.json, all files at root could be template files.
 		// But we should be more specific — only skip manifest.json and binary at root.
-		return path.Base(filePath) == "manifest.json"
+		base := path.Base(filePath)
+		return base == "manifest.json" || strings.HasPrefix(base, "presto-template-")
 	}
 	return false
 }

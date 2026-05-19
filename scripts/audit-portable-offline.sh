@@ -89,4 +89,12 @@ if grep -REn 'portable|dist-.*portable|_frontend-embed-portable' Makefile .githu
   fail "portable packaging command uses VITE_PRESTO_CHANNEL=slim"
 fi
 
+if grep -REn 'fonts\.googleapis\.com|fonts\.gstatic\.com|@import url\(['\''"]https://' frontend/src >/dev/null; then
+  fail "frontend source contains remote font or CSS imports"
+fi
+
+if grep -Fq 'Presto-Homepage/releases' frontend/src/routes/settings/+page.svelte; then
+  fail "settings update fallback still points at Presto-Homepage releases"
+fi
+
 echo "PORTABLE_OFFLINE_STATIC_AUDIT=PASS"
