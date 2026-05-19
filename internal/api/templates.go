@@ -70,6 +70,7 @@ func (s *Server) handleListTemplates(w http.ResponseWriter, r *http.Request) {
 			Description: t.Manifest.Description,
 			Version:     t.Manifest.Version,
 			Author:      t.Manifest.Author,
+			Builtin:     t.Builtin,
 			Keywords:    t.Manifest.Keywords,
 		}
 		for _, f := range t.Manifest.RequiredFonts {

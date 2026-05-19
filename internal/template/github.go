@@ -1172,6 +1172,11 @@ func (m *Manager) Uninstall(name string) error {
 	// SEC-38: Use Lstat to detect symlinks (not follow them)
 	info, err := os.Lstat(tplDir)
 	if err != nil {
+		if os.IsNotExist(err) && m.BuiltinTemplatesDir != "" {
+			if _, builtinErr := loadTemplateFromDir(filepath.Join(m.BuiltinTemplatesDir, name)); builtinErr == nil {
+				return fmt.Errorf("%s %q; delete a user overlay instead", errCannotRemoveBuiltinTemplate, name)
+			}
+		}
 		return fmt.Errorf("template not found: %w", err)
 	}
 	// SEC-38: Reject symlinks to prevent TOCTOU attacks

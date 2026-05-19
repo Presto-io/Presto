@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -179,12 +180,18 @@ func main() {
 	if err := appdata.MarkGenerated(prestoDir); err != nil {
 		logger.Warn("[presto] failed to mark generated app data", "error", err)
 	}
-	manager := template.NewManager(templatesDir)
 	typstBin := findTypstBinary()
 	logger.Info("[presto] using typst", "path", typstBin)
 	tinymistBin := findTinymistBinary()
 	logger.Info("[presto] using tinymist", "path", tinymistBin)
 	capabilities := currentReleaseCapabilities()
+	builtinTemplatesDir := ""
+	if capabilities.PackagedRuntimes || capabilities.ReleaseChannel == "portable" {
+		if exePath, err := os.Executable(); err == nil {
+			builtinTemplatesDir = template.ResolveBuiltinTemplatesDir(filepath.Dir(exePath), runtime.GOOS)
+		}
+	}
+	manager := template.NewManagerWithBuiltin(templatesDir, builtinTemplatesDir)
 	var registry *template.RegistryCache
 	if capabilities.OnlineRegistry {
 		registry = template.NewRegistryCache(dirs.CacheDir)
@@ -198,11 +205,12 @@ func main() {
 	compiler.FontPaths = fontPaths
 	compiler.AvailableFonts = compiler.ListFonts()
 	apiHandler := api.NewServer(api.ServerOptions{
-		TemplatesDir: templatesDir,
-		TypstBin:     typstBin,
-		FontPaths:    fontPaths,
-		Registry:     registry,
-		Capabilities: toAPIReleaseCapabilities(capabilities),
+		TemplatesDir:        templatesDir,
+		BuiltinTemplatesDir: builtinTemplatesDir,
+		TypstBin:            typstBin,
+		FontPaths:           fontPaths,
+		Registry:            registry,
+		Capabilities:        toAPIReleaseCapabilities(capabilities),
 	})
 	frontendFS, _ := fs.Sub(assets, "build")
 	handler := &spaFallbackHandler{api: apiHandler, assets: frontendFS}

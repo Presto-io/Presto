@@ -14,14 +14,25 @@ type InstalledTemplate struct {
 	Manifest   *Manifest
 	BinaryPath string
 	Dir        string
+	Builtin    bool
 }
 
+const errCannotRemoveBuiltinTemplate = "cannot remove builtin template"
+
 type Manager struct {
-	TemplatesDir string
+	TemplatesDir        string
+	BuiltinTemplatesDir string
 }
 
 func NewManager(templatesDir string) *Manager {
-	return &Manager{TemplatesDir: templatesDir}
+	return NewManagerWithBuiltin(templatesDir, "")
+}
+
+func NewManagerWithBuiltin(templatesDir string, builtinTemplatesDir string) *Manager {
+	return &Manager{
+		TemplatesDir:        templatesDir,
+		BuiltinTemplatesDir: builtinTemplatesDir,
+	}
 }
 
 func templateBinaryName(name string) string {
@@ -58,20 +69,38 @@ func installArtifactLayout(goos string, manifestName string, downloadedFilename 
 }
 
 func (m *Manager) List() ([]InstalledTemplate, error) {
-	entries, err := os.ReadDir(m.TemplatesDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
+	var templates []InstalledTemplate
+	seen := make(map[string]bool)
+
+	if err := appendTemplatesFromRoot(&templates, seen, m.TemplatesDir, false); err != nil {
 		return nil, err
 	}
+	if m.BuiltinTemplatesDir != "" {
+		if err := appendTemplatesFromRoot(&templates, seen, m.BuiltinTemplatesDir, true); err != nil {
+			return nil, err
+		}
+	}
 
-	var templates []InstalledTemplate
+	return templates, nil
+}
+
+func appendTemplatesFromRoot(templates *[]InstalledTemplate, seen map[string]bool, root string, builtin bool) error {
+	if root == "" {
+		return nil
+	}
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
 		}
-		tplDir := filepath.Join(m.TemplatesDir, entry.Name())
+		tplDir := filepath.Join(root, entry.Name())
 		tpl, err := loadTemplateFromDir(tplDir)
 		if err != nil {
 			slog.Debug("[templates] skipping invalid template",
@@ -79,14 +108,6 @@ func (m *Manager) List() ([]InstalledTemplate, error) {
 				"error", err.Error())
 			continue
 		}
-		templates = append(templates, tpl)
-	}
-
-	// Keep names stable. If duplicates exist, keep the first discovered template
-	// and skip later entries instead of renaming files on disk.
-	seen := make(map[string]bool)
-	deduped := templates[:0]
-	for _, tpl := range templates {
 		name := tpl.Manifest.Name
 		if seen[name] {
 			slog.Warn("[templates] duplicate template skipped",
@@ -95,10 +116,11 @@ func (m *Manager) List() ([]InstalledTemplate, error) {
 			continue
 		}
 		seen[name] = true
-		deduped = append(deduped, tpl)
+		tpl.Builtin = builtin
+		*templates = append(*templates, tpl)
 	}
 
-	return deduped, nil
+	return nil
 }
 
 func loadTemplateFromDir(tplDir string) (InstalledTemplate, error) {
@@ -209,15 +231,8 @@ func (m *Manager) Exists(name string) bool {
 	if err := validateName(name); err != nil {
 		return false
 	}
-	tplDir := filepath.Join(m.TemplatesDir, name)
-	manifestPath := filepath.Join(tplDir, "manifest.json")
-	_, err := os.Stat(manifestPath)
-	if err == nil {
-		return true
-	}
-
-	tpl, err := loadTemplateFromDir(tplDir)
-	return err == nil && tpl.Manifest.Name == name
+	_, err := m.Get(name)
+	return err == nil
 }
 
 func (m *Manager) UniqueTemplateName(name string) string {

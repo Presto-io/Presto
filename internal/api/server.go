@@ -63,14 +63,15 @@ func normalizeReleaseCapabilities(capabilities ReleaseCapabilities) ReleaseCapab
 
 // ServerOptions configures the API server.
 type ServerOptions struct {
-	TemplatesDir string
-	StaticDir    string
-	TypstBin     string
-	APIKey       string   // empty = desktop mode (no auth required)
-	InjectAPIKey bool     // inject API key into static HTML only for trusted local deployments
-	FontPaths    []string // additional font directories for typst
-	Registry     *template.RegistryCache
-	Capabilities ReleaseCapabilities
+	TemplatesDir        string
+	BuiltinTemplatesDir string
+	StaticDir           string
+	TypstBin            string
+	APIKey              string   // empty = desktop mode (no auth required)
+	InjectAPIKey        bool     // inject API key into static HTML only for trusted local deployments
+	FontPaths           []string // additional font directories for typst
+	Registry            *template.RegistryCache
+	Capabilities        ReleaseCapabilities
 }
 
 func NewServer(opts ServerOptions) http.Handler {
@@ -88,7 +89,7 @@ func NewServer(opts ServerOptions) http.Handler {
 
 	s := &Server{
 		mux:            http.NewServeMux(),
-		manager:        template.NewManager(opts.TemplatesDir),
+		manager:        template.NewManagerWithBuiltin(opts.TemplatesDir, opts.BuiltinTemplatesDir),
 		compiler:       compiler,
 		registry:       opts.Registry,
 		capabilities:   normalizeReleaseCapabilities(opts.Capabilities),
@@ -97,8 +98,8 @@ func NewServer(opts ServerOptions) http.Handler {
 		previewService: preview.NewService(),
 	}
 
-	log.Printf("[presto] starting server, templates=%s static=%s typst=%s root=%s",
-		opts.TemplatesDir, opts.StaticDir, opts.TypstBin, compilerRoot)
+	log.Printf("[presto] starting server, templates=%s builtinTemplates=%s static=%s typst=%s root=%s",
+		opts.TemplatesDir, opts.BuiltinTemplatesDir, opts.StaticDir, opts.TypstBin, compilerRoot)
 
 	s.mux.HandleFunc("GET /api/health", s.handleHealth)
 	s.mux.HandleFunc("POST /api/convert", s.handleConvert)

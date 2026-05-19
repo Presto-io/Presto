@@ -4,21 +4,35 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
+
+func writeTestTemplate(t *testing.T, root, dirName, manifestName, displayName string) string {
+	t.Helper()
+	tplDir := filepath.Join(root, dirName)
+	if err := os.MkdirAll(tplDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	manifest := `{"name":"` + manifestName + `","displayName":"` + displayName + `","version":"0.1.0","author":"test"}`
+	if err := os.WriteFile(filepath.Join(tplDir, "manifest.json"), []byte(manifest), 0644); err != nil {
+		t.Fatal(err)
+	}
+	bin := createMockTemplate(t, t.TempDir())
+	data, err := os.ReadFile(bin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tplDir, templateBinaryName(manifestName)), data, 0755); err != nil {
+		t.Fatal(err)
+	}
+	return tplDir
+}
 
 func TestManagerListTemplates(t *testing.T) {
 	dir := t.TempDir()
 
-	tplDir := filepath.Join(dir, "mock")
-	os.MkdirAll(tplDir, 0755)
-
-	manifest := `{"name":"mock","displayName":"Mock Template","version":"0.1.0","author":"test"}`
-	os.WriteFile(filepath.Join(tplDir, "manifest.json"), []byte(manifest), 0644)
-
-	bin := createMockTemplate(t, t.TempDir())
-	data, _ := os.ReadFile(bin)
-	os.WriteFile(filepath.Join(tplDir, templateBinaryName("mock")), data, 0755)
+	writeTestTemplate(t, dir, "mock", "mock", "Mock Template")
 
 	mgr := NewManager(dir)
 	templates, err := mgr.List()
@@ -36,15 +50,7 @@ func TestManagerListTemplates(t *testing.T) {
 func TestManagerGet(t *testing.T) {
 	dir := t.TempDir()
 
-	tplDir := filepath.Join(dir, "mock")
-	os.MkdirAll(tplDir, 0755)
-
-	manifest := `{"name":"mock","displayName":"Mock","version":"0.1.0","author":"test"}`
-	os.WriteFile(filepath.Join(tplDir, "manifest.json"), []byte(manifest), 0644)
-
-	bin := createMockTemplate(t, t.TempDir())
-	data, _ := os.ReadFile(bin)
-	os.WriteFile(filepath.Join(tplDir, templateBinaryName("mock")), data, 0755)
+	writeTestTemplate(t, dir, "mock", "mock", "Mock")
 
 	mgr := NewManager(dir)
 	tpl, err := mgr.Get("mock")
@@ -99,15 +105,9 @@ func TestManagerListTemplateWithoutManifest(t *testing.T) {
 
 func TestManagerListSkipsDuplicateWithoutRenaming(t *testing.T) {
 	dir := t.TempDir()
-	bin := createMockTemplate(t, t.TempDir())
-	data, _ := os.ReadFile(bin)
 
 	for _, dirName := range []string{"mock-a", "mock-b"} {
-		tplDir := filepath.Join(dir, dirName)
-		os.MkdirAll(tplDir, 0755)
-		manifest := `{"name":"mock","displayName":"Mock","version":"0.1.0","author":"test"}`
-		os.WriteFile(filepath.Join(tplDir, "manifest.json"), []byte(manifest), 0644)
-		os.WriteFile(filepath.Join(tplDir, templateBinaryName("mock")), data, 0755)
+		writeTestTemplate(t, dir, dirName, "mock", "Mock")
 	}
 
 	mgr := NewManager(dir)
@@ -120,6 +120,93 @@ func TestManagerListSkipsDuplicateWithoutRenaming(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, "mock-2")); !os.IsNotExist(err) {
 		t.Fatalf("duplicate template should not be renamed to mock-2, stat err = %v", err)
+	}
+}
+
+func TestManagerListIncludesBuiltinOnlyTemplate(t *testing.T) {
+	userDir := t.TempDir()
+	builtinDir := t.TempDir()
+	writeTestTemplate(t, builtinDir, "mock", "mock", "Builtin Mock")
+
+	mgr := NewManagerWithBuiltin(userDir, builtinDir)
+	templates, err := mgr.List()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(templates) != 1 {
+		t.Fatalf("got %d templates, want 1", len(templates))
+	}
+	if templates[0].Manifest.DisplayName != "Builtin Mock" {
+		t.Fatalf("displayName = %q", templates[0].Manifest.DisplayName)
+	}
+	if !templates[0].Builtin {
+		t.Fatal("builtin-only template should be marked builtin")
+	}
+	if !mgr.Exists("mock") {
+		t.Fatal("Exists should detect builtin template")
+	}
+}
+
+func TestManagerUserTemplateShadowsBuiltinByManifestName(t *testing.T) {
+	userDir := t.TempDir()
+	builtinDir := t.TempDir()
+	writeTestTemplate(t, builtinDir, "mock", "mock", "Builtin Mock")
+	writeTestTemplate(t, userDir, "mock", "mock", "User Mock")
+
+	mgr := NewManagerWithBuiltin(userDir, builtinDir)
+	tpl, err := mgr.Get("mock")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if tpl.Manifest.DisplayName != "User Mock" {
+		t.Fatalf("displayName = %q, want User Mock", tpl.Manifest.DisplayName)
+	}
+	if tpl.Builtin {
+		t.Fatal("user template should not be marked builtin")
+	}
+}
+
+func TestManagerUninstallOverlayRevealsBuiltin(t *testing.T) {
+	userDir := t.TempDir()
+	builtinDir := t.TempDir()
+	writeTestTemplate(t, builtinDir, "mock", "mock", "Builtin Mock")
+	writeTestTemplate(t, userDir, "mock", "mock", "User Mock")
+
+	mgr := NewManagerWithBuiltin(userDir, builtinDir)
+	if err := mgr.Uninstall("mock"); err != nil {
+		t.Fatalf("unexpected uninstall error: %v", err)
+	}
+	tpl, err := mgr.Get("mock")
+	if err != nil {
+		t.Fatalf("expected builtin after overlay deletion: %v", err)
+	}
+	if tpl.Manifest.DisplayName != "Builtin Mock" {
+		t.Fatalf("displayName = %q, want Builtin Mock", tpl.Manifest.DisplayName)
+	}
+	if !tpl.Builtin {
+		t.Fatal("revealed template should be builtin")
+	}
+}
+
+func TestManagerUninstallBuiltinOnlyTemplateFails(t *testing.T) {
+	userDir := t.TempDir()
+	builtinDir := t.TempDir()
+	writeTestTemplate(t, builtinDir, "mock", "mock", "Builtin Mock")
+
+	mgr := NewManagerWithBuiltin(userDir, builtinDir)
+	err := mgr.Uninstall("mock")
+	if err == nil {
+		t.Fatal("expected builtin uninstall to fail")
+	}
+	if !strings.Contains(err.Error(), "cannot remove builtin template") {
+		t.Fatalf("error = %q, want cannot remove builtin template", err.Error())
+	}
+	tpl, getErr := mgr.Get("mock")
+	if getErr != nil {
+		t.Fatalf("builtin template should remain: %v", getErr)
+	}
+	if tpl.Manifest.DisplayName != "Builtin Mock" {
+		t.Fatalf("displayName = %q", tpl.Manifest.DisplayName)
 	}
 }
 
