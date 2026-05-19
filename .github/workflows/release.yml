@@ -688,6 +688,9 @@ jobs:
           cd dist
           sha256sum Presto-* > checksums.txt
 
+      - name: Audit release asset matrix
+        run: bash scripts/audit-release-assets.sh dist
+
       - name: Upload to Release
         run: |
           PRERELEASE_FLAG=""
