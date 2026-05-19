@@ -59,6 +59,13 @@ func normalizeReleaseCapabilities(capabilities ReleaseCapabilities) ReleaseCapab
 	return capabilities
 }
 
+func (a *App) releaseCapabilities() ReleaseCapabilities {
+	if a == nil {
+		return currentReleaseCapabilities()
+	}
+	return normalizeReleaseCapabilities(a.capabilities)
+}
+
 func toAPIReleaseCapabilities(capabilities ReleaseCapabilities) api.ReleaseCapabilities {
 	return api.ReleaseCapabilities{
 		ReleaseChannel:       capabilities.ReleaseChannel,

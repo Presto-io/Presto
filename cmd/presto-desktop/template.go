@@ -17,6 +17,16 @@ type templateUpdate struct {
 }
 
 func (a *App) checkFirstLaunch() {
+	capabilities := a.releaseCapabilities()
+	if !capabilities.FirstLaunchBootstrap && !capabilities.TemplateAutoUpdate {
+		logger.Info("[first-launch] online template bootstrap disabled by release channel", "channel", capabilities.ReleaseChannel)
+		return
+	}
+	if a.registry == nil {
+		logger.Warn("[first-launch] registry not available, skipping default template and update checks")
+		return
+	}
+
 	logger.Debug("[first-launch] starting check", "registry_available", a.registry.Load() != nil)
 
 	templates, err := a.manager.List()
@@ -26,16 +36,35 @@ func (a *App) checkFirstLaunch() {
 	}
 
 	if len(templates) == 0 {
-		logger.Info("[first-launch] first launch detected, starting default template download")
-		a.downloadDefaultTemplates()
+		if capabilities.FirstLaunchBootstrap {
+			logger.Info("[first-launch] first launch detected, starting default template download")
+			a.downloadDefaultTemplates()
+		} else {
+			logger.Info("[first-launch] first launch bootstrap disabled by release channel", "channel", capabilities.ReleaseChannel)
+		}
 		return
 	}
 
-	logger.Info("[first-launch] templates already installed, checking for updates", "count", len(templates))
-	go a.checkTemplateUpdates(templates)
+	if capabilities.TemplateAutoUpdate {
+		logger.Info("[first-launch] templates already installed, checking for updates", "count", len(templates))
+		go a.checkTemplateUpdates(templates)
+	} else {
+		logger.Info("[template-update] template auto-update disabled by release channel", "channel", capabilities.ReleaseChannel)
+	}
 }
 
 func (a *App) downloadDefaultTemplates() {
+	capabilities := a.releaseCapabilities()
+	if !capabilities.FirstLaunchBootstrap {
+		logger.Info("[first-launch] default template download disabled by release channel", "channel", capabilities.ReleaseChannel)
+		return
+	}
+	if a.registry == nil {
+		logger.Warn("[first-launch] registry not available, skipping default download")
+		a.emitFirstLaunchError("无法获取模板列表")
+		return
+	}
+
 	reg := a.registry.Load()
 	if reg == nil {
 		logger.Warn("[first-launch] registry not available, skipping default download")
@@ -139,6 +168,16 @@ func (a *App) emitFirstLaunchError(message string) {
 }
 
 func (a *App) checkTemplateUpdates(installed []template.InstalledTemplate) {
+	capabilities := a.releaseCapabilities()
+	if !capabilities.TemplateAutoUpdate {
+		logger.Info("[template-update] template auto-update disabled by release channel", "channel", capabilities.ReleaseChannel)
+		return
+	}
+	if a.registry == nil {
+		logger.Warn("[template-update] registry not available, skipping update check")
+		return
+	}
+
 	logger.Debug("[template-update] starting update check", "count", len(installed))
 
 	reg := a.registry.Load()
@@ -266,6 +305,9 @@ func (a *App) emitTemplateUpdateComplete(success int, failed int, updated []stri
 }
 
 func (a *App) InstallTemplate(templateName string) error {
+	if !a.releaseCapabilities().OnlineTemplateStore {
+		return fmt.Errorf("online template install is disabled in this release channel")
+	}
 	return a.installTemplate(templateName, true)
 }
 

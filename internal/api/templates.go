@@ -89,6 +89,11 @@ func (s *Server) handleListTemplates(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDiscoverTemplates(w http.ResponseWriter, r *http.Request) {
+	if !s.capabilities.OnlineTemplateStore {
+		writeJSONError(w, "online template store disabled", http.StatusForbidden)
+		return
+	}
+
 	repos, err := template.DiscoverTemplates()
 	if err != nil {
 		log.Printf("[templates] discover failed: %v", err)
@@ -101,6 +106,11 @@ func (s *Server) handleDiscoverTemplates(w http.ResponseWriter, r *http.Request)
 }
 
 func (s *Server) handleInstallTemplate(w http.ResponseWriter, r *http.Request) {
+	if !s.capabilities.OnlineTemplateStore {
+		writeJSONError(w, "online template store disabled", http.StatusForbidden)
+		return
+	}
+
 	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
 	id := r.PathValue("id")
 

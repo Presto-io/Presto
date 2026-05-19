@@ -45,6 +45,10 @@ type UpdateInfo struct {
 func (a *App) CheckForUpdate() (*UpdateInfo, error) {
 	current := a.GetVersion()
 	info := &UpdateInfo{CurrentVersion: current}
+	if !a.releaseCapabilities().AppUpdateCheck {
+		info.LatestVersion = current
+		return info, nil
+	}
 
 	client := &http.Client{Timeout: 15 * time.Second}
 	resp, err := client.Get(updateReleaseAPIURL)
@@ -109,6 +113,17 @@ func (a *App) CheckStartupUpdate() {
 
 // CheckAndNotifyUpdate checks for updates and shows a dialog for the result.
 func (a *App) CheckAndNotifyUpdate() {
+	if !a.releaseCapabilities().AppUpdateCheck {
+		if a.ctx != nil {
+			wailsRuntime.MessageDialog(a.ctx, wailsRuntime.MessageDialogOptions{
+				Type:    wailsRuntime.InfoDialog,
+				Title:   "检查更新",
+				Message: "当前版本不支持在线更新",
+			})
+		}
+		return
+	}
+
 	info, err := a.CheckForUpdate()
 	if err != nil {
 		log.Printf("[desktop] update check failed: %v", err)
@@ -179,6 +194,9 @@ func (a *App) promptForUpdate(info *UpdateInfo) {
 // DownloadAndInstallUpdate downloads the release asset and installs it in-place.
 // Progress is reported via Wails events: "update:progress" (int 0-100), "update:status" (string).
 func (a *App) DownloadAndInstallUpdate(downloadURL string) error {
+	if !a.releaseCapabilities().AppUpdateCheck {
+		return fmt.Errorf("online updates are disabled in this release channel")
+	}
 	if downloadURL == "" {
 		return fmt.Errorf("no download URL")
 	}
@@ -270,6 +288,9 @@ func isExpectedUpdateAsset(filename string) bool {
 	}
 	platform := fmt.Sprintf("-%s-%s", osName, runtime.GOARCH)
 	if !strings.HasPrefix(filename, "Presto-") || !strings.Contains(filename, platform) {
+		return false
+	}
+	if strings.Contains(filename, "-portable-") {
 		return false
 	}
 	switch runtime.GOOS {

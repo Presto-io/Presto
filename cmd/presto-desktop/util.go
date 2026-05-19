@@ -26,7 +26,7 @@ func (a *App) IsVerbose() bool {
 }
 
 func (a *App) GetCapabilities() ReleaseCapabilities {
-	return normalizeReleaseCapabilities(a.capabilities)
+	return a.releaseCapabilities()
 }
 
 func (a *App) SetWindowTitle(title string) {

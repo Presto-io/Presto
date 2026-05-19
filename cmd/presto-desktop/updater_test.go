@@ -41,6 +41,9 @@ func TestIsExpectedUpdateAsset(t *testing.T) {
 	if !isExpectedUpdateAsset(testUpdateFilename()) {
 		t.Fatalf("expected platform asset to be accepted")
 	}
+	if isExpectedUpdateAsset(strings.Replace(testUpdateFilename(), "Presto-1.2.3-", "Presto-1.2.3-portable-", 1)) {
+		t.Fatalf("portable update asset should not be accepted by default updater")
+	}
 	if isExpectedUpdateAsset("Presto-1.2.3-plan9-amd64.tar.gz") {
 		t.Fatalf("unexpected platform asset accepted")
 	}
@@ -60,6 +63,31 @@ func TestParseUpdateChecksums(t *testing.T) {
 	}
 	if _, ok := checksums["ignored.txt"]; !ok {
 		t.Fatalf("expected sha256sum-formatted line to be parsed")
+	}
+}
+
+func TestPortableCapabilitiesDisableUpdateChecks(t *testing.T) {
+	app := &App{
+		capabilities: ReleaseCapabilities{
+			ReleaseChannel: "portable",
+			AppUpdateCheck: false,
+		},
+	}
+
+	info, err := app.CheckForUpdate()
+	if err != nil {
+		t.Fatalf("disabled update check returned error: %v", err)
+	}
+	if info.HasUpdate {
+		t.Fatalf("disabled update check should not report an update: %+v", info)
+	}
+	if info.CurrentVersion != info.LatestVersion {
+		t.Fatalf("disabled update check should return current as latest: %+v", info)
+	}
+
+	err = app.DownloadAndInstallUpdate("https://github.com/Presto-io/Presto-Homepage/releases/download/v1.2.3/" + testUpdateFilename())
+	if err == nil || !strings.Contains(err.Error(), "online updates are disabled in this release channel") {
+		t.Fatalf("expected disabled update install error, got %v", err)
 	}
 }
 

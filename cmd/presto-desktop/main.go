@@ -131,8 +131,15 @@ func (a *App) startup(ctx context.Context) {
 		case <-time.After(5 * time.Second):
 			logger.Warn("[startup] frontend ready timeout, proceeding anyway")
 		}
-		a.checkFirstLaunch()
-		go a.CheckStartupUpdate()
+		capabilities := a.releaseCapabilities()
+		if capabilities.FirstLaunchBootstrap || capabilities.TemplateAutoUpdate {
+			a.checkFirstLaunch()
+		} else {
+			logger.Info("[startup] online template bootstrap disabled by release channel", "channel", capabilities.ReleaseChannel)
+		}
+		if capabilities.AppUpdateCheck {
+			go a.CheckStartupUpdate()
+		}
 	}()
 }
 
@@ -178,8 +185,13 @@ func main() {
 	tinymistBin := findTinymistBinary()
 	logger.Info("[presto] using tinymist", "path", tinymistBin)
 	capabilities := currentReleaseCapabilities()
-	registry := template.NewRegistryCache(dirs.CacheDir)
-	registry.RefreshAsync()
+	var registry *template.RegistryCache
+	if capabilities.OnlineRegistry {
+		registry = template.NewRegistryCache(dirs.CacheDir)
+		registry.RefreshAsync()
+	} else {
+		logger.Info("[presto] online registry disabled by release channel", "channel", capabilities.ReleaseChannel)
+	}
 	// SEC-40: Use os temp dir instead of $HOME to restrict file access
 	compiler := typst.NewCompilerWithRoot(os.TempDir())
 	compiler.BinPath = typstBin
