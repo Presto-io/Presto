@@ -107,6 +107,14 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
+      - name: Prepare portable template registry snapshot
+        run: |
+          git clone --depth=1 https://github.com/Presto-io/template-registry.git ../template-registry
+          test -f ../template-registry/registry.json
+          test -f ../template-registry/templates/gongwen/manifest.json
+          test -f ../template-registry/templates/jiaoan-shicao/manifest.json
+          test -f ../template-registry/templates/jiaoan-jihua/manifest.json
+
       - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -239,6 +247,15 @@ jobs:
             vc_redist_url: https://aka.ms/vc14/vc_redist.arm64.exe
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Prepare portable template registry snapshot
+        if: matrix.goarch == 'amd64'
+        run: |
+          git clone --depth=1 https://github.com/Presto-io/template-registry.git ../template-registry
+          test -f ../template-registry/registry.json
+          test -f ../template-registry/templates/gongwen/manifest.json
+          test -f ../template-registry/templates/jiaoan-shicao/manifest.json
+          test -f ../template-registry/templates/jiaoan-jihua/manifest.json
 
       - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
@@ -430,6 +447,15 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Prepare portable template registry snapshot
+        if: matrix.goarch == 'amd64'
+        run: |
+          git clone --depth=1 https://github.com/Presto-io/template-registry.git ../template-registry
+          test -f ../template-registry/registry.json
+          test -f ../template-registry/templates/gongwen/manifest.json
+          test -f ../template-registry/templates/jiaoan-shicao/manifest.json
+          test -f ../template-registry/templates/jiaoan-jihua/manifest.json
 
       - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
