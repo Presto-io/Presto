@@ -612,7 +612,9 @@ dist-linux-portable-amd64: _frontend-embed-portable
 	@mkdir -p "$(DIST)/_appimage/$(APP_NAME).AppDir/usr/bin" "$(DIST)/_appimage/$(APP_NAME).AppDir/usr/share/presto"
 	@if [ "$(PORTABLE_LINUX_BUILD)" = "native" ]; then \
 		rm -rf cmd/presto-desktop/build/_app && \
-		cp -r frontend/build/* cmd/presto-desktop/build/ && \
+		if [ -d frontend/build ] && find frontend/build -mindepth 1 -maxdepth 1 | grep -q .; then \
+			cp -r frontend/build/* cmd/presto-desktop/build/; \
+		fi && \
 		GOOS=linux GOARCH=amd64 CGO_ENABLED=1 go build -tags "$(WAILS_TAGS)" -ldflags "$(PORTABLE_LDFLAGS)" \
 			-o dist/_appimage/$(APP_NAME).AppDir/usr/bin/$(APP_NAME) $(DESKTOP_SRC)/; \
 	else \
@@ -627,7 +629,9 @@ dist-linux-portable-amd64: _frontend-embed-portable
 				apt-get update -qq && \
 				apt-get install -y -qq libgtk-3-dev libwebkit2gtk-4.0-dev pkg-config > /dev/null 2>&1 && \
 				rm -rf cmd/presto-desktop/build/_app && \
-				cp -r frontend/build/* cmd/presto-desktop/build/ && \
+				if [ -d frontend/build ] && find frontend/build -mindepth 1 -maxdepth 1 | grep -q .; then \
+					cp -r frontend/build/* cmd/presto-desktop/build/; \
+				fi && \
 				go build -tags "$(WAILS_TAGS)" -ldflags "$(PORTABLE_LDFLAGS)" \
 					-o dist/_appimage/$(APP_NAME).AppDir/usr/bin/$(APP_NAME) $(DESKTOP_SRC)/'; \
 	fi
