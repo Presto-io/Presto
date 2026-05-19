@@ -35,6 +35,17 @@ jobs:
         working-directory: frontend
         run: npm run build
 
+      - name: Validate responsive showcase shell
+        run: |
+          if grep -R "width:1200px\|height:800px" frontend/build/_app/immutable/assets frontend/build/showcase; then
+            echo "::error::Showcase build reintroduced the fixed 1200x800 shell"
+            exit 1
+          fi
+          if ! grep -R -q "showcase-viewport.*width:100%.*min-width:0" frontend/build/_app/immutable/assets; then
+            echo "::error::Showcase viewport is not built as a responsive container"
+            exit 1
+          fi
+
       - name: Extract showcase files
         run: |
           mkdir -p showcase-output

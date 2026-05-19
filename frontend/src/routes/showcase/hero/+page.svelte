@@ -209,8 +209,10 @@
     display: flex;
     align-items: center;
     gap: var(--space-md);
+    min-width: 0;
   }
   .template-name {
+    display: inline-block;
     font-size: 13px;
     font-weight: 500;
     color: var(--color-text);
@@ -286,6 +288,7 @@
   }
   .preview-pane {
     position: relative;
+    flex: 0 1 clamp(230px, 46%, 520px);
   }
   .preview-container {
     height: 100%;
