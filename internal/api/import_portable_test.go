@@ -32,7 +32,7 @@ func makeTemplateZip(t *testing.T, root string, name string, binary []byte, extr
 		prefix += "/"
 	}
 	writeZipFile(prefix+"manifest.json", []byte(`{"name":"`+name+`","displayName":"`+name+`","version":"1.0.0","author":"Presto-io"}`))
-	writeZipFile(prefix+"presto-template-"+name, binary)
+	writeZipFile(prefix+expectedTemplateBinaryName(name), binary)
 	for name, data := range extra {
 		writeZipFile(name, data)
 	}
@@ -69,7 +69,7 @@ func makeTemplateZipOrdered(t *testing.T, root string, name string, binary []byt
 	for _, file := range orderedFiles {
 		writeZipFile(prefix+file.name, file.data)
 	}
-	writeZipFile(prefix+"presto-template-"+name, binary)
+	writeZipFile(prefix+expectedTemplateBinaryName(name), binary)
 	if err := zw.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -191,7 +191,7 @@ func TestZipImportRequiresExpectedTemplateBinaryName(t *testing.T) {
 		t.Fatalf("imported templates = %d, want 1", len(result.Templates))
 	}
 
-	binaryPath := filepath.Join(mgr.TemplatesDir, "gongwen", "presto-template-gongwen")
+	binaryPath := filepath.Join(mgr.TemplatesDir, "gongwen", expectedTemplateBinaryName("gongwen"))
 	binary, err := os.ReadFile(binaryPath)
 	if err != nil {
 		t.Fatalf("read installed binary: %v", err)
@@ -255,7 +255,7 @@ func TestPortableOverwriteChecksumMismatchKeepsExistingUserTemplate(t *testing.T
 	if err := os.WriteFile(filepath.Join(existingDir, "manifest.json"), []byte(`{"name":"gongwen","displayName":"existing","version":"1.0.0","author":"Presto-io"}`), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(existingDir, "presto-template-gongwen"), []byte("existing binary"), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(existingDir, expectedTemplateBinaryName("gongwen")), []byte("existing binary"), 0600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -269,7 +269,7 @@ func TestPortableOverwriteChecksumMismatchKeepsExistingUserTemplate(t *testing.T
 		t.Fatal("expected checksum mismatch")
 	}
 
-	binary, readErr := os.ReadFile(filepath.Join(existingDir, "presto-template-gongwen"))
+	binary, readErr := os.ReadFile(filepath.Join(existingDir, expectedTemplateBinaryName("gongwen")))
 	if readErr != nil {
 		t.Fatalf("existing binary should remain after failed overwrite: %v", readErr)
 	}
