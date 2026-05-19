@@ -1,7 +1,9 @@
 .PHONY: frontend server desktop build dev run-desktop check check-go check-frontend check-go-race check-desktop-compile check-local clean \
        _build-macos-arm64 _build-macos-amd64 \
+       _build-macos-portable-arm64 _build-macos-portable-amd64 _bundle-app-portable _frontend-embed-portable \
        dist-macos dist-macos-arm64 dist-macos-amd64 dist-macos-universal \
        dist-dmg dist-dmg-arm64 dist-dmg-amd64 dist-dmg-universal \
+       dist-dmg-portable-arm64 dist-dmg-portable-amd64 dist-windows-portable-amd64 dist-linux-portable-amd64 dist-portable \
        dist-windows dist-linux dist notarize inno windows-installer _inno-language _download-typst _download-tinymist _download-vc-redist
 
 # ─── Config ──────────────────────────────────────────────
@@ -14,7 +16,14 @@ VERSION_BASE := $(firstword $(subst -, ,$(VERSION)))
 TYPST_VERSION:= 0.14.2
 TINYMIST_VERSION := 0.14.18
 WAILS_TAGS   := desktop,production
+CHANNEL      ?= slim
 LDFLAGS      := -s -w -X main.version=$(VERSION)
+PORTABLE_LDFLAGS := $(LDFLAGS) -X main.releaseChannel=portable
+PORTABLE_FRONTEND_ENV := VITE_PRESTO_CHANNEL=portable
+# Release matrix contract: default Presto-$(VERSION)-macOS-$(1).dmg remains unchanged.
+# Portable additions: Presto-$(VERSION)-portable-macOS-$(arch).dmg,
+# Presto-$(VERSION)-portable-windows-$(arch).exe target with ZIP fallback until
+# single-file embedding lands, and Presto-$(VERSION)-portable-linux-$(arch).AppImage.
 DIST         := dist
 DESKTOP_SRC  := ./cmd/presto-desktop
 DESKTOP_EMBED:= cmd/presto-desktop/build
@@ -143,6 +152,16 @@ else
 	rm -rf $(DESKTOP_EMBED)/_app
 	cp -r frontend/build/* $(DESKTOP_EMBED)/
 endif
+endif
+
+_frontend-embed-portable:
+	cd frontend && $(PORTABLE_FRONTEND_ENV) $(NPM) run build
+ifeq ($(OS),Windows_NT)
+	@powershell -NoProfile -Command "if (Test-Path '$(DESKTOP_EMBED)/_app') { Remove-Item -Recurse -Force '$(DESKTOP_EMBED)/_app' }"
+	@powershell -NoProfile -Command "Copy-Item -Path 'frontend/build/*' -Destination '$(DESKTOP_EMBED)' -Recurse -Force"
+else
+	rm -rf $(DESKTOP_EMBED)/_app
+	cp -r frontend/build/* $(DESKTOP_EMBED)/
 endif
 
 # Download typst binary for a given platform
@@ -377,6 +396,85 @@ dist-dmg-universal: dist-macos-universal
 
 dist-dmg: dist-dmg-arm64 dist-dmg-amd64 dist-dmg-universal
 
+_build-macos-portable-arm64: _frontend-embed-portable
+	@mkdir -p $(DIST)/_bin
+	@( MACOSX_DEPLOYMENT_TARGET=$(MACOSX_DEPLOYMENT_TARGET) \
+		GOOS=darwin GOARCH=arm64 CGO_ENABLED=1 \
+		CGO_LDFLAGS="-framework UniformTypeIdentifiers" \
+		go build -tags "$(WAILS_TAGS)" -ldflags "$(PORTABLE_LDFLAGS)" \
+		-o $(DIST)/_bin/presto-portable-darwin-arm64 $(DESKTOP_SRC)/ ) & PID_GO=$$!; \
+	( $(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_DARWIN_ARM64) \
+		TYPST_OUT=$(DIST)/_bin/typst-darwin-arm64 ) & PID_TYPST=$$!; \
+	( $(MAKE) _download-tinymist TINYMIST_ARCHIVE=$(TINYMIST_DARWIN_ARM64) \
+		TINYMIST_SHA256=$(TINYMIST_DARWIN_ARM64_SHA256) \
+		TINYMIST_OUT=$(DIST)/_bin/tinymist-darwin-arm64 ) & PID_TINYMIST=$$!; \
+	wait $$PID_GO || exit 1; \
+	wait $$PID_TYPST || exit 1; \
+	wait $$PID_TINYMIST || exit 1
+
+_build-macos-portable-amd64: _frontend-embed-portable
+	@mkdir -p $(DIST)/_bin
+	@( MACOSX_DEPLOYMENT_TARGET=$(MACOSX_DEPLOYMENT_TARGET) \
+		GOOS=darwin GOARCH=amd64 CGO_ENABLED=1 \
+		CGO_LDFLAGS="-framework UniformTypeIdentifiers" \
+		go build -tags "$(WAILS_TAGS)" -ldflags "$(PORTABLE_LDFLAGS)" \
+		-o $(DIST)/_bin/presto-portable-darwin-amd64 $(DESKTOP_SRC)/ ) & PID_GO=$$!; \
+	( $(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_DARWIN_AMD64) \
+		TYPST_OUT=$(DIST)/_bin/typst-darwin-amd64 ) & PID_TYPST=$$!; \
+	( $(MAKE) _download-tinymist TINYMIST_ARCHIVE=$(TINYMIST_DARWIN_AMD64) \
+		TINYMIST_SHA256=$(TINYMIST_DARWIN_AMD64_SHA256) \
+		TINYMIST_OUT=$(DIST)/_bin/tinymist-darwin-amd64 ) & PID_TINYMIST=$$!; \
+	wait $$PID_GO || exit 1; \
+	wait $$PID_TYPST || exit 1; \
+	wait $$PID_TINYMIST || exit 1
+
+_bundle-app-portable:
+	@mkdir -p "$(DIST)/$(APP_NAME).app/Contents/MacOS"
+	@mkdir -p "$(DIST)/$(APP_NAME).app/Contents/Resources"
+	@mkdir -p "$(DIST)/$(APP_NAME).app/Contents/Resources/zh-Hans.lproj"
+	rm -rf "$(DIST)/$(APP_NAME).app/Contents/Resources/sidecars/tinymist"
+	cp $(DIST)/_bin/presto-portable-darwin-$(GOARCH) \
+		"$(DIST)/$(APP_NAME).app/Contents/MacOS/$(APP_NAME)"
+	cp $(TYPST_BIN) "$(DIST)/$(APP_NAME).app/Contents/Resources/typst"
+	cp $(TINYMIST_BIN) "$(DIST)/$(APP_NAME).app/Contents/Resources/tinymist"
+	chmod +x "$(DIST)/$(APP_NAME).app/Contents/Resources/typst" "$(DIST)/$(APP_NAME).app/Contents/Resources/tinymist"
+	bash packaging/release/portable-templates.sh "$(DIST)/$(APP_NAME).app/Contents/Resources"
+	cp packaging/macos/Info.plist "$(DIST)/$(APP_NAME).app/Contents/"
+	cp packaging/macos/zh-Hans.lproj/InfoPlist.strings \
+		"$(DIST)/$(APP_NAME).app/Contents/Resources/zh-Hans.lproj/InfoPlist.strings"
+	sed -i '' 's/0\.1\.0/$(VERSION)/g' "$(DIST)/$(APP_NAME).app/Contents/Info.plist"
+	@if [ -f packaging/macos/icon.icns ]; then \
+		cp packaging/macos/icon.icns "$(DIST)/$(APP_NAME).app/Contents/Resources/"; \
+	fi
+	bash packaging/macos/codesign.sh "$(DIST)/$(APP_NAME).app"
+
+define CREATE_PORTABLE_DMG
+	@echo "==> Creating portable DMG..."
+	@rm -rf "$(DIST)/_dmg_stage" && mkdir -p "$(DIST)/_dmg_stage"
+	@cp -a "$(DIST)/$(APP_NAME).app" "$(DIST)/_dmg_stage/"
+	bash packaging/macos/create-dmg.sh \
+		--volname "$(APP_NAME)" \
+		--background "$(DMG_BG)" \
+		--volicon "$(DMG_VOLICON)" \
+		--window-size $(DMG_WIN_W) $(DMG_WIN_H) \
+		--icon-size $(DMG_ICON_SIZE) \
+		--icon "$(APP_NAME).app" $(DMG_APP_X) $(DMG_APP_Y) \
+		--hide-extension "$(APP_NAME).app" \
+		--app-drop-link $(DMG_LNK_X) $(DMG_LNK_Y) \
+		"$(DIST)/$(APP_NAME)-$(VERSION)-portable-macOS-$(1).dmg" \
+		"$(DIST)/_dmg_stage"
+	@rm -rf "$(DIST)/_dmg_stage"
+	@echo "==> $(DIST)/$(APP_NAME)-$(VERSION)-portable-macOS-$(1).dmg"
+endef
+
+dist-dmg-portable-arm64: _build-macos-portable-arm64
+	@$(MAKE) _bundle-app-portable GOARCH=arm64 TYPST_BIN=$(DIST)/_bin/typst-darwin-arm64 TINYMIST_BIN=$(DIST)/_bin/tinymist-darwin-arm64
+	$(call CREATE_PORTABLE_DMG,arm64)
+
+dist-dmg-portable-amd64: _build-macos-portable-amd64
+	@$(MAKE) _bundle-app-portable GOARCH=amd64 TYPST_BIN=$(DIST)/_bin/typst-darwin-amd64 TINYMIST_BIN=$(DIST)/_bin/tinymist-darwin-amd64
+	$(call CREATE_PORTABLE_DMG,amd64)
+
 # ─── Notarization ───────────────────────────────────────
 # Usage: make notarize DMG_PATH=dist/Presto-0.1.0-macOS-arm64.dmg
 
@@ -433,6 +531,45 @@ endif
 
 dist-windows: dist-windows-amd64
 
+# Windows single-file portable exe embedding is not implemented yet. This target keeps
+# the preferred portable-windows make target and emits an explicit ZIP fallback bundle
+# with the exe, Typst, Tinymist, and official template snapshot.
+ifeq ($(OS),Windows_NT)
+dist-windows-portable-amd64: _frontend-embed-portable
+	@powershell -NoProfile -Command "New-Item -ItemType Directory -Force -Path '$(DIST)','$(DIST)\\_portable-windows-amd64' | Out-Null"
+	@"$(MAKE)" _download-typst TYPST_ARCHIVE=$(TYPST_WINDOWS_AMD64) TYPST_OUT=$(DIST)/typst.exe
+	@"$(MAKE)" _download-tinymist TINYMIST_ARCHIVE=$(TINYMIST_WINDOWS_AMD64) TINYMIST_OUT=$(DIST)/tinymist.exe TINYMIST_SHA256=$(TINYMIST_WINDOWS_AMD64_SHA256)
+	@cd $(DESKTOP_SRC) && go run github.com/tc-hib/go-winres@latest make --in winres.json
+	@powershell -NoProfile -Command '$$env:GOOS="windows"; $$env:GOARCH="amd64"; $$env:CGO_ENABLED="0"; & go build -tags "$(WAILS_TAGS)" -ldflags "$(PORTABLE_LDFLAGS) -H windowsgui" -o "$(DIST)\\_portable-windows-amd64\\$(APP_NAME).exe" "$(DESKTOP_SRC)/"; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }'
+	@powershell -NoProfile -Command "Copy-Item '$(DIST)\\typst.exe','$(DIST)\\tinymist.exe' -Destination '$(DIST)\\_portable-windows-amd64' -Force"
+	bash packaging/release/portable-templates.sh "$(DIST)/_portable-windows-amd64"
+	@powershell -NoProfile -Command "Remove-Item -Force '$(DIST)\\$(APP_NAME)-$(VERSION)-portable-windows-amd64.zip' -ErrorAction SilentlyContinue; Compress-Archive -Path '$(DIST)\\_portable-windows-amd64\\*' -DestinationPath '$(DIST)\\$(APP_NAME)-$(VERSION)-portable-windows-amd64.zip' -Force"
+	@echo "WARNING: $(APP_NAME)-$(VERSION)-portable-windows-amd64.exe single-file embedding is not implemented; emitted explicit portable ZIP fallback."
+	@echo "==> $(DIST)/$(APP_NAME)-$(VERSION)-portable-windows-amd64.zip"
+else
+dist-windows-portable-amd64: _frontend-embed-portable
+	@mkdir -p $(DIST) $(DIST)/_portable-windows-amd64
+	@cd $(DESKTOP_SRC) && go run github.com/tc-hib/go-winres@latest make --in winres.json
+	@command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1 || \
+		{ echo "Error: mingw-w64 not found. Install with: brew install mingw-w64"; exit 1; }
+	@( GOOS=windows GOARCH=amd64 CGO_ENABLED=1 \
+		CC=x86_64-w64-mingw32-gcc \
+		go build -tags "$(WAILS_TAGS)" -ldflags "$(PORTABLE_LDFLAGS) -H windowsgui" \
+		-o "$(DIST)/_portable-windows-amd64/$(APP_NAME).exe" $(DESKTOP_SRC)/ ) & PID_GO=$$!; \
+	( $(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_WINDOWS_AMD64) \
+		TYPST_OUT=$(DIST)/_portable-windows-amd64/typst.exe ) & PID_TYPST=$$!; \
+	( $(MAKE) _download-tinymist TINYMIST_ARCHIVE=$(TINYMIST_WINDOWS_AMD64) \
+		TINYMIST_OUT=$(DIST)/_portable-windows-amd64/tinymist.exe TINYMIST_SHA256=$(TINYMIST_WINDOWS_AMD64_SHA256) ) & PID_TINYMIST=$$!; \
+	wait $$PID_GO || exit 1; \
+	wait $$PID_TYPST || exit 1; \
+	wait $$PID_TINYMIST || exit 1
+	bash packaging/release/portable-templates.sh "$(DIST)/_portable-windows-amd64"
+	@rm -f "$(DIST)/$(APP_NAME)-$(VERSION)-portable-windows-amd64.zip"
+	@( cd "$(DIST)/_portable-windows-amd64" && zip -qr "../$(APP_NAME)-$(VERSION)-portable-windows-amd64.zip" . )
+	@echo "WARNING: $(APP_NAME)-$(VERSION)-portable-windows-amd64.exe single-file embedding is not implemented; emitted explicit portable ZIP fallback."
+	@echo "==> $(DIST)/$(APP_NAME)-$(VERSION)-portable-windows-amd64.zip"
+endif
+
 # ─── Linux Distribution ─────────────────────────────────
 # Requires Docker (webkit2gtk headers not available on macOS)
 
@@ -458,12 +595,50 @@ dist-linux-amd64: frontend
 
 dist-linux: dist-linux-amd64
 
+dist-linux-portable-amd64: _frontend-embed-portable
+	@mkdir -p $(DIST)
+	@command -v docker >/dev/null 2>&1 || \
+		{ echo "Error: Docker not found. Linux portable builds require Docker."; exit 1; }
+	@rm -rf "$(DIST)/_appimage"
+	@mkdir -p "$(DIST)/_appimage/$(APP_NAME).AppDir/usr/bin" "$(DIST)/_appimage/$(APP_NAME).AppDir/usr/share/presto"
+	docker run --rm \
+		-v "$(PWD)":/src \
+		-w /src \
+		-e GOOS=linux -e GOARCH=amd64 -e CGO_ENABLED=1 \
+		golang:1.26.3 \
+		bash -c '\
+			apt-get update -qq && \
+			apt-get install -y -qq libgtk-3-dev libwebkit2gtk-4.0-dev pkg-config > /dev/null 2>&1 && \
+			rm -rf cmd/presto-desktop/build/_app && \
+			cp -r frontend/build/* cmd/presto-desktop/build/ && \
+			go build -tags "$(WAILS_TAGS)" -ldflags "$(PORTABLE_LDFLAGS)" \
+				-o dist/_appimage/$(APP_NAME).AppDir/usr/bin/$(APP_NAME) $(DESKTOP_SRC)/'
+	@$(MAKE) _download-typst TYPST_ARCHIVE=$(TYPST_LINUX_AMD64) TYPST_OUT=$(DIST)/_appimage/$(APP_NAME).AppDir/usr/bin/typst
+	@$(MAKE) _download-tinymist TINYMIST_ARCHIVE=$(TINYMIST_LINUX_AMD64) TINYMIST_OUT=$(DIST)/_appimage/$(APP_NAME).AppDir/usr/bin/tinymist TINYMIST_SHA256=$(TINYMIST_LINUX_AMD64_SHA256)
+	bash packaging/release/portable-templates.sh "$(DIST)/_appimage/$(APP_NAME).AppDir/usr/share/presto"
+	cp -R "$(DIST)/_appimage/$(APP_NAME).AppDir/usr/share/presto/templates" "$(DIST)/_appimage/$(APP_NAME).AppDir/usr/bin/templates"
+	cp packaging/linux/presto.desktop "$(DIST)/_appimage/$(APP_NAME).AppDir/presto.desktop"
+	@mkdir -p "$(DIST)/_appimage/$(APP_NAME).AppDir/usr/share/applications" "$(DIST)/_appimage/$(APP_NAME).AppDir/usr/share/icons/hicolor/512x512/apps"
+	cp packaging/linux/presto.desktop "$(DIST)/_appimage/$(APP_NAME).AppDir/usr/share/applications/presto.desktop"
+	@if [ -f frontend/static/icon-512x512.png ]; then \
+		cp frontend/static/icon-512x512.png "$(DIST)/_appimage/$(APP_NAME).AppDir/presto.png"; \
+		cp frontend/static/icon-512x512.png "$(DIST)/_appimage/$(APP_NAME).AppDir/usr/share/icons/hicolor/512x512/apps/presto.png"; \
+	fi
+	printf '#!/bin/sh\nHERE=$$(dirname "$$(readlink -f "$$0")")\nexec "$$HERE/usr/bin/$(APP_NAME)" "$$@"\n' > "$(DIST)/_appimage/$(APP_NAME).AppDir/AppRun"
+	chmod +x "$(DIST)/_appimage/$(APP_NAME).AppDir/AppRun" "$(DIST)/_appimage/$(APP_NAME).AppDir/usr/bin/$(APP_NAME)" "$(DIST)/_appimage/$(APP_NAME).AppDir/usr/bin/typst" "$(DIST)/_appimage/$(APP_NAME).AppDir/usr/bin/tinymist"
+	bash packaging/linux/appimage.sh "$(DIST)/_appimage/$(APP_NAME).AppDir" "$(DIST)/$(APP_NAME)-$(VERSION)-portable-linux-amd64.AppImage"
+
 # ─── Build All ───────────────────────────────────────────
 
 dist: dist-dmg dist-windows dist-linux
 	@echo ""
 	@echo "=== Distribution artifacts ==="
 	@ls -lh $(DIST)/*.dmg $(DIST)/*.exe $(DIST)/*-linux-* 2>/dev/null || true
+
+dist-portable: dist-dmg-portable-arm64 dist-dmg-portable-amd64 dist-windows-portable-amd64 dist-linux-portable-amd64
+	@echo ""
+	@echo "=== Portable distribution artifacts ==="
+	@ls -lh $(DIST)/*portable* 2>/dev/null || true
 
 # ─── Clean ───────────────────────────────────────────────
 
