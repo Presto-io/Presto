@@ -85,8 +85,9 @@ func (a *App) CheckForUpdate() (*UpdateInfo, error) {
 		osName = "macOS"
 	}
 	pattern := fmt.Sprintf("%s-%s", osName, runtime.GOARCH)
+	channel := a.releaseCapabilities().ReleaseChannel
 	for _, asset := range release.Assets {
-		if strings.Contains(asset.Name, pattern) && isExpectedUpdateAsset(asset.Name) {
+		if strings.Contains(asset.Name, pattern) && isExpectedUpdateAssetForChannel(asset.Name, channel) {
 			if _, _, _, err := parseUpdateAssetURL(asset.BrowserDownloadURL); err != nil {
 				log.Printf("[desktop] skipped unsafe update asset URL for %s: %v", asset.Name, err)
 				continue
@@ -204,7 +205,7 @@ func (a *App) DownloadAndInstallUpdate(downloadURL string) error {
 	if err != nil {
 		return fmt.Errorf("unsafe update URL: %w", err)
 	}
-	if !isExpectedUpdateAsset(filename) {
+	if !isExpectedUpdateAssetForChannel(filename, a.releaseCapabilities().ReleaseChannel) {
 		return fmt.Errorf("unexpected update asset for this platform: %s", filename)
 	}
 
@@ -282,15 +283,22 @@ func parseUpdateAssetURL(rawURL string) (repo, tag, filename string, err error) 
 }
 
 func isExpectedUpdateAsset(filename string) bool {
+	return isExpectedUpdateAssetForChannel(filename, currentReleaseCapabilities().ReleaseChannel)
+}
+
+func isExpectedUpdateAssetForChannel(filename string, channel string) bool {
+	if channel == "portable" {
+		return false
+	}
+	if strings.Contains(filename, "-portable-") {
+		return false
+	}
 	osName := runtime.GOOS
 	if osName == "darwin" {
 		osName = "macOS"
 	}
 	platform := fmt.Sprintf("-%s-%s", osName, runtime.GOARCH)
 	if !strings.HasPrefix(filename, "Presto-") || !strings.Contains(filename, platform) {
-		return false
-	}
-	if strings.Contains(filename, "-portable-") {
 		return false
 	}
 	switch runtime.GOOS {

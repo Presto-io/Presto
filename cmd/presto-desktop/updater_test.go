@@ -52,6 +52,21 @@ func TestIsExpectedUpdateAsset(t *testing.T) {
 	}
 }
 
+func TestIsExpectedUpdateAssetForChannel(t *testing.T) {
+	if runtime.GOOS == "darwin" && runtime.GOARCH == "arm64" && !isExpectedUpdateAssetForChannel("Presto-1.2.3-macOS-arm64.dmg", "slim") {
+		t.Fatalf("default macOS arm64 asset should be accepted on darwin/arm64")
+	}
+	if isExpectedUpdateAssetForChannel("Presto-1.2.3-portable-macOS-arm64.dmg", "slim") {
+		t.Fatalf("default updater should reject portable-macOS assets")
+	}
+	if isExpectedUpdateAssetForChannel("Presto-1.2.3-portable-windows-amd64.exe", "slim") {
+		t.Fatalf("default updater should reject portable Windows assets")
+	}
+	if isExpectedUpdateAssetForChannel(testUpdateFilename(), "portable") {
+		t.Fatalf("portable rejects all update assets")
+	}
+}
+
 func TestParseUpdateChecksums(t *testing.T) {
 	filename := testUpdateFilename()
 	hash := strings.Repeat("a", 64)
