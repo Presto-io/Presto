@@ -93,7 +93,7 @@ func addFileMenu(appMenu *menu.Menu, app *App) {
 	})
 	fileMenu.AddSeparator()
 	fileMenu.AddText("关闭窗口", keys.CmdOrCtrl("w"), func(_ *menu.CallbackData) {
-		wailsRuntime.EventsEmit(app.ctx, "menu:close-window")
+		app.QuitApp()
 	})
 }
 

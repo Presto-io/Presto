@@ -26,6 +26,11 @@
 	let appVersion = $state(__APP_VERSION__);
 	let capabilities = $state<ReleaseCapabilities>(defaultCapabilities);
 	let channelText = $derived(capabilities.releaseChannel === 'portable' ? '离线便携包' : '默认精剪包');
+	type CloseDecision = 'Save' | 'Discard' | 'Cancel';
+	let closeConfirmDialog = $state<HTMLDialogElement>();
+	let closeConfirmFilename = $state('');
+	let closeDecisionPromise: Promise<CloseDecision> | null = null;
+	let resolveCloseDecision: ((decision: CloseDecision) => void) | null = null;
 
 	type MenuAction =
 		| 'new'
@@ -175,6 +180,100 @@
 		return event.defaultPrevented;
 	}
 
+	function hasRealEditorChanges(): boolean {
+		const content = editor.markdown;
+		if (!content.trim()) return false;
+		if (content === editor.savedContent) return false;
+		if (editor.exampleContent && content === editor.exampleContent) return false;
+		return true;
+	}
+
+	function currentDocumentFilename(): string {
+		return editor.currentFilePath?.split(/[/\\]/).pop() || '';
+	}
+
+	function askUnsavedCloseDecision(): Promise<CloseDecision> {
+		if (!hasRealEditorChanges()) return Promise.resolve('Discard');
+		if (closeDecisionPromise) return closeDecisionPromise;
+
+		closeConfirmFilename = currentDocumentFilename();
+		closeDecisionPromise = new Promise((resolve) => {
+			resolveCloseDecision = resolve;
+			closeConfirmDialog?.showModal();
+		});
+		return closeDecisionPromise;
+	}
+
+	function completeCloseDecision(decision: CloseDecision) {
+		closeConfirmDialog?.close();
+		const resolve = resolveCloseDecision;
+		resolveCloseDecision = null;
+		closeDecisionPromise = null;
+		resolve?.(decision);
+	}
+
+	function handleCloseDialogCancel(event: Event) {
+		event.preventDefault();
+		completeCloseDecision('Cancel');
+	}
+
+	async function saveEditorMarkdown(): Promise<boolean> {
+		if (!editor.markdown.trim()) return false;
+		if (!window.go?.main?.App?.SaveMarkdown) return false;
+
+		try {
+			if (editor.currentFilePath) {
+				await window.go.main.App.SaveMarkdown(editor.markdown, editor.currentFilePath);
+			} else {
+				if (!window.go.main.App.SaveMarkdownAs) return false;
+				const defaultName = (editor.outputInfo?.previewTitle || editor.documentTitle || 'untitled') + '.md';
+				const savedPath = await window.go.main.App.SaveMarkdownAs(editor.markdown, defaultName);
+				if (!savedPath) return false;
+				editor.currentFilePath = savedPath;
+			}
+			editor.isDirty = false;
+			editor.savedContent = editor.markdown;
+			await window.go?.main?.App?.SetDirtyState?.(false, '');
+			return true;
+		} catch (error) {
+			notificationStore.show({
+				message: error instanceof Error ? error.message : String(error),
+				type: 'error',
+				source: 'editor',
+				groupKey: 'global-close',
+				durationMs: 4500,
+			});
+			return false;
+		}
+	}
+
+	async function closeWindowWithoutPrompt() {
+		editor.isDirty = false;
+		editor.savedContent = editor.markdown;
+		await window.go?.main?.App?.SetDirtyState?.(false, '');
+
+		if (window.go?.main?.App?.QuitApp) {
+			await window.go.main.App.QuitApp();
+		} else {
+			window.runtime?.Quit?.();
+		}
+	}
+
+	async function handleGlobalCloseRequest(action: 'close-window' | 'quit' = 'close-window') {
+		const handled = emitPageMenuAction(action);
+		if (handled) return;
+
+		const decision = await askUnsavedCloseDecision();
+		if (decision === 'Cancel') return;
+
+		if (decision === 'Save') {
+			const saved = await saveEditorMarkdown();
+			if (!saved) return;
+		}
+
+		await closeWindowWithoutPrompt();
+	}
+
 	function handleMenuItem(item: { action?: MenuAction; href?: string }) {
 		if (item.action) {
 			if (['undo', 'redo', 'cut', 'copy', 'paste', 'selectall'].includes(item.action)) {
@@ -182,10 +281,10 @@
 				document.execCommand(command);
 				return;
 			}
-			const handled = emitPageMenuAction(item.action);
-			if (!handled && (item.action === 'close-window' || item.action === 'quit')) {
-				void window.go?.main?.App?.QuitApp?.();
-				window.runtime?.Quit?.();
+			if (item.action === 'close-window' || item.action === 'quit') {
+				void handleGlobalCloseRequest(item.action);
+			} else {
+				emitPageMenuAction(item.action);
 			}
 			return;
 		}
@@ -213,11 +312,7 @@
 	}
 
 	function handleWindowClose() {
-		const handled = emitPageMenuAction('close-window');
-		if (!handled) {
-			void window.go?.main?.App?.QuitApp?.();
-			window.runtime?.Quit?.();
-		}
+		void handleGlobalCloseRequest('close-window');
 	}
 
 	$effect(() => {
@@ -364,6 +459,15 @@
 			window.runtime.EventsOn('app:show-about', (data: any) => {
 				void openAbout(data?.version);
 			});
+			window.runtime.EventsOn('menu:close-window', () => {
+				void handleGlobalCloseRequest('close-window');
+			});
+			window.runtime.EventsOn('menu:quit', () => {
+				void handleGlobalCloseRequest('quit');
+			});
+			window.runtime.EventsOn('app:request-close', () => {
+				void handleGlobalCloseRequest('close-window');
+			});
 			// URL scheme: presto://install/{name} → navigate to template detail page
 			// Hot start: event pushed from Go via SingleInstanceLock
 			window.runtime.EventsOn('url-scheme-open-template', (name: string) => {
@@ -434,6 +538,9 @@
 		window.runtime?.EventsOff?.('native-file-drop');
 		window.runtime?.EventsOff?.('native-file-open');
 		window.runtime?.EventsOff?.('app:show-about');
+		window.runtime?.EventsOff?.('menu:close-window');
+		window.runtime?.EventsOff?.('menu:quit');
+		window.runtime?.EventsOff?.('app:request-close');
 	});
 </script>
 
@@ -505,6 +612,22 @@
 	<div class="dialog-actions">
 		<button class="dialog-btn primary" onclick={fileRouter.confirmAccept}>替换</button>
 		<button class="dialog-btn" onclick={fileRouter.confirmCancel}>取消</button>
+	</div>
+</dialog>
+
+<dialog bind:this={closeConfirmDialog} class="confirm-dialog" oncancel={handleCloseDialogCancel}>
+	<h3>保存更改？</h3>
+	<p>
+		{#if closeConfirmFilename}
+			是否保存对 “{closeConfirmFilename}” 的更改？
+		{:else}
+			是否保存对文档的更改？
+		{/if}
+	</p>
+	<div class="dialog-actions">
+		<button type="button" class="dialog-btn primary" onclick={() => completeCloseDecision('Save')}>保存</button>
+		<button type="button" class="dialog-btn" onclick={() => completeCloseDecision('Discard')}>不保存</button>
+		<button type="button" class="dialog-btn" onclick={() => completeCloseDecision('Cancel')}>取消</button>
 	</div>
 </dialog>
 {/if}

@@ -850,21 +850,6 @@
       runtime.EventsOn('menu:saveas', handleSaveAs);
       runtime.EventsOn('menu:store', () => goto('/store-templates'));
       runtime.EventsOn('menu:skill-store', () => goto('/store-skills'));
-      runtime.EventsOn('menu:close-window', () => {
-        void handleCloseRequest();
-      });
-
-      runtime.EventsOn('menu:quit', async () => {
-        await handleCloseRequest();
-      });
-
-      runtime.EventsOn('app:save-and-close', async () => {
-        const saved = await handleSave();
-        if (saved) await closeWindowWithoutPrompt();
-      });
-      runtime.EventsOn('app:request-close', () => {
-        void handleCloseRequest();
-      });
     }
 
     function handleTemplatesUpdated(e: Event) {
@@ -988,10 +973,6 @@
         runtime.EventsOff('menu:saveas');
         runtime.EventsOff('menu:store');
         runtime.EventsOff('menu:skill-store');
-        runtime.EventsOff('menu:close-window');
-        runtime.EventsOff('menu:quit');
-        runtime.EventsOff('app:save-and-close');
-        runtime.EventsOff('app:request-close');
         runtime.EventsOff('preview:event');
       }
     };
