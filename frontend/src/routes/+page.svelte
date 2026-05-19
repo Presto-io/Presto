@@ -240,9 +240,17 @@
   let closeDecisionPromise: Promise<CloseDecision> | null = null;
   let resolveCloseDecision: ((decision: CloseDecision) => void) | null = null;
 
-  async function loadExample(templateId: string) {
+  function canApplyDefaultExample(templateId: string): boolean {
+    return editor.selectedTemplate === templateId &&
+      !editor.pendingExternalLoad &&
+      !editor.currentFilePath &&
+      !editor.markdown.trim();
+  }
+
+  async function loadExample(templateId: string, options: { force?: boolean } = {}) {
     try {
       const example = await getExample(templateId);
+      if (!options.force && !canApplyDefaultExample(templateId)) return;
       if (example) {
         resetPreviewDocumentKey();
         editor.markdown = example;
@@ -273,7 +281,7 @@
   function handleUseExample() {
     confirmDialog?.close();
     editor.selectedTemplate = pendingTemplate;
-    loadExample(pendingTemplate);
+    loadExample(pendingTemplate, { force: true });
     pendingTemplate = '';
   }
 

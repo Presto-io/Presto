@@ -90,6 +90,7 @@ COPY --from=frontend-builder /app/build /srv/frontend
 ENV PORT=8080
 ENV HOST=0.0.0.0
 ENV STATIC_DIR=/srv/frontend
+ENV PRESTO_INJECT_API_KEY=true
 ENV HOME=/home/presto
 ENV PRESTO_CONFIG_DIR=/config
 ENV PRESTO_DATA_DIR=/data

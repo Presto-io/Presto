@@ -39,6 +39,26 @@ func TestPreviewRunnerWritesSessionMainTyp(t *testing.T) {
 	}
 }
 
+func TestPreviewRunnerWritesWorkDirSessionMainTypInSystemTemp(t *testing.T) {
+	runner := newPreviewRunner(preview.NewService(), "tinymist")
+	documentDir := t.TempDir()
+	mainTypPath, cleanup, err := runner.writeSessionFile(documentDir, "#show: doc")
+	if err != nil {
+		t.Fatalf("write session file: %v", err)
+	}
+	defer cleanup()
+
+	if filepath.Dir(mainTypPath) == documentDir {
+		t.Fatalf("main.typ should be written outside document dir, got %q", mainTypPath)
+	}
+	if _, err := os.Stat(filepath.Join(documentDir, "main.typ")); !os.IsNotExist(err) {
+		t.Fatalf("document dir main.typ should not exist, stat err = %v", err)
+	}
+	if filepath.Dir(mainTypPath) != runner.sessionWorkDir {
+		t.Fatalf("runner sessionWorkDir = %q, want %q", runner.sessionWorkDir, filepath.Dir(mainTypPath))
+	}
+}
+
 func TestPreviewRunnerBuildsTinymistArgs(t *testing.T) {
 	runner := newPreviewRunner(preview.NewService(), "tinymist")
 	got := runner.buildTinymistArgs("/tmp/main.typ", 23625, 23626)
@@ -170,7 +190,7 @@ func TestPreviewRunnerRewritesExistingSessionFileForContentUpdate(t *testing.T) 
 
 func TestPreviewRunnerStartTinymistReturnsStartError(t *testing.T) {
 	runner := newPreviewRunner(preview.NewService(), filepath.Join(t.TempDir(), "missing-tinymist"))
-	if err := runner.startTinymist(context.Background(), "/tmp/main.typ", 1, 2); err == nil {
+	if err := runner.startTinymist(context.Background(), "/tmp/main.typ", "", 1, 2); err == nil {
 		t.Fatal("startTinymist should return start error for missing binary")
 	}
 }

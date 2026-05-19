@@ -41,6 +41,13 @@ function templateNamesFrom(items: any[] | undefined): string[] {
     .filter((name): name is string => typeof name === 'string' && name.length > 0);
 }
 
+function canSeedEditorWithTemplate(templateName?: string): boolean {
+  return !editor.pendingExternalLoad &&
+    !editor.currentFilePath &&
+    !editor.markdown.trim() &&
+    (!templateName || !editor.selectedTemplate || editor.selectedTemplate === templateName);
+}
+
 export const firstLaunchStore = {
   get state() { return _state; },
 
@@ -101,11 +108,7 @@ export const firstLaunchStore = {
 
         // Auto-select and load example for first successfully downloaded template
         // Prefer 'gongwen' if it's among the downloads
-        const canSeedEditor = !editor.pendingExternalLoad &&
-          !editor.currentFilePath &&
-          !editor.markdown.trim();
-
-        if (!editor.selectedTemplate && canSeedEditor) {
+        if (!editor.selectedTemplate && canSeedEditorWithTemplate()) {
           const templates = Array.from(_state.templates.keys());
           const successTemplates = templates.filter((t: string) =>
             _state.templates.get(t)?.status === 'success'
@@ -122,6 +125,7 @@ export const firstLaunchStore = {
 
             // Load example document into editor
             getExample(templateToSelect).then(example => {
+              if (!canSeedEditorWithTemplate(templateToSelect)) return;
               if (example) {
                 editor.markdown = example;
                 editor.savedContent = example;

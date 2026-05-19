@@ -53,50 +53,35 @@ func newPreviewRunner(service *preview.Service, tinymistPath string) *previewRun
 }
 
 func (r *previewRunner) writeSessionFile(workDir string, typstSource string) (mainTypPath string, cleanup func(), err error) {
-	ownedWorkDir := false
-	if workDir == "" {
-		r.mu.Lock()
-		workDir = r.sessionWorkDir
-		r.mu.Unlock()
-		if workDir == "" {
-			workDir, err = os.MkdirTemp("", "presto-preview-*")
-			if err != nil {
-				return "", nil, err
-			}
-			ownedWorkDir = true
-		} else {
-			ownedWorkDir = true
+	r.mu.Lock()
+	sessionWorkDir := r.sessionWorkDir
+	r.mu.Unlock()
+	if sessionWorkDir == "" {
+		sessionWorkDir, err = os.MkdirTemp("", "presto-preview-*")
+		if err != nil {
+			return "", nil, err
 		}
 	}
 
-	if err := os.MkdirAll(workDir, 0755); err != nil {
-		if ownedWorkDir {
-			_ = os.RemoveAll(workDir)
-		}
+	if err := os.MkdirAll(sessionWorkDir, 0755); err != nil {
+		_ = os.RemoveAll(sessionWorkDir)
 		return "", nil, err
 	}
 
-	mainTypPath = filepath.Join(workDir, "main.typ")
+	mainTypPath = filepath.Join(sessionWorkDir, "main.typ")
 	if err := os.WriteFile(mainTypPath, []byte(typstSource), 0644); err != nil {
-		if ownedWorkDir {
-			_ = os.RemoveAll(workDir)
-		}
+		_ = os.RemoveAll(sessionWorkDir)
 		return "", nil, err
 	}
 
-	if ownedWorkDir {
-		r.mu.Lock()
-		r.sessionWorkDir = workDir
-		r.mu.Unlock()
-	}
+	r.mu.Lock()
+	r.sessionWorkDir = sessionWorkDir
+	r.mu.Unlock()
 
 	cleanup = func() {
-		if !ownedWorkDir {
-			return
-		}
-		_ = os.RemoveAll(workDir)
+		_ = os.RemoveAll(sessionWorkDir)
 		r.mu.Lock()
-		if r.sessionWorkDir == workDir {
+		if r.sessionWorkDir == sessionWorkDir {
 			r.sessionWorkDir = ""
 		}
 		r.mu.Unlock()
@@ -116,12 +101,15 @@ func (r *previewRunner) buildTinymistArgs(mainTypPath string, dataPort int, cont
 	}
 }
 
-func (r *previewRunner) startTinymist(ctx context.Context, mainTypPath string, dataPort int, controlPort int) error {
+func (r *previewRunner) startTinymist(ctx context.Context, mainTypPath string, workDir string, dataPort int, controlPort int) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	runCtx, cancel := context.WithCancel(ctx)
 	cmd := exec.CommandContext(runCtx, r.tinymistPath, r.buildTinymistArgs(mainTypPath, dataPort, controlPort)...)
+	if workDir != "" {
+		cmd.Dir = workDir
+	}
 	if err := cmd.Start(); err != nil {
 		cancel()
 		return err
@@ -371,7 +359,7 @@ func (a *App) PreviewUpdate(markdown string, templateID string, workDir string, 
 			return applyFallback(err.Error())
 		}
 
-		if err := a.previewRunner.startTinymist(context.Background(), mainTypPath, dataPort, controlPort); err != nil {
+		if err := a.previewRunner.startTinymist(context.Background(), mainTypPath, workDir, dataPort, controlPort); err != nil {
 			return applyFallback(err.Error())
 		}
 		dataPlaneURL := fmt.Sprintf("http://127.0.0.1:%d", dataPort)
