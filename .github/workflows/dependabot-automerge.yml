@@ -7,7 +7,7 @@ on:
     workflows: [Test, Security Scan]
     types: [completed]
   schedule:
-    - cron: '17 */4 * * *'
+    - cron: '19 13 * * *'
   workflow_dispatch:
     inputs:
       pr_number:
