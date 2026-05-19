@@ -93,8 +93,14 @@ if grep -REn 'fonts\.googleapis\.com|fonts\.gstatic\.com|@import url\(['\''"]htt
   fail "frontend source contains remote font or CSS imports"
 fi
 
-if grep -Fq 'Presto-Homepage/releases' frontend/src/routes/settings/+page.svelte; then
-  fail "settings update fallback still points at Presto-Homepage releases"
+if grep -REn --exclude='*_test.go' 'Presto-Homepage/releases|repos/Presto-io/Presto-Homepage/releases' \
+  cmd/presto-desktop/*.go frontend/src .github/workflows >/dev/null; then
+  fail "app update checks must target Presto-io/Presto releases, not Presto-Homepage"
+fi
+
+if grep -REn 'HOMEPAGE_DISPATCH_TOKEN|release-published' \
+  .github/workflows >/dev/null; then
+  fail "release workflow must not dispatch release sync events to Presto-Homepage"
 fi
 
 echo "PORTABLE_OFFLINE_STATIC_AUDIT=PASS"
