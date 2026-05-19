@@ -1,4 +1,5 @@
 import type { Registry } from '$lib/api/types';
+import { loadCapabilities } from '$lib/config/channel';
 
 const useMock = import.meta.env.DEV || import.meta.env.VITE_MOCK === '1';
 
@@ -20,6 +21,11 @@ export const registryStore = {
     _loading = true;
     _error = null;
     try {
+      const capabilities = await loadCapabilities();
+      if (!capabilities.onlineRegistry) {
+        _registry = { version: 0, updatedAt: '', templates: [] };
+        return;
+      }
       const res = await fetch(REGISTRY_URL);
       if (!res.ok) throw new Error(`${res.status}`);
       _registry = await res.json();

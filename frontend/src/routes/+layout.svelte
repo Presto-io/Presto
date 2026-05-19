@@ -9,6 +9,11 @@
 	import { fileRouter } from '$lib/stores/file-router.svelte';
 	import { notificationStore } from '$lib/stores/notification.svelte';
 	import { editor } from '$lib/stores/editor.svelte';
+	import {
+		defaultCapabilities,
+		loadCapabilities,
+		type ReleaseCapabilities,
+	} from '$lib/config/channel';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 
@@ -19,6 +24,8 @@
 	let isWindowsDesktop = $state(false);
 	let showAbout = $state(false);
 	let appVersion = $state(__APP_VERSION__);
+	let capabilities = $state<ReleaseCapabilities>(defaultCapabilities);
+	let channelText = $derived(capabilities.releaseChannel === 'portable' ? '离线便携包' : '默认精剪包');
 
 	type MenuAction =
 		| 'new'
@@ -84,6 +91,23 @@
 			],
 		},
 	];
+	let visibleMenuGroups = $derived(
+		menuGroups
+			.map((group) => ({
+				...group,
+				items: group.items.filter((item) => menuItemAllowed(item)),
+			}))
+			.filter((group) => group.items.some((item) => !item.separator))
+	);
+
+	function menuItemAllowed(item: { label: string; href?: string; separator?: boolean }): boolean {
+		if (item.separator) return true;
+		if (item.href === '/store-templates') return capabilities.onlineTemplateStore;
+		if (item.href === '/store-skills') return capabilities.onlineSkillStore;
+		if (item.href === 'update:presto') return capabilities.appUpdateCheck;
+		if (item.href?.startsWith('http')) return capabilities.externalBrowserLinks;
+		return true;
+	}
 
 	async function resolveEmbeddedMenuMode() {
 		if (isShowcase) {
@@ -128,6 +152,7 @@
 	}
 
 	function openExternal(url: string) {
+		if (!capabilities.externalBrowserLinks) return;
 		if (window.runtime?.BrowserOpenURL) {
 			window.runtime.BrowserOpenURL(url);
 		} else {
@@ -136,6 +161,7 @@
 	}
 
 	function checkUpdateFromAbout() {
+		if (!capabilities.appUpdateCheck) return;
 		closeAbout();
 		void window.go?.main?.App?.CheckAndNotifyUpdate?.();
 	}
@@ -170,10 +196,12 @@
 			return;
 		}
 		if (item.href === 'update:presto') {
+			if (!capabilities.appUpdateCheck) return;
 			void window.go?.main?.App?.CheckAndNotifyUpdate?.();
 			return;
 		}
 		if (item.href.startsWith('http')) {
+			if (!capabilities.externalBrowserLinks) return;
 			if (window.runtime?.BrowserOpenURL) {
 				window.runtime.BrowserOpenURL(item.href);
 			} else {
@@ -315,6 +343,7 @@
 		// Skip all event registration in showcase mode
 		if (isShowcase) return;
 
+		capabilities = await loadCapabilities();
 		void loadAppVersion();
 
 		// Register drag handlers on window in capture phase
@@ -339,7 +368,9 @@
 			// Hot start: event pushed from Go via SingleInstanceLock
 			window.runtime.EventsOn('url-scheme-open-template', (name: string) => {
 				console.log('[url-scheme] hot start event received:', name);
-				goto(`/store-templates?template=${encodeURIComponent(name)}`);
+				if (capabilities.onlineTemplateStore) {
+					goto(`/store-templates?template=${encodeURIComponent(name)}`);
+				}
 			});
 
 			// Cold start: pull pending URL from Go (event timing unreliable at startup)
@@ -349,7 +380,7 @@
 				console.log('[url-scheme] startup URL:', pendingURL);
 				if (pendingURL) {
 					const match = pendingURL.match(/^presto:\/\/install\/(.+)/);
-					if (match) {
+					if (match && capabilities.onlineTemplateStore) {
 						console.log('[url-scheme] navigating to template:', match[1]);
 						goto(`/store-templates?template=${encodeURIComponent(match[1])}`);
 					}
@@ -411,7 +442,7 @@
 		<nav class="embedded-menu" aria-label="应用菜单" style="--wails-draggable:drag">
 			<div class="embedded-menu-left">
 				<span class="embedded-menu-title">Presto</span>
-				{#each menuGroups as group}
+				{#each visibleMenuGroups as group}
 					<div class="menu-group">
 						<button class="menu-trigger" type="button">{group.label}</button>
 						<div class="menu-popover">
@@ -515,6 +546,10 @@
 					<strong>{appVersion}</strong>
 				</div>
 				<div class="about-info-row">
+					<span>发行渠道</span>
+					<strong>{channelText}</strong>
+				</div>
+				<div class="about-info-row">
 					<span>排版引擎</span>
 					<strong>Typst</strong>
 				</div>
@@ -531,14 +566,18 @@
 			<div class="about-footer">
 				<div class="about-copyright">© 2024-2026 Presto-io</div>
 				<div class="about-actions">
-					<button type="button" class="about-action" onclick={checkUpdateFromAbout}>
-						<RefreshCw size={14} />
-						检查更新
-					</button>
-					<button type="button" class="about-action" onclick={() => openExternal('https://github.com/Presto-io/Presto')}>
-						<ExternalLink size={14} />
-						GitHub
-					</button>
+					{#if capabilities.appUpdateCheck}
+						<button type="button" class="about-action" onclick={checkUpdateFromAbout}>
+							<RefreshCw size={14} />
+							检查更新
+						</button>
+					{/if}
+					{#if capabilities.externalBrowserLinks}
+						<button type="button" class="about-action" onclick={() => openExternal('https://github.com/Presto-io/Presto')}>
+							<ExternalLink size={14} />
+							GitHub
+						</button>
+					{/if}
 				</div>
 			</div>
 		</div>

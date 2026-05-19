@@ -5,10 +5,13 @@
   import { installFromRegistry, deleteTemplate } from '$lib/api/client';
   import type { RegistryItem } from '$lib/api/types';
   import { page } from '$app/stores';
+  import { loadCapabilities, type ReleaseCapabilities } from '$lib/config/channel';
 
   const isDev = import.meta.env.DEV || import.meta.env.VITE_MOCK === '1';
   let installedVersions = $derived(new Map(templateStore.templates.map(t => [t.name, t.version])));
   let communityEnabled = $state(false);
+  let capabilities = $state<ReleaseCapabilities | null>(null);
+  let capabilitiesLoaded = $state(false);
 
   // Read ?template= query param for deep linking (from presto:// URL scheme)
   let initialTemplate = $derived($page.url.searchParams.get('template'));
@@ -29,32 +32,68 @@
     await templateStore.refresh();
   }
 
-  onMount(() => {
+  onMount(async () => {
+    capabilities = await loadCapabilities();
+    capabilitiesLoaded = true;
     templateStore.load();
     communityEnabled = localStorage.getItem('communityTemplates') === 'true';
   });
 </script>
 
-<StoreView
-  mode="desktop"
-  registryUrl="https://presto.c-1o.top/templates/registry.json"
-  mockRegistryUrl="/mock/registry.json"
-  title="模板商店"
-  installFn={handleInstall}
-  {installedVersions}
-  previewUrl={(name) => `/showcase/editor?registry=${name}`}
-  readmeUrl={(name) => `https://presto.c-1o.top/templates/${name}/README.md`}
-  backRoute="/settings"
-  {communityEnabled}
-  initialSelectedId={initialTemplate}
-  statsUrl={isDev ? '/mock/stats.json' : 'https://registry.presto.app/api/stats'}
-  onInstallSuccess={async (name) => {
-    if (!isDev) {
-      try {
-        await fetch(`https://registry.presto.app/api/stats/${encodeURIComponent(name)}/download`, { method: 'POST' });
-      } catch {}
-    }
-  }}
-  uninstallFn={handleUninstall}
-  onUninstallSuccess={() => {}}
-/>
+{#if !capabilitiesLoaded}
+  <main class="store-disabled">
+    <h2>模板商店</h2>
+  </main>
+{:else if capabilities && !capabilities.onlineTemplateStore}
+  <main class="store-disabled">
+    <h2>模板商店</h2>
+    <p>离线便携包已关闭在线模板商店。你仍可通过本地 ZIP 导入官方模板覆盖版本。</p>
+  </main>
+{:else if capabilities}
+  <StoreView
+    mode="desktop"
+    registryUrl="https://presto.c-1o.top/templates/registry.json"
+    mockRegistryUrl="/mock/registry.json"
+    title="模板商店"
+    installFn={handleInstall}
+    {installedVersions}
+    previewUrl={(name) => `/showcase/editor?registry=${name}`}
+    readmeUrl={(name) => `https://presto.c-1o.top/templates/${name}/README.md`}
+    backRoute="/settings"
+    {communityEnabled}
+    initialSelectedId={initialTemplate}
+    statsUrl={isDev ? '/mock/stats.json' : 'https://registry.presto.app/api/stats'}
+    onInstallSuccess={async (name) => {
+      if (!isDev) {
+        try {
+          await fetch(`https://registry.presto.app/api/stats/${encodeURIComponent(name)}/download`, { method: 'POST' });
+        } catch {}
+      }
+    }}
+    uninstallFn={handleUninstall}
+    onUninstallSuccess={() => {}}
+  />
+{/if}
+
+<style>
+  .store-disabled {
+    display: flex;
+    height: 100%;
+    flex-direction: column;
+    justify-content: center;
+    gap: var(--space-sm);
+    padding: var(--space-xl);
+    color: var(--color-text);
+  }
+  .store-disabled h2 {
+    margin: 0;
+    font-size: 1rem;
+  }
+  .store-disabled p {
+    max-width: 420px;
+    margin: 0;
+    color: var(--color-muted);
+    font-size: 0.875rem;
+    line-height: 1.6;
+  }
+</style>

@@ -16,6 +16,7 @@ func buildMenu(app *App) *menu.Menu {
 func buildMenuForPlatform(app *App, platform string) *menu.Menu {
 	appMenu := menu.NewMenu()
 	isDarwin := platform == "darwin"
+	capabilities := app.releaseCapabilities()
 
 	if isDarwin {
 		appMenu.Append(menu.AppMenu())
@@ -27,8 +28,12 @@ func buildMenuForPlatform(app *App, platform string) *menu.Menu {
 	} else {
 		addEditMenu(appMenu, app)
 	}
-	addTemplateMenu(appMenu, app)
-	addSkillMenu(appMenu, app)
+	if capabilities.OnlineTemplateStore {
+		addTemplateMenu(appMenu, app)
+	}
+	if capabilities.OnlineSkillStore {
+		addSkillMenu(appMenu, app)
+	}
 
 	if isDarwin {
 		appMenu.Append(menu.WindowMenu())
@@ -108,17 +113,22 @@ func addSkillMenu(appMenu *menu.Menu, app *App) {
 
 func addHelpMenu(appMenu *menu.Menu, app *App, includeAbout bool) {
 	helpMenu := appMenu.AddSubmenu("帮助")
-	helpMenu.AddText("文档", nil, func(_ *menu.CallbackData) {
-		wailsRuntime.BrowserOpenURL(app.ctx, "https://presto.io/docs")
-	})
+	capabilities := app.releaseCapabilities()
+	if capabilities.ExternalBrowserLinks {
+		helpMenu.AddText("文档", nil, func(_ *menu.CallbackData) {
+			wailsRuntime.BrowserOpenURL(app.ctx, "https://presto.io/docs")
+		})
+	}
 	if includeAbout {
 		helpMenu.AddText("关于 Presto", nil, func(_ *menu.CallbackData) {
 			app.ShowAboutDialog()
 		})
 	}
-	helpMenu.AddText("检查更新", nil, func(_ *menu.CallbackData) {
-		go app.CheckAndNotifyUpdate()
-	})
+	if capabilities.AppUpdateCheck {
+		helpMenu.AddText("检查更新", nil, func(_ *menu.CallbackData) {
+			go app.CheckAndNotifyUpdate()
+		})
+	}
 }
 
 func (a *App) ShowAboutDialog() {

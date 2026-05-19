@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { ExternalLink, Shield, Info, BookOpen, ArrowLeft, RefreshCw, Settings, Scale, HelpCircle, Store, Puzzle } from 'lucide-svelte';
   import { goto } from '$app/navigation';
+  import { defaultCapabilities, loadCapabilities, releaseChannelLabel, type ReleaseCapabilities } from '$lib/config/channel';
   import { triggerAction, resetWizard } from '$lib/stores/wizard.svelte';
 
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgent);
@@ -18,6 +19,8 @@
   let updateProgress = $state(0);
   let updateStatus = $state('');
   let activeSection = $state('general');
+  let capabilities = $state<ReleaseCapabilities>(defaultCapabilities);
+  let channelText = $derived(releaseChannelLabel(capabilities));
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   type Section = { id: string; label: string; icon: any };
@@ -32,8 +35,14 @@
     { id: 'store-skills', label: '技能商店', icon: Puzzle },
     { id: 'store-templates', label: '模板商店', icon: Store },
   ];
+  let visibleStoreSections = $derived(storeSections.filter((sec) => {
+    if (sec.id === 'store-skills') return capabilities.onlineSkillStore;
+    if (sec.id === 'store-templates') return capabilities.onlineTemplateStore;
+    return true;
+  }));
 
   function openExternal(url: string) {
+    if (!capabilities.externalBrowserLinks) return;
     if ((window as any).runtime?.BrowserOpenURL) {
       (window as any).runtime.BrowserOpenURL(url);
     } else {
@@ -42,6 +51,7 @@
   }
 
   async function checkUpdate() {
+    if (!capabilities.appUpdateCheck) return;
     checking = true;
     updateError = '';
     updateInfo = null;
@@ -49,7 +59,7 @@
       if (window.go?.main?.App?.CheckForUpdate) {
         const info = await window.go.main.App.CheckForUpdate();
         updateInfo = info;
-      } else {
+      } else if (capabilities.appUpdateCheck) {
         const resp = await fetch('https://api.github.com/repos/Presto-io/Presto-Homepage/releases/latest');
         if (!resp.ok) throw new Error(`GitHub API error: ${resp.status}`);
         const release = await resp.json();
@@ -69,6 +79,7 @@
   }
 
   async function startUpdate() {
+    if (!capabilities.appUpdateCheck) return;
     if (!updateInfo?.downloadURL || !window.go?.main?.App?.DownloadAndInstallUpdate) return;
     updating = true;
     updateError = '';
@@ -83,6 +94,7 @@
   }
 
   onMount(async () => {
+    capabilities = await loadCapabilities();
     communityEnabled = localStorage.getItem('communityTemplates') === 'true';
     if (window.go?.main?.App?.GetVersion) {
       try {
@@ -119,8 +131,8 @@
 
   function scrollTo(id: string) {
     // Route-based sections navigate to a separate page
-    if (id === 'store-skills') { goto('/store-skills'); return; }
-    if (id === 'store-templates') { goto('/store-templates'); return; }
+    if (id === 'store-skills' && capabilities.onlineSkillStore) { goto('/store-skills'); return; }
+    if (id === 'store-templates' && capabilities.onlineTemplateStore) { goto('/store-templates'); return; }
     activeSection = id;
     const content = document.querySelector('.settings-content') as HTMLElement;
     const el = content?.querySelector(`#section-${id}`) as HTMLElement;
@@ -131,6 +143,7 @@
 
   // --- Toggle ---
   function toggleCommunity() {
+    if (!capabilities.onlineTemplateStore) return;
     if (!communityEnabled) {
       showWarning = true;
     } else {
@@ -175,39 +188,43 @@
           {sec.label}
         </button>
       {/each}
-      <div class="nav-sep"></div>
-      {#each storeSections as sec (sec.id)}
-        {@const Icon = sec.icon}
-        <button
-          class="nav-item nav-item-store"
-          class:active={activeSection === sec.id}
-          onclick={() => scrollTo(sec.id)}
-        >
-          <Icon size={14} />
-          {sec.label}
-        </button>
-      {/each}
+      {#if visibleStoreSections.length > 0}
+        <div class="nav-sep"></div>
+        {#each visibleStoreSections as sec (sec.id)}
+          {@const Icon = sec.icon}
+          <button
+            class="nav-item nav-item-store"
+            class:active={activeSection === sec.id}
+            onclick={() => scrollTo(sec.id)}
+          >
+            <Icon size={14} />
+            {sec.label}
+          </button>
+        {/each}
+      {/if}
     </nav>
 
     <div class="settings-content-wrapper">
       <div class="settings-content">
           <section id="section-general">
             <h3><Settings size={16} /> 通用</h3>
-            <div class="setting-row">
-              <div class="setting-info">
-                <span class="setting-label">启用社区模板</span>
-                <span class="setting-desc">社区模板未经 Presto 验证，二进制由第三方开发者直接发布。官方和已验证模板始终可用。</span>
+            {#if capabilities.onlineTemplateStore}
+              <div class="setting-row">
+                <div class="setting-info">
+                  <span class="setting-label">启用社区模板</span>
+                  <span class="setting-desc">社区模板未经 Presto 验证，二进制由第三方开发者直接发布。官方和已验证模板始终可用。</span>
+                </div>
+                <button
+                  class="toggle"
+                  onclick={toggleCommunity}
+                  role="switch"
+                  aria-checked={communityEnabled}
+                  aria-label="启用社区模板"
+                >
+                  <span class="slider" class:on={communityEnabled}></span>
+                </button>
               </div>
-              <button
-                class="toggle"
-                onclick={toggleCommunity}
-                role="switch"
-                aria-checked={communityEnabled}
-                aria-label="启用社区模板"
-              >
-                <span class="slider" class:on={communityEnabled}></span>
-              </button>
-            </div>
+            {/if}
           </section>
 
           <section id="section-help">
@@ -262,14 +279,18 @@
                 <span class="shortcut-action">打开设置</span>
                 <span class="shortcut-keys"><kbd>{mod}</kbd><kbd>,</kbd></span>
               </div>
-              <div class="shortcut-row">
-                <span class="shortcut-action">模板商店</span>
-                <span class="shortcut-keys"><kbd>{mod}</kbd><kbd>⇧</kbd><kbd>T</kbd></span>
-              </div>
-              <div class="shortcut-row">
-                <span class="shortcut-action">技能商店</span>
-                <span class="shortcut-keys"><kbd>{mod}</kbd><kbd>⇧</kbd><kbd>K</kbd></span>
-              </div>
+              {#if capabilities.onlineTemplateStore}
+                <div class="shortcut-row">
+                  <span class="shortcut-action">模板商店</span>
+                  <span class="shortcut-keys"><kbd>{mod}</kbd><kbd>⇧</kbd><kbd>T</kbd></span>
+                </div>
+              {/if}
+              {#if capabilities.onlineSkillStore}
+                <div class="shortcut-row">
+                  <span class="shortcut-action">技能商店</span>
+                  <span class="shortcut-keys"><kbd>{mod}</kbd><kbd>⇧</kbd><kbd>K</kbd></span>
+                </div>
+              {/if}
               <div class="shortcut-row">
                 <span class="shortcut-action">搜索 / 替换</span>
                 <span class="shortcut-keys"><kbd>{mod}</kbd><kbd>F</kbd></span>
@@ -302,12 +323,14 @@
               <li>模板协议：可执行文件，stdin 接收 Markdown，stdout 输出 Typst</li>
               <li>附带 manifest.json 描述模板元数据</li>
               <li>支持任意编程语言（Go、Rust、Python、JavaScript 等）</li>
-              <li>
-                <a href="https://github.com/Presto-io/template-starter" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://github.com/Presto-io/template-starter'); }}>
-                  开发文档
-                  <ExternalLink size={12} />
-                </a>
-              </li>
+              {#if capabilities.externalBrowserLinks}
+                <li>
+                  <a href="https://github.com/Presto-io/template-starter" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://github.com/Presto-io/template-starter'); }}>
+                    开发文档
+                    <ExternalLink size={12} />
+                  </a>
+                </li>
+              {/if}
             </ul>
           </section>
 
@@ -322,46 +345,54 @@
                 <span class="about-value">{appVersion}</span>
               </div>
               <div class="about-row">
-                <span class="about-label">更新</span>
-                <span class="about-value">
-                  {#if updating}
-                    <span class="update-progress-wrap">
-                      <span class="update-status-text">{updateStatus}</span>
-                      <span class="update-progress-bar">
-                        <span class="update-progress-fill" style="width: {updateProgress}%"></span>
+                <span class="about-label">发行渠道</span>
+                <span class="about-value">{channelText}</span>
+              </div>
+              {#if capabilities.appUpdateCheck}
+                <div class="about-row">
+                  <span class="about-label">更新</span>
+                  <span class="about-value">
+                    {#if updating}
+                      <span class="update-progress-wrap">
+                        <span class="update-status-text">{updateStatus}</span>
+                        <span class="update-progress-bar">
+                          <span class="update-progress-fill" style="width: {updateProgress}%"></span>
+                        </span>
+                        <span class="update-pct">{updateProgress}%</span>
                       </span>
-                      <span class="update-pct">{updateProgress}%</span>
-                    </span>
-                  {:else if checking}
-                    <RefreshCw size={12} class="spin" />
-                    检查中…
-                  {:else if updateInfo?.hasUpdate}
-                    {#if window.go?.main?.App?.DownloadAndInstallUpdate}
-                      <button class="btn-check-update btn-download-update" onclick={startUpdate}>
-                        下载并安装 v{updateInfo.latestVersion}
-                      </button>
+                    {:else if checking}
+                      <RefreshCw size={12} class="spin" />
+                      检查中…
+                    {:else if updateInfo?.hasUpdate}
+                      {#if window.go?.main?.App?.DownloadAndInstallUpdate}
+                        <button class="btn-check-update btn-download-update" onclick={startUpdate}>
+                          下载并安装 v{updateInfo.latestVersion}
+                        </button>
+                      {:else}
+                        <a href={updateInfo.downloadURL || updateInfo.releaseURL} onclick={(e: MouseEvent) => { e.preventDefault(); openExternal(updateInfo!.downloadURL || updateInfo!.releaseURL); }} class="update-link">
+                          v{updateInfo.latestVersion} 可用
+                          <ExternalLink size={12} />
+                        </a>
+                      {/if}
+                    {:else if updateInfo && !updateInfo.hasUpdate}
+                      已是最新版本
+                    {:else if updateError}
+                      <span class="update-error" title={updateError}>检查失败</span>
                     {:else}
-                      <a href={updateInfo.downloadURL || updateInfo.releaseURL} onclick={(e: MouseEvent) => { e.preventDefault(); openExternal(updateInfo!.downloadURL || updateInfo!.releaseURL); }} class="update-link">
-                        v{updateInfo.latestVersion} 可用
-                        <ExternalLink size={12} />
-                      </a>
+                      <button class="btn-check-update" onclick={checkUpdate}>检查更新</button>
                     {/if}
-                  {:else if updateInfo && !updateInfo.hasUpdate}
-                    已是最新版本
-                  {:else if updateError}
-                    <span class="update-error" title={updateError}>检查失败</span>
-                  {:else}
-                    <button class="btn-check-update" onclick={checkUpdate}>检查更新</button>
-                  {/if}
-                </span>
-              </div>
-              <div class="about-row">
-                <span class="about-label">源码</span>
-                <a href="https://github.com/Presto-io/Presto" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://github.com/Presto-io/Presto'); }} class="about-value">
-                  GitHub
-                  <ExternalLink size={12} />
-                </a>
-              </div>
+                  </span>
+                </div>
+              {/if}
+              {#if capabilities.externalBrowserLinks}
+                <div class="about-row">
+                  <span class="about-label">源码</span>
+                  <a href="https://github.com/Presto-io/Presto" onclick={(e: MouseEvent) => { e.preventDefault(); openExternal('https://github.com/Presto-io/Presto'); }} class="about-value">
+                    GitHub
+                    <ExternalLink size={12} />
+                  </a>
+                </div>
+              {/if}
               <div class="about-row">
                 <span class="about-label">许可证</span>
                 <span class="about-value">MIT License</span>

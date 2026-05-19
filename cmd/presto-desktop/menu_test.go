@@ -72,6 +72,33 @@ func requireTopLevelLabel(t *testing.T, item *menu.MenuItem, label string) {
 	}
 }
 
+func portableAppForMenuTest() *App {
+	return &App{capabilities: ReleaseCapabilities{
+		ReleaseChannel:       "portable",
+		OnlineRegistry:       false,
+		OnlineTemplateStore:  false,
+		OnlineSkillStore:     false,
+		TemplateAutoUpdate:   false,
+		FirstLaunchBootstrap: false,
+		AppUpdateCheck:       false,
+		ExternalBrowserLinks: false,
+		LocalTemplateImport:  true,
+		PackagedRuntimes:     true,
+	}}
+}
+
+func menuContainsLabel(m *menu.Menu, label string) bool {
+	for _, item := range m.Items {
+		if item.Label == label {
+			return true
+		}
+		if item.SubMenu != nil && menuContainsLabel(item.SubMenu, label) {
+			return true
+		}
+	}
+	return false
+}
+
 func TestUpdateMenuStateWithoutNativeMenu(t *testing.T) {
 	app := &App{}
 
@@ -388,5 +415,21 @@ func TestBuildMenu_SkillSubmenu(t *testing.T) {
 	legacySkillLabel := "技能" + "管理…"
 	if item := findItem(skillMenu, legacySkillLabel); item != nil {
 		t.Fatalf("%s should not exist in 技能 menu", legacySkillLabel)
+	}
+}
+
+func TestBuildMenu_PortableHidesOnlineMenuItems(t *testing.T) {
+	m := buildMenuForPlatform(portableAppForMenuTest(), "windows")
+
+	for _, label := range []string{"模板商店", "技能商店", "文档", "检查更新"} {
+		if menuContainsLabel(m, label) {
+			t.Fatalf("portable menu should not include %q", label)
+		}
+	}
+	if findSubmenu(m, "模板") != nil {
+		t.Fatal("portable menu should not include 模板 top-level online menu")
+	}
+	if findSubmenu(m, "技能") != nil {
+		t.Fatal("portable menu should not include 技能 top-level online menu")
 	}
 }
