@@ -24,6 +24,8 @@ brew install --cask brewforge/more/presto
 
 前往 [GitHub Releases](https://github.com/Presto-io/Presto/releases) 下载对应平台的安装包。
 
+默认精剪包和离线便携包的差异、升级方式和发布资产规则见 [Release Channels](docs/release-channels.md)。
+
 > **macOS 首次打开提示"无法验证开发者"？**
 >
 > 由于应用尚未签名，macOS 会阻止首次打开。请在终端运行：
