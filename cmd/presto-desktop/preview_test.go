@@ -126,6 +126,30 @@ func TestPreviewRunnerStopIsIdempotent(t *testing.T) {
 	}
 }
 
+func TestPreviewStopForcesNextSameIdentityUpdateToRestart(t *testing.T) {
+	service := preview.NewService()
+	runner := newPreviewRunner(service, "tinymist")
+	app := NewApp(nil, nil, nil, ReleaseCapabilities{}, service, runner)
+
+	identity := preview.DocumentIdentity{TemplateID: "mock", DocumentKey: "doc.md"}
+	first := service.BeginUpdate(identity)
+	if event, ok := service.StartSessionForVersion(first.Version, identity); !ok {
+		t.Fatalf("start session failed: %#v", event)
+	}
+	if event, ok := service.ApplySessionEventForVersion(first.Version, service.CurrentSessionID(), preview.EventReady, "http://127.0.0.1:1", nil); !ok {
+		t.Fatalf("ready session failed: %#v", event)
+	}
+
+	if err := app.PreviewStop(); err != nil {
+		t.Fatalf("PreviewStop returned error: %v", err)
+	}
+
+	second := service.BeginUpdate(identity)
+	if !second.RestartSession {
+		t.Fatal("same document update after PreviewStop should restart the resident preview session")
+	}
+}
+
 func TestPreviewRunnerStopsOldSessionBeforeNewDocumentIdentity(t *testing.T) {
 	runner := newPreviewRunner(preview.NewService(), "tinymist")
 	oldMainTypPath, oldCleanup, err := runner.writeSessionFile("", "#let doc = old")

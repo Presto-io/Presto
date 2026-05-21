@@ -36,6 +36,7 @@
   let isDebugMode = $state(import.meta.env.DEV);
   let inlineErrorGroup = $state<string | null>(null);
   let autoDetectedOnce = $state(false);
+  let previewIndicator = $state<'idle' | 'markdown-error' | 'preview-error'>('idle');
 
   // React to external content load (drag-drop or file-router)
 
@@ -78,6 +79,7 @@
   let previewRequestSeq = 0;
   let residentPreviewInFlight = false;
   let residentPreviewPending: { md: string; requestSeq: number } | null = null;
+  let residentPreviewStopPromise: Promise<void> | null = null;
   let unsavedPreviewDocumentKey = `unsaved-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const legacyPreviewDebounceMs = 500;
 
@@ -162,6 +164,9 @@
   function clearEditorError(groupKey: string) {
     notificationStore.dismissGroup(groupKey);
     clearInlineError(groupKey);
+    if (groupKey === 'compile-error') {
+      previewIndicator = 'idle';
+    }
   }
 
   function showEditorError(
@@ -211,6 +216,10 @@
           }
         : undefined,
     });
+  }
+
+  function setPreviewErrorIndicatorForCode(code?: string) {
+    previewIndicator = code === 'conversion_failed' ? 'markdown-error' : 'preview-error';
   }
 
   onDestroy(() => { clearTimeout(hideTimer); clearTimeout(saveFeedbackTimer); });
@@ -468,6 +477,7 @@
   }
 
   function setPreviewLoading() {
+    previewIndicator = 'idle';
     const mode = editor.previewMode;
     if (mode.kind === 'embedded') {
       editor.previewMode = {
@@ -481,6 +491,36 @@
       sessionId: editor.previewSessionId || undefined,
       fallbackSvgPages: editor.svgPages,
     };
+  }
+
+  function stopResidentPreviewForEmptyDocument() {
+    const stop = window.go?.main?.App?.PreviewStop?.();
+    if (!stop) {
+      residentPreviewStopPromise = null;
+      return;
+    }
+
+    const tracked = stop.catch((error) => {
+      console.warn('Failed to stop empty document preview:', error);
+    }).finally(() => {
+      if (residentPreviewStopPromise === tracked) {
+        residentPreviewStopPromise = null;
+      }
+    });
+    residentPreviewStopPromise = tracked;
+  }
+
+  function resetPreviewStateForEmptyDocument() {
+    clearTimeout(debounceTimer);
+    residentPreviewPending = null;
+    converting = false;
+    editor.outputInfo = null;
+    editor.outputInfoCacheKey = '';
+    editor.documentTitle = '';
+    editor.previewDocumentVersion += 1;
+    syncFallbackPages([]);
+    clearEditorError('compile-error');
+    stopResidentPreviewForEmptyDocument();
   }
 
   function setFallbackPagesForMode(pages: string[]) {
@@ -509,12 +549,14 @@
     if (event.kind === 'retry') editor.previewRetryCount += 1;
 
     if (event.svg && typeof event.page === 'number' && event.page > 0) {
+      previewIndicator = 'idle';
       const pages = [...fallbackPagesForCurrentMode()];
       pages[event.page - 1] = event.svg;
       setFallbackPagesForMode(pages);
     }
 
     if (event.dataPlaneUrl && event.sessionId && (event.kind === 'ready' || event.mode === 'embedded')) {
+      previewIndicator = 'idle';
       editor.previewMode = {
         kind: 'embedded',
         sessionId: event.sessionId,
@@ -526,6 +568,7 @@
     }
 
     if (event.mode === 'starting') {
+      previewIndicator = 'idle';
       if (editor.previewMode.kind === 'embedded') {
         editor.previewMode = {
           ...editor.previewMode,
@@ -542,6 +585,7 @@
     }
 
     if (event.kind === 'error') {
+      setPreviewErrorIndicatorForCode(event.error?.code);
       editor.previewMode = {
         kind: 'error',
         fallbackSvgPages: editor.svgPages,
@@ -551,6 +595,9 @@
     }
 
     if (event.kind === 'fallback' || event.mode === 'fallback') {
+      if (event.error?.code && event.error.code !== 'tinymist_unavailable') {
+        setPreviewErrorIndicatorForCode(event.error.code);
+      }
       editor.previewMode = {
         kind: 'fallback',
         svgPages: editor.svgPages,
@@ -560,15 +607,32 @@
   }
 
   async function runLegacyPreview(md: string, shouldApply: () => boolean = () => true) {
-    const typstSource = await convert(md, editor.selectedTemplate);
+    let typstSource: string;
+    try {
+      typstSource = await convert(md, editor.selectedTemplate);
+    } catch (error) {
+      if (shouldApply()) {
+        previewIndicator = 'markdown-error';
+      }
+      throw error;
+    }
     if (!shouldApply()) return;
     editor.typstSource = typstSource;
     // Compile to SVG for preview — use Wails binding when available
     // (Wails WebView strips HTTP headers/query params, so workDir gets lost via fetch)
-    const pages = window.go?.main?.App?.CompileSVG
-      ? await window.go.main.App.CompileSVG(typstSource, editor.documentDir)
-      : await compileSvg(typstSource, editor.documentDir || undefined);
+    let pages: string[];
+    try {
+      pages = window.go?.main?.App?.CompileSVG
+        ? await window.go.main.App.CompileSVG(typstSource, editor.documentDir)
+        : await compileSvg(typstSource, editor.documentDir || undefined);
+    } catch (error) {
+      if (shouldApply()) {
+        previewIndicator = 'preview-error';
+      }
+      throw error;
+    }
     if (!shouldApply()) return;
+    previewIndicator = 'idle';
     syncFallbackPages(pages);
   }
 
@@ -609,6 +673,7 @@
 
     const svgPages = result.svgPages ?? result.SVGPages;
     if (svgPages && svgPages.length > 0) {
+      previewIndicator = 'idle';
       syncFallbackPages(svgPages);
       return true;
     }
@@ -691,12 +756,7 @@
     const isLatestPreviewRequest = () => requestSeq === previewRequestSeq;
 
     if (!editor.selectedTemplate || !md.trim()) {
-      residentPreviewPending = null;
-      editor.outputInfo = null;
-      editor.outputInfoCacheKey = '';
-      editor.documentTitle = '';
-      syncFallbackPages([]);
-      clearEditorError('compile-error');
+      resetPreviewStateForEmptyDocument();
       return;
     }
     clearInlineError('compile-error');
@@ -705,6 +765,10 @@
     if (md.includes('![') && shouldShowPoint('image-path')) triggerAction('image-path');
 
     clearTimeout(debounceTimer);
+    if (residentPreviewStopPromise) {
+      await residentPreviewStopPromise;
+      if (!isLatestPreviewRequest()) return;
+    }
     if (window.go?.main?.App?.PreviewUpdateAsync || window.go?.main?.App?.PreviewUpdate) {
       converting = true;
       setPreviewLoading();
@@ -983,6 +1047,10 @@
     <TemplateSelector selected={editor.selectedTemplate} onbeforechange={handleTemplateChange} />
     {#if converting}
       <div class="status-dot compiling"></div>
+    {:else if previewIndicator === 'markdown-error'}
+      <div class="status-dot markdown-error"></div>
+    {:else if previewIndicator === 'preview-error'}
+      <div class="status-dot preview-error"></div>
     {:else if editor.isDirty}
       <div class="status-dot dirty"></div>
     {:else if editor.saveFeedback === 'saved'}
@@ -1127,6 +1195,14 @@
     background: var(--color-accent-dim, rgba(122, 162, 247, 0.5));
     animation: breathe-dirty 2.5s ease-in-out infinite;
   }
+  .status-dot.markdown-error {
+    background: #f5c542;
+    animation: breathe-warning 1.8s ease-in-out infinite;
+  }
+  .status-dot.preview-error {
+    background: var(--color-danger);
+    animation: breathe-danger 1.3s ease-in-out infinite;
+  }
   .status-dot.saved {
     background: var(--color-success);
     animation: save-flash 1.2s ease-out forwards;
@@ -1138,6 +1214,14 @@
   @keyframes breathe-dirty {
     0%, 100% { opacity: 0.35; }
     50% { opacity: 0.7; }
+  }
+  @keyframes breathe-warning {
+    0%, 100% { opacity: 0.45; box-shadow: 0 0 0 rgba(245, 197, 66, 0); }
+    50% { opacity: 1; box-shadow: 0 0 8px rgba(245, 197, 66, 0.55); }
+  }
+  @keyframes breathe-danger {
+    0%, 100% { opacity: 0.5; box-shadow: 0 0 0 rgba(255, 77, 91, 0); }
+    50% { opacity: 1; box-shadow: 0 0 9px rgba(255, 77, 91, 0.6); }
   }
   @keyframes save-flash {
     0% { opacity: 1; transform: scale(1); }

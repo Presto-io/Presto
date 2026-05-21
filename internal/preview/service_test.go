@@ -93,6 +93,28 @@ func TestReadyEventSetsEmbeddedMode(t *testing.T) {
 	}
 }
 
+func TestTeardownForcesNextSameIdentityUpdateToRestart(t *testing.T) {
+	svc := NewService()
+	identity := DocumentIdentity{TemplateID: "gongwen", WorkDir: "/tmp/doc", DocumentKey: "a.md", MainTypstPath: "/tmp/doc/main.typ"}
+	first := svc.BeginUpdate(identity)
+	svc.StartSession(identity)
+	if event, ok := svc.ApplySessionEvent(svc.CurrentSessionID(), EventReady, "http://127.0.0.1:1234", nil); !ok || event.Mode != ModeEmbedded {
+		t.Fatalf("ready event = (%#v, %v), want embedded", event, ok)
+	}
+
+	if event, ok := svc.ApplySessionEvent(svc.CurrentSessionID(), EventTeardown, "", nil); !ok || event.Mode != ModeFallback {
+		t.Fatalf("teardown event = (%#v, %v), want fallback", event, ok)
+	}
+
+	next := svc.BeginUpdate(identity)
+	if next.Version != first.Version+1 {
+		t.Fatalf("next version = %d, want %d", next.Version, first.Version+1)
+	}
+	if !next.RestartSession {
+		t.Fatal("BeginUpdate after teardown should restart even for the same identity")
+	}
+}
+
 func TestRecoverDoesNotStealPreviewUntilNextEdit(t *testing.T) {
 	svc := NewService()
 	identity := DocumentIdentity{TemplateID: "gongwen", WorkDir: "/tmp/doc", DocumentKey: "a.md", MainTypstPath: "/tmp/doc/main.typ"}

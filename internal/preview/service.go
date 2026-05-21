@@ -225,6 +225,7 @@ func (s *Service) applySessionEventLocked(sessionID string, kind EventKind, data
 		s.mode = ModeFallback
 	case EventTeardown:
 		s.mode = ModeFallback
+		s.identity = DocumentIdentity{}
 	}
 
 	event := s.eventLocked(kind, errInfo, nil)
