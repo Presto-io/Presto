@@ -123,6 +123,11 @@ Filename: "{app}\{#PRODUCT_EXECUTABLE}"; Parameters: "--migrate-legacy-data"; St
 Filename: "{app}\{#PRODUCT_EXECUTABLE}"; Description: "{cm:LaunchPresto}"; Flags: nowait postinstall skipifsilent
 
 [Registry]
+Root: HKA; Subkey: "Software\Classes\presto"; ValueType: string; ValueName: ""; ValueData: "URL:Presto Protocol"; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\presto"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""
+Root: HKA; Subkey: "Software\Classes\presto\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#PRODUCT_EXECUTABLE},0"
+Root: HKA; Subkey: "Software\Classes\presto\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#PRODUCT_EXECUTABLE}"" ""%1"""
+
 Root: HKA; Subkey: "Software\Classes\Presto.Markdown"; ValueType: string; ValueName: ""; ValueData: "Presto Markdown 文档"; Flags: uninsdeletekey
 Root: HKA; Subkey: "Software\Classes\Presto.Markdown"; ValueType: string; ValueName: "FriendlyTypeName"; ValueData: "Markdown 文档"
 Root: HKA; Subkey: "Software\Classes\Presto.Markdown\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#PRODUCT_EXECUTABLE},0"

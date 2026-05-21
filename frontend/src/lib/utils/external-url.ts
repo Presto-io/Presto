@@ -36,17 +36,27 @@ export function isValidPrestoInstallName(name: string | undefined | null): boole
   return !!name && PRESTO_TEMPLATE_NAME.test(name);
 }
 
+export function prestoTemplateOpenUrl(name: string): string {
+  if (!isValidPrestoInstallName(name)) return '';
+  return `presto://open?resource=template&id=${encodeURIComponent(name)}`;
+}
+
 export function isTrustedPrestoInstallUrl(raw: string | undefined | null): boolean {
   if (!raw) return false;
   try {
     const url = new URL(raw);
-    return (
-      url.protocol === 'presto:' &&
-      url.hostname === 'install' &&
+    if (url.protocol !== 'presto:' || url.hash) return false;
+    if (url.hostname === 'open') {
+      return (
+        (url.pathname === '' || url.pathname === '/') &&
+        url.searchParams.get('resource') === 'template' &&
+        isValidPrestoInstallName(url.searchParams.get('id')) &&
+        Array.from(url.searchParams.keys()).every((key) => key === 'resource' || key === 'id')
+      );
+    }
+    return url.hostname === 'install' &&
       !url.search &&
-      !url.hash &&
-      isValidPrestoInstallName(url.pathname.slice(1))
-    );
+      isValidPrestoInstallName(url.pathname.slice(1));
   } catch {
     return false;
   }

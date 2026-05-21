@@ -12,7 +12,7 @@
   import { networkStore } from '$lib/stores/network.svelte';
   import Toast from '$lib/components/Toast.svelte';
   import OfflineMode from '$lib/components/OfflineMode.svelte';
-  import { githubUrlFromRepo, isValidPrestoInstallName, trustedGithubUrl } from '$lib/utils/external-url';
+  import { githubUrlFromRepo, prestoTemplateOpenUrl, trustedGithubUrl } from '$lib/utils/external-url';
 
   interface Props {
     mode: 'desktop' | 'web';
@@ -787,8 +787,8 @@
                 {/if}
               {:else if mode === 'web'}
                 <button class="btn-install" onclick={() => {
-                  if (!isValidPrestoInstallName(selectedTemplate!.name)) return;
-                  const url = `presto://install/${selectedTemplate!.name}`;
+                  const url = prestoTemplateOpenUrl(selectedTemplate!.name);
+                  if (!url) return;
                   if (window.parent !== window) {
                     window.parent.postMessage({ type: 'presto-open-template', url }, window.location.origin);
                   } else {

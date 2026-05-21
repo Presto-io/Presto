@@ -132,6 +132,39 @@
 		return true;
 	}
 
+	function templateIdFromPrestoURL(rawURL: string | null | undefined): string | null {
+		if (!rawURL) return null;
+		try {
+			const url = new URL(rawURL);
+			if (url.protocol !== 'presto:') return null;
+			if (url.hostname === 'open') {
+				if (url.pathname && url.pathname !== '/') return null;
+				if (url.hash) return null;
+				if (!Array.from(url.searchParams.keys()).every((key) => key === 'resource' || key === 'id')) {
+					return null;
+				}
+				if (url.searchParams.get('resource') !== 'template') return null;
+				const id = url.searchParams.get('id');
+				return id && /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(id) ? id : null;
+			}
+			if (url.hostname === 'install' && !url.search && !url.hash) {
+				const id = url.pathname.replace(/^\/+/, '');
+				return /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(id) ? id : null;
+			}
+		} catch {
+			return null;
+		}
+		return null;
+	}
+
+	function openTemplateFromProtocol(templateId: string, loadedCapabilities = capabilities) {
+		if (!loadedCapabilities.onlineTemplateStore) {
+			notificationStore.show('离线便携版不支持从互联网打开模板商店内容。', 'warning');
+			return;
+		}
+		goto(`/store-templates?template=${encodeURIComponent(templateId)}`);
+	}
+
 	async function resolveEmbeddedMenuMode() {
 		if (isShowcase) {
 			showEmbeddedMenu = false;
@@ -489,13 +522,11 @@
 			window.runtime.EventsOn('app:request-close', () => {
 				void handleGlobalCloseRequest('close-window');
 			});
-			// URL scheme: presto://install/{name} → navigate to template detail page
+			// URL scheme: presto://open?resource=template&id={name} → template detail page.
 			// Hot start: event pushed from Go via SingleInstanceLock
 			window.runtime.EventsOn('url-scheme-open-template', (name: string) => {
 				console.log('[url-scheme] hot start event received:', name);
-				if (capabilities.onlineTemplateStore) {
-					goto(`/store-templates?template=${encodeURIComponent(name)}`);
-				}
+				openTemplateFromProtocol(name);
 			});
 
 			// Cold start: pull pending URL from Go (event timing unreliable at startup)
@@ -506,10 +537,10 @@
 				console.log('[url-scheme] checking for startup URL...');
 				console.log('[url-scheme] startup URL:', pendingURL);
 				if (pendingURL) {
-					const match = pendingURL.match(/^presto:\/\/install\/(.+)/);
-					if (match && loadedCapabilities.onlineTemplateStore) {
-						console.log('[url-scheme] navigating to template:', match[1]);
-						goto(`/store-templates?template=${encodeURIComponent(match[1])}`);
+					const templateId = templateIdFromPrestoURL(pendingURL);
+					if (templateId) {
+						console.log('[url-scheme] navigating to template:', templateId);
+						openTemplateFromProtocol(templateId, loadedCapabilities);
 					}
 				}
 			}).catch((e) => {

@@ -4,3 +4,4 @@ Exec=Presto
 Icon=presto
 Type=Application
 Categories=Office;
+MimeType=x-scheme-handler/presto;
