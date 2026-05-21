@@ -8,6 +8,7 @@
   import { Download, Settings, FolderOpen, Layers, AlertTriangle, ExternalLink } from 'lucide-svelte';
   import { goto } from '$app/navigation';
   import { editor } from '$lib/stores/editor.svelte';
+  import { startupFileStore } from '$lib/stores/startup-file.svelte';
   import { templateStore } from '$lib/stores/templates.svelte';
   import { notificationStore } from '$lib/stores/notification.svelte';
   import { extractTemplateName, resolveTemplate } from '$lib/utils/frontmatter';
@@ -242,6 +243,7 @@
 
   function canApplyDefaultExample(templateId: string): boolean {
     return editor.selectedTemplate === templateId &&
+      !startupFileStore.checkPending &&
       !editor.pendingExternalLoad &&
       !editor.currentFilePath &&
       !editor.markdown.trim();

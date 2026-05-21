@@ -20,7 +20,10 @@ func filterExternalPaths(paths []string) []string {
 	seen := make(map[string]struct{}, len(paths))
 	var filtered []string
 	for _, path := range paths {
-		if strings.HasPrefix(path, "presto://") || !isSupportedExternalPath(path) {
+		if strings.HasPrefix(path, "-") ||
+			strings.HasPrefix(path, "presto://") ||
+			path == logFilePath ||
+			!isSupportedExternalPath(path) {
 			continue
 		}
 		if _, ok := seen[path]; ok {

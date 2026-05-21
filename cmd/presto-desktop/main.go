@@ -235,14 +235,14 @@ func main() {
 		appMenu = buildMenu(app)
 	}
 	logger.Debug("[url-scheme] os.Args", "args", os.Args)
-	for _, arg := range os.Args[1:] {
+	for _, arg := range flag.Args() {
 		if strings.HasPrefix(arg, "presto://") {
 			startupURL = arg
 			logger.Debug("[url-scheme] captured startup URL", "url", arg)
 			break
 		}
 	}
-	app.dispatchOrQueueExternalFiles(os.Args[1:])
+	app.dispatchOrQueueExternalFiles(flag.Args())
 	err = wails.Run(&options.App{
 		Title:            "Presto",
 		Width:            1280,

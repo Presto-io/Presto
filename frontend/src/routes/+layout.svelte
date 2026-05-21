@@ -9,6 +9,7 @@
 	import { fileRouter } from '$lib/stores/file-router.svelte';
 	import { notificationStore } from '$lib/stores/notification.svelte';
 	import { editor } from '$lib/stores/editor.svelte';
+	import { startupFileStore } from '$lib/stores/startup-file.svelte';
 	import {
 		defaultCapabilities,
 		loadCapabilities,
@@ -436,7 +437,10 @@
 
 	onMount(async () => {
 		// Skip all event registration in showcase mode
-		if (isShowcase) return;
+		if (isShowcase) {
+			startupFileStore.markChecked();
+			return;
+		}
 
 		capabilities = await loadCapabilities();
 		void loadAppVersion();
@@ -525,7 +529,11 @@
 				}
 			} catch (e) {
 				console.error('[file-open] GetStartupFiles failed:', e);
+			} finally {
+				startupFileStore.markChecked();
 			}
+		} else {
+			startupFileStore.markChecked();
 		}
 	});
 

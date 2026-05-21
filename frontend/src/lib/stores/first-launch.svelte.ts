@@ -7,6 +7,7 @@ import { templateStore } from './templates.svelte';
 import { installState } from './install-state.svelte';
 import { editor } from './editor.svelte';
 import { notificationStore } from './notification.svelte';
+import { startupFileStore } from './startup-file.svelte';
 import { getExample, convertAndCompile } from '$lib/api/client';
 
 interface TemplateProgress {
@@ -42,7 +43,8 @@ function templateNamesFrom(items: any[] | undefined): string[] {
 }
 
 function canSeedEditorWithTemplate(templateName?: string): boolean {
-  return !editor.pendingExternalLoad &&
+  return !startupFileStore.checkPending &&
+    !editor.pendingExternalLoad &&
     !editor.currentFilePath &&
     !editor.markdown.trim() &&
     (!templateName || !editor.selectedTemplate || editor.selectedTemplate === templateName);

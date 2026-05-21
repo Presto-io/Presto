@@ -28,11 +28,6 @@ func initLogger() {
 		}
 
 		writer = io.MultiWriter(os.Stderr, loggerLogFile)
-
-		logger.Info("[logger] log rotation enabled",
-			"max_size_mb", 10,
-			"max_backups", 5,
-			"log_file", logFilePath)
 	}
 
 	opts := &slog.HandlerOptions{
@@ -48,6 +43,12 @@ func initLogger() {
 		"verbose", verbose,
 		"log_file", logFilePath,
 		"level", level.String())
+	if logFilePath != "" {
+		logger.Info("[logger] log rotation enabled",
+			"max_size_mb", 10,
+			"max_backups", 5,
+			"log_file", logFilePath)
+	}
 }
 
 func closeLogger() {

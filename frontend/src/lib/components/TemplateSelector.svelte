@@ -7,6 +7,7 @@
   import { templateStore } from '$lib/stores/templates.svelte';
   import { firstLaunchStore } from '$lib/stores/first-launch.svelte';
   import { editor } from '$lib/stores/editor.svelte';
+  import { startupFileStore } from '$lib/stores/startup-file.svelte';
 
   let {
     selected = $bindable(''),
@@ -49,16 +50,25 @@
     (templates.find(t => t.name === selected)?.missingFonts?.length ?? 0) > 0
   );
 
+  function canAutoSelectDefaultTemplate(): boolean {
+    return !startupFileStore.checkPending &&
+      !selected &&
+      templates.length > 0 &&
+      !editor.markdown.trim() &&
+      !editor.pendingExternalLoad;
+  }
+
+  function autoSelectDefaultTemplate() {
+    if (!canAutoSelectDefaultTemplate()) return;
+    if (onbeforechange) {
+      onbeforechange(templates[0].name);
+    } else {
+      selected = templates[0].name;
+    }
+  }
+
   onMount(() => {
-    templateStore.load().then(() => {
-      if (!selected && templates.length > 0 && !editor.markdown.trim() && !editor.pendingExternalLoad) {
-        if (onbeforechange) {
-          onbeforechange(templates[0].name);
-        } else {
-          selected = templates[0].name;
-        }
-      }
-    });
+    templateStore.load().then(autoSelectDefaultTemplate);
 
     document.addEventListener('pointerdown', handleOutsideClick, true);
     return () => document.removeEventListener('pointerdown', handleOutsideClick, true);
@@ -126,6 +136,10 @@
     // Reset highlight when search changes
     void search;
     highlightIndex = 0;
+  });
+
+  $effect(() => {
+    autoSelectDefaultTemplate();
   });
 </script>
 
