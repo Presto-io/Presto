@@ -100,12 +100,8 @@ func (a *App) SaveMarkdown(content string, filePath string) error {
 }
 
 func (a *App) SaveMarkdownAs(content string, defaultFilename string) (string, error) {
-	if defaultFilename == "" {
-		defaultFilename = "untitled.md"
-	}
-	if !strings.HasSuffix(strings.ToLower(defaultFilename), ".md") {
-		defaultFilename += ".md"
-	}
+	base := strings.TrimSuffix(defaultFilename, filepath.Ext(defaultFilename))
+	defaultFilename = templ.CleanFilenameBase(base, "presto-document") + ".md"
 	savePath, err := wailsRuntime.SaveFileDialog(a.ctx, wailsRuntime.SaveDialogOptions{
 		DefaultFilename: defaultFilename,
 		Filters: []wailsRuntime.FileFilter{
@@ -208,10 +204,15 @@ func (a *App) SavePDF(markdown string, templateId string, workDir string, output
 		return fmt.Errorf("compile failed: %w", err)
 	}
 
-	if outputBaseName == "" {
-		outputBaseName = "output"
+	info := templ.OutputInfo{OutputBaseName: outputBaseName}
+	if templ.IsGenericOutputBaseName(outputBaseName) && tpl.Manifest.Capabilities.OutputInfo {
+		if templateInfo, err := executor.GetOutputInfo(markdown); err == nil {
+			info = templateInfo
+		} else {
+			logger.Warn("[desktop] output info failed for PDF filename", "template", templateId, "error", err)
+		}
 	}
-	filename := outputBaseName + ".pdf"
+	filename := templ.OutputBaseNameOrMarkdownFallback(info, markdown) + ".pdf"
 
 	savePath, err := wailsRuntime.SaveFileDialog(a.ctx, wailsRuntime.SaveDialogOptions{
 		DefaultFilename: filename,

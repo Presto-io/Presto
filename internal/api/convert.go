@@ -195,7 +195,8 @@ func (s *Server) handleConvertAndCompile(w http.ResponseWriter, r *http.Request)
 		}
 	}
 	w.Header().Set("Content-Type", "application/pdf")
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", info.OutputBaseName+".pdf"))
+	outputBaseName := template.OutputBaseNameOrMarkdownFallback(info, req.Markdown)
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", outputBaseName+".pdf"))
 	w.Write(pdf)
 }
 

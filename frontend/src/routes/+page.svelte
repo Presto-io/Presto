@@ -3,7 +3,7 @@
   import Editor from '$lib/components/Editor.svelte';
   import Preview from '$lib/components/Preview.svelte';
   import TemplateSelector from '$lib/components/TemplateSelector.svelte';
-  import { convert, compileSvg, convertAndCompile, getExample, getOutputInfo, previewUpdate } from '$lib/api/client';
+  import { convert, compileSvg, convertAndCompile, getExample, previewUpdate } from '$lib/api/client';
   import type { PreviewEvent } from '$lib/api/types';
   import { Download, Settings, FolderOpen, Layers, AlertTriangle, ExternalLink } from 'lucide-svelte';
   import { goto } from '$app/navigation';
@@ -12,6 +12,12 @@
   import { templateStore } from '$lib/stores/templates.svelte';
   import { notificationStore } from '$lib/stores/notification.svelte';
   import { extractTemplateName, resolveTemplate } from '$lib/utils/frontmatter';
+  import {
+    currentDocumentDisplayTitle,
+    markdownDefaultFilenameForCurrentDocument,
+    outputBaseNameForCurrentDocument,
+    refreshOutputInfo,
+  } from '$lib/utils/document-name';
   import { triggerAction, shouldShowPoint } from '$lib/stores/wizard.svelte';
   import { fileRouter } from '$lib/stores/file-router.svelte';
 
@@ -56,14 +62,13 @@
     }
   });
 
-  // Dynamic window title: *filename - Presto (Windows only)
+  // Keep both desktop and browser tab titles aligned with the current document.
   $effect(() => {
-    if (!window.go?.main?.App?.SetWindowTitle) return;
-    const filename = editor.currentFilePath
-      ? editor.currentFilePath.split(/[/\\]/).pop() || '未命名'
-      : '未命名';
+    const titleBase = currentDocumentDisplayTitle();
     const dirtyMark = editor.isDirty ? '*' : '';
-    window.go.main.App.SetWindowTitle(`${dirtyMark}${filename} - Presto`);
+    const title = titleBase ? `${dirtyMark}${titleBase} - Presto` : `${dirtyMark}Presto`;
+    if (typeof document !== 'undefined') document.title = title;
+    window.go?.main?.App?.SetWindowTitle?.(title);
   });
 
   let editorScrollRatio = $state(0);
@@ -342,36 +347,6 @@
     }
   }
 
-  function outputInfoCacheKey(markdown: string, templateId: string): string {
-    return `${templateId}\n${markdown}`;
-  }
-
-  async function refreshOutputInfo(markdown: string, templateId: string, shouldApply: () => boolean = () => true) {
-    const info = window.go?.main?.App?.GetOutputInfo
-      ? await window.go.main.App.GetOutputInfo(markdown, templateId)
-      : await getOutputInfo(markdown, templateId);
-    if (!shouldApply()) return;
-    editor.outputInfo = info;
-    editor.outputInfoCacheKey = outputInfoCacheKey(markdown, templateId);
-    editor.documentTitle = info.previewTitle || info.document?.title || '';
-  }
-
-  function cachedOutputBaseName(): string {
-    const key = outputInfoCacheKey(editor.markdown, editor.selectedTemplate);
-    if (editor.outputInfo && editor.outputInfoCacheKey === key) {
-      return editor.outputInfo.outputBaseName || 'output';
-    }
-    return 'output';
-  }
-
-  async function outputBaseNameForCurrentDocument(): Promise<string> {
-    const key = outputInfoCacheKey(editor.markdown, editor.selectedTemplate);
-    if (!editor.outputInfo || editor.outputInfoCacheKey !== key) {
-      await refreshOutputInfo(editor.markdown, editor.selectedTemplate);
-    }
-    return cachedOutputBaseName();
-  }
-
   async function handleNew() {
     if (hasRealChanges()) {
       const decision = await askUnsavedCloseDecision();
@@ -426,7 +401,7 @@
     if (!editor.markdown.trim()) return false;
     if (!window.go?.main?.App?.SaveMarkdownAs) return false;
     try {
-      const defaultName = (editor.outputInfo?.previewTitle || editor.documentTitle || 'untitled') + '.md';
+      const defaultName = await markdownDefaultFilenameForCurrentDocument();
       const savedPath = await window.go.main.App.SaveMarkdownAs(editor.markdown, defaultName);
       if (savedPath) {
         editor.currentFilePath = savedPath;
@@ -745,19 +720,17 @@
   async function handleDownload() {
     if (!editor.selectedTemplate || !editor.markdown.trim()) return;
     try {
+      const outputBaseName = await outputBaseNameForCurrentDocument();
       if (window.go?.main?.App?.SavePDF) {
-        const outputBaseName = await outputBaseNameForCurrentDocument();
         await window.go.main.App.SavePDF(editor.markdown, editor.selectedTemplate, editor.documentDir, outputBaseName);
         clearEditorError('editor-action');
         return;
       }
-      const { blob, fileName } = await convertAndCompile(editor.markdown, editor.selectedTemplate, editor.documentDir || undefined);
+      const { blob } = await convertAndCompile(editor.markdown, editor.selectedTemplate, editor.documentDir || undefined);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = editor.outputInfo && editor.outputInfoCacheKey === outputInfoCacheKey(editor.markdown, editor.selectedTemplate)
-        ? cachedOutputBaseName() + '.pdf'
-        : fileName;
+      a.download = `${outputBaseName}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
       clearEditorError('editor-action');

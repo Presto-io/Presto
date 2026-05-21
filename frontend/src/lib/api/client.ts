@@ -146,7 +146,7 @@ export async function convertAndCompile(
   const match = disposition.match(/filename="([^"]+)"/) ?? disposition.match(/filename=([^;]+)/);
   return {
     blob: await res.blob(),
-    fileName: match?.[1]?.trim() || 'output.pdf'
+    fileName: match?.[1]?.trim() || 'presto-document.pdf'
   };
 }
 

@@ -10,6 +10,7 @@
 	import { notificationStore } from '$lib/stores/notification.svelte';
 	import { editor } from '$lib/stores/editor.svelte';
 	import { startupFileStore } from '$lib/stores/startup-file.svelte';
+	import { markdownDefaultFilenameForCurrentDocument } from '$lib/utils/document-name';
 	import {
 		defaultCapabilities,
 		loadCapabilities,
@@ -243,7 +244,7 @@
 				await window.go.main.App.SaveMarkdown(editor.markdown, editor.currentFilePath);
 			} else {
 				if (!window.go.main.App.SaveMarkdownAs) return false;
-				const defaultName = (editor.outputInfo?.previewTitle || editor.documentTitle || 'untitled') + '.md';
+				const defaultName = await markdownDefaultFilenameForCurrentDocument();
 				const savedPath = await window.go.main.App.SaveMarkdownAs(editor.markdown, defaultName);
 				if (!savedPath) return false;
 				editor.currentFilePath = savedPath;
