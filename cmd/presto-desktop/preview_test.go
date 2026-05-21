@@ -5,14 +5,18 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/mrered/presto/internal/preview"
+	"github.com/mrered/presto/internal/template"
+	"github.com/mrered/presto/internal/typst"
 )
 
 func TestPreviewRunnerWritesSessionMainTyp(t *testing.T) {
@@ -278,5 +282,72 @@ func TestPreviewRunnerUpdateTinymistMemoryFileSendsControlPlaneUpdate(t *testing
 		}
 	case <-time.After(time.Second):
 		t.Fatal("timed out waiting for control plane update")
+	}
+}
+
+func TestPreviewUpdateAsyncReturnsBeforeFallbackCompile(t *testing.T) {
+	templateRoot := t.TempDir()
+	writeDesktopPreviewTestTemplate(t, templateRoot, "mock")
+
+	compiler := typst.NewCompiler()
+	compiler.BinPath = filepath.Join(t.TempDir(), "missing-typst")
+	app := NewApp(
+		template.NewManager(templateRoot),
+		compiler,
+		nil,
+		ReleaseCapabilities{},
+		preview.NewService(),
+		newPreviewRunner(preview.NewService(), filepath.Join(t.TempDir(), "missing-tinymist")),
+	)
+
+	start := time.Now()
+	result, err := app.PreviewUpdateAsync("# Hello", "mock", "", "doc.md")
+	if err != nil {
+		t.Fatalf("PreviewUpdateAsync returned error: %v", err)
+	}
+	if elapsed := time.Since(start); elapsed > 200*time.Millisecond {
+		t.Fatalf("PreviewUpdateAsync took %s, expected immediate return", elapsed)
+	}
+	if result.Version == 0 {
+		t.Fatal("expected document version to be assigned")
+	}
+	if len(result.Events) == 0 || result.Events[0].Mode != preview.ModeFallback {
+		t.Fatalf("initial events = %#v, want fallback/status event", result.Events)
+	}
+}
+
+func writeDesktopPreviewTestTemplate(t *testing.T, root string, name string) {
+	t.Helper()
+	tplDir := filepath.Join(root, name)
+	if err := os.MkdirAll(tplDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	manifest := `{"name":"` + name + `","displayName":"Mock","version":"0.1.0","author":"test"}`
+	if err := os.WriteFile(filepath.Join(tplDir, "manifest.json"), []byte(manifest), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	src := filepath.Join(t.TempDir(), "template.go")
+	binName := "presto-template-" + name
+	if runtime.GOOS == "windows" {
+		binName += ".exe"
+	}
+	bin := filepath.Join(tplDir, binName)
+	code := `package main
+import (
+	"io"
+	"os"
+)
+func main() {
+	data, _ := io.ReadAll(os.Stdin)
+	os.Stdout.Write(data)
+}
+`
+	if err := os.WriteFile(src, []byte(code), 0644); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("go", "build", "-o", bin, src)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("build mock template: %v\n%s", err, output)
 	}
 }

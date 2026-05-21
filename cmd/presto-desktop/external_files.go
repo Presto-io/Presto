@@ -46,6 +46,7 @@ func (a *App) SetFileOpenReady() {
 	a.fileOpenReady = true
 	a.externalFilesMu.Unlock()
 	logger.Debug("[file-open] frontend listeners ready")
+	a.showMainWindow("file-open-ready")
 }
 
 func (a *App) GetStartupFiles() []OpenFilesItem {
@@ -85,6 +86,7 @@ func (a *App) dispatchOrQueueExternalFiles(paths []string) {
 	a.externalFilesMu.Unlock()
 
 	logger.Debug("[file-open] emitting files", "count", len(items))
+	a.showMainWindow("file-open")
 	wailsRuntime.EventsEmit(ctx, "native-file-open", items)
 }
 

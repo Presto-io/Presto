@@ -37,6 +37,12 @@ interface WailsApp {
 		workDir: string,
 		documentKey: string
 	) => Promise<PreviewUpdateResult>;
+	PreviewUpdateAsync: (
+		markdown: string,
+		templateID: string,
+		workDir: string,
+		documentKey: string
+	) => Promise<PreviewUpdateResult>;
 	PreviewStop: () => Promise<void>;
 	PreviewMode: () => Promise<{
 		mode: string;

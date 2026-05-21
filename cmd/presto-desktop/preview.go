@@ -269,6 +269,32 @@ func (r *previewRunner) modeSnapshot() map[string]interface{} {
 }
 
 func (a *App) PreviewUpdate(markdown string, templateID string, workDir string, documentKey string) (*preview.UpdateResult, error) {
+	result := a.beginPreviewUpdate(templateID, workDir, documentKey)
+	typstSource, err := a.convertPreviewMarkdown(result, markdown, templateID)
+	if err != nil {
+		return result, err
+	}
+	return a.finishPreviewUpdate(result, typstSource, templateID, workDir, documentKey)
+}
+
+func (a *App) PreviewUpdateAsync(markdown string, templateID string, workDir string, documentKey string) (*preview.UpdateResult, error) {
+	result := a.beginPreviewUpdate(templateID, workDir, documentKey)
+	go func(result *preview.UpdateResult, markdown string, templateID string, workDir string, documentKey string) {
+		typstSource, err := a.convertPreviewMarkdown(result, markdown, templateID)
+		if err != nil {
+			if logger != nil {
+				logger.Warn("[preview] async conversion failed", "version", result.Version, "error", err)
+			}
+			return
+		}
+		if _, err := a.finishPreviewUpdate(result, typstSource, templateID, workDir, documentKey); err != nil && logger != nil {
+			logger.Warn("[preview] async update failed", "version", result.Version, "error", err)
+		}
+	}(result, markdown, templateID, workDir, documentKey)
+	return result, nil
+}
+
+func (a *App) beginPreviewUpdate(templateID string, workDir string, documentKey string) *preview.UpdateResult {
 	identity := preview.DocumentIdentity{
 		TemplateID:    templateID,
 		WorkDir:       workDir,
@@ -277,13 +303,19 @@ func (a *App) PreviewUpdate(markdown string, templateID string, workDir string, 
 	}
 	result := a.previewService.BeginUpdate(identity)
 	a.emitPreviewEvents(result.Events)
+	return &result
+}
 
+func (a *App) convertPreviewMarkdown(result *preview.UpdateResult, markdown string, templateID string) (string, error) {
+	if result == nil {
+		return "", fmt.Errorf("preview result is nil")
+	}
 	tpl, err := a.manager.Get(templateID)
 	if err != nil {
 		event := a.previewService.ConversionFailed(result.Version, err)
 		result.Events = append(result.Events, event)
 		a.emitPreviewEvent(event)
-		return &result, err
+		return "", err
 	}
 
 	typstSource, err := a.manager.Executor(tpl).Convert(markdown)
@@ -291,18 +323,36 @@ func (a *App) PreviewUpdate(markdown string, templateID string, workDir string, 
 		event := a.previewService.ConversionFailed(result.Version, err)
 		result.Events = append(result.Events, event)
 		a.emitPreviewEvent(event)
-		return &result, err
+		return "", err
 	}
 
 	if !a.previewService.IsCurrentVersion(result.Version) {
-		return &result, nil
+		return "", nil
+	}
+
+	return typstSource, nil
+}
+
+func (a *App) finishPreviewUpdate(result *preview.UpdateResult, typstSource string, templateID string, workDir string, documentKey string) (*preview.UpdateResult, error) {
+	if result == nil {
+		return nil, fmt.Errorf("preview result is nil")
+	}
+	if !a.previewService.IsCurrentVersion(result.Version) {
+		return result, nil
+	}
+
+	identity := preview.DocumentIdentity{
+		TemplateID:    templateID,
+		WorkDir:       workDir,
+		DocumentKey:   documentKey,
+		MainTypstPath: mainTypstIdentityPath(workDir),
 	}
 
 	a.previewRunner.updateMu.Lock()
 	defer a.previewRunner.updateMu.Unlock()
 
 	if !a.previewService.IsCurrentVersion(result.Version) {
-		return &result, nil
+		return result, nil
 	}
 
 	var previousProcess runningPreviewProcess
@@ -322,7 +372,7 @@ func (a *App) PreviewUpdate(markdown string, templateID string, workDir string, 
 		event := a.previewService.FallbackFailed(result.Version, err)
 		result.Events = append(result.Events, event)
 		a.emitPreviewEvent(event)
-		return &result, err
+		return result, err
 	}
 	applyFallback := func(reason string) (*preview.UpdateResult, error) {
 		if cleanup != nil {
@@ -333,7 +383,7 @@ func (a *App) PreviewUpdate(markdown string, templateID string, workDir string, 
 			a.previewRunner.restoreProcess(previousProcess)
 			previousProcess = runningPreviewProcess{}
 		}
-		return a.applyFallback(&result, typstSource, workDir, reason)
+		return a.applyFallback(result, typstSource, workDir, reason)
 	}
 
 	if a.tinymistUnavailable() {
@@ -349,7 +399,7 @@ func (a *App) PreviewUpdate(markdown string, templateID string, workDir string, 
 			MainTypstPath: sessionMainTypPath,
 		})
 		if !ok {
-			return &result, nil
+			return result, nil
 		}
 		result.Events = append(result.Events, startEvent)
 		a.emitPreviewEvent(startEvent)
@@ -369,7 +419,7 @@ func (a *App) PreviewUpdate(markdown string, templateID string, workDir string, 
 			a.previewRunner.restoreProcess(previousProcess)
 			previousProcess = runningPreviewProcess{}
 			if !a.previewService.IsCurrentVersion(result.Version) {
-				return &result, nil
+				return result, nil
 			}
 			return applyFallback(fmt.Sprintf("tinymist preview not ready: %v", err))
 		}
@@ -379,7 +429,7 @@ func (a *App) PreviewUpdate(markdown string, templateID string, workDir string, 
 			a.previewRunner.restoreProcess(previousProcess)
 			previousProcess = runningPreviewProcess{}
 			if !a.previewService.IsCurrentVersion(result.Version) {
-				return &result, nil
+				return result, nil
 			}
 			return applyFallback(fmt.Sprintf("tinymist control plane not ready: %v", err))
 		}
@@ -387,7 +437,7 @@ func (a *App) PreviewUpdate(markdown string, templateID string, workDir string, 
 			_ = controlConn.Close()
 			_ = a.previewRunner.stop()
 			a.previewRunner.restoreProcess(previousProcess)
-			return &result, nil
+			return result, nil
 		}
 
 		readyEvent, ok := a.previewService.ApplySessionEventForVersion(
@@ -400,7 +450,7 @@ func (a *App) PreviewUpdate(markdown string, templateID string, workDir string, 
 		if !ok {
 			_ = a.previewRunner.stop()
 			a.previewRunner.restoreProcess(previousProcess)
-			return &result, nil
+			return result, nil
 		}
 		result.Events = append(result.Events, readyEvent)
 		a.emitPreviewEvent(readyEvent)
@@ -421,7 +471,7 @@ func (a *App) PreviewUpdate(markdown string, templateID string, workDir string, 
 		}
 	}
 
-	return &result, nil
+	return result, nil
 }
 
 func (a *App) PreviewStop() error {

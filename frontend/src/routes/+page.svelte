@@ -79,6 +79,8 @@
   type ResidentPreviewResult = {
     version?: number;
     Version?: number;
+    restartSession?: boolean;
+    RestartSession?: boolean;
     events?: PreviewEvent[];
     svgPages?: string[];
     Events?: PreviewEvent[];
@@ -490,6 +492,22 @@
     editor.previewMode = { kind: 'fallback', svgPages: pages };
   }
 
+  function setPreviewLoading() {
+    const mode = editor.previewMode;
+    if (mode.kind === 'embedded') {
+      editor.previewMode = {
+        ...mode,
+        fallbackSvgPages: editor.svgPages,
+      };
+      return;
+    }
+    editor.previewMode = {
+      kind: 'starting',
+      sessionId: editor.previewSessionId || undefined,
+      fallbackSvgPages: editor.svgPages,
+    };
+  }
+
   function setFallbackPagesForMode(pages: string[]) {
     editor.svgPages = pages;
     const mode = editor.previewMode;
@@ -581,16 +599,19 @@
 
   async function runResidentPreview(md: string, shouldApply: () => boolean = () => true): Promise<boolean> {
     const previousMode = editor.previewMode;
-    if (shouldApply() && previousMode.kind !== 'embedded') {
-      editor.previewMode = {
-        kind: 'starting',
-        sessionId: editor.previewSessionId || undefined,
-        fallbackSvgPages: editor.svgPages,
-      };
-    }
+    if (shouldApply()) setPreviewLoading();
 
     let result: ResidentPreviewResult;
-    if (window.go?.main?.App?.PreviewUpdate) {
+    let asyncAccepted = false;
+    if (window.go?.main?.App?.PreviewUpdateAsync) {
+      asyncAccepted = true;
+      result = await window.go.main.App.PreviewUpdateAsync(
+        md,
+        editor.selectedTemplate,
+        editor.documentDir,
+        currentPreviewDocumentKey(),
+      ) as unknown as ResidentPreviewResult;
+    } else if (window.go?.main?.App?.PreviewUpdate) {
       result = await window.go.main.App.PreviewUpdate(
         md,
         editor.selectedTemplate,
@@ -609,6 +630,7 @@
 
     const events = result.events ?? result.Events ?? [];
     for (const event of events) applyPreviewEvent(event);
+    if (asyncAccepted) return true;
 
     const svgPages = result.svgPages ?? result.SVGPages;
     if (svgPages && svgPages.length > 0) {
@@ -708,7 +730,9 @@
     if (md.includes('![') && shouldShowPoint('image-path')) triggerAction('image-path');
 
     clearTimeout(debounceTimer);
-    if (window.go?.main?.App?.PreviewUpdate) {
+    if (window.go?.main?.App?.PreviewUpdateAsync || window.go?.main?.App?.PreviewUpdate) {
+      converting = true;
+      setPreviewLoading();
       requestResidentPreview(md, requestSeq);
       return;
     }

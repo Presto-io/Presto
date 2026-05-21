@@ -32,6 +32,22 @@
 	let closeConfirmFilename = $state('');
 	let closeDecisionPromise: Promise<CloseDecision> | null = null;
 	let resolveCloseDecision: ((decision: CloseDecision) => void) | null = null;
+	let capabilitiesPromise: Promise<ReleaseCapabilities> | null = null;
+
+	function ensureCapabilitiesLoaded(): Promise<ReleaseCapabilities> {
+		if (!capabilitiesPromise) {
+			capabilitiesPromise = loadCapabilities()
+				.then((loaded) => {
+					capabilities = loaded;
+					return loaded;
+				})
+				.catch((e) => {
+					console.error('[capabilities] load failed:', e);
+					return capabilities;
+				});
+		}
+		return capabilitiesPromise;
+	}
 
 	type MenuAction =
 		| 'new'
@@ -435,14 +451,14 @@
 		}
 	});
 
-	onMount(async () => {
+	onMount(() => {
 		// Skip all event registration in showcase mode
 		if (isShowcase) {
 			startupFileStore.markChecked();
 			return;
 		}
 
-		capabilities = await loadCapabilities();
+		void ensureCapabilitiesLoaded();
 		void loadAppVersion();
 
 		// Register drag handlers on window in capture phase
@@ -482,20 +498,22 @@
 			});
 
 			// Cold start: pull pending URL from Go (event timing unreliable at startup)
-			try {
+			void Promise.all([
+				(window as any).go.main.App.GetStartupURL(),
+				ensureCapabilitiesLoaded(),
+			]).then(([pendingURL, loadedCapabilities]) => {
 				console.log('[url-scheme] checking for startup URL...');
-				const pendingURL = await (window as any).go.main.App.GetStartupURL();
 				console.log('[url-scheme] startup URL:', pendingURL);
 				if (pendingURL) {
 					const match = pendingURL.match(/^presto:\/\/install\/(.+)/);
-					if (match && capabilities.onlineTemplateStore) {
+					if (match && loadedCapabilities.onlineTemplateStore) {
 						console.log('[url-scheme] navigating to template:', match[1]);
 						goto(`/store-templates?template=${encodeURIComponent(match[1])}`);
 					}
 				}
-			} catch (e) {
+			}).catch((e) => {
 				console.error('[url-scheme] GetStartupURL failed:', e);
-			}
+			});
 
 			// Edit menu event listeners (from Go custom edit menu on Windows)
 			window.runtime.EventsOn('menu:undo', () => document.execCommand('undo'));
@@ -505,33 +523,33 @@
 			window.runtime.EventsOn('menu:paste', () => document.execCommand('paste'));
 			window.runtime.EventsOn('menu:selectall', () => document.execCommand('selectAll'));
 
-			const handleNativeEvent = async (...args: any[]) => {
+			const handleNativeEvent = (...args: any[]) => {
 				const items: any[] = Array.isArray(args[0]) ? args[0] : args;
-				await handleNativeItems(items, 'open');
+				void handleNativeItems(items, 'open');
 			};
 
-			window.runtime.EventsOn('native-file-drop', async (...args: any[]) => {
+			window.runtime.EventsOn('native-file-drop', (...args: any[]) => {
 				const items: any[] = Array.isArray(args[0]) ? args[0] : args;
-				await handleNativeItems(items, 'drop');
+				void handleNativeItems(items, 'drop');
 			});
 			window.runtime.EventsOn('native-file-open', handleNativeEvent);
 
-			try {
-				await (window as any).go.main.App.SetFileOpenReady();
-			} catch (e) {
-				console.error('[file-open] SetFileOpenReady failed:', e);
-			}
-
-			try {
-				const startupFiles = await (window as any).go.main.App.GetStartupFiles();
-				if (startupFiles?.length) {
-					await handleNativeItems(startupFiles, 'open');
-				}
-			} catch (e) {
-				console.error('[file-open] GetStartupFiles failed:', e);
-			} finally {
-				startupFileStore.markChecked();
-			}
+			void Promise.resolve()
+				.then(() => (window as any).go.main.App.SetFileOpenReady())
+				.catch((e) => {
+					console.error('[file-open] SetFileOpenReady failed:', e);
+				})
+				.then(() => (window as any).go.main.App.GetStartupFiles())
+				.then((startupFiles) => {
+					startupFileStore.markChecked();
+					if (startupFiles?.length) {
+						void handleNativeItems(startupFiles, 'open');
+					}
+				})
+				.catch((e) => {
+					console.error('[file-open] GetStartupFiles failed:', e);
+					startupFileStore.markChecked();
+				});
 		} else {
 			startupFileStore.markChecked();
 		}

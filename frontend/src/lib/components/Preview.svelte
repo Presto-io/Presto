@@ -188,7 +188,7 @@
     {:else if !activeEmbeddedLoaded()}
       <div class="placeholder">
         <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
-        <p>兼容预览</p>
+        <p>预览加载中</p>
       </div>
     {/if}
     {#if frameASrc}
@@ -210,7 +210,7 @@
       ></iframe>
     {/if}
     {#if !activeEmbeddedLoaded()}
-      <div class="preview-status">兼容预览</div>
+      <div class="preview-status">预览加载中</div>
     {/if}
     {#if debug}
       <div class="preview-status">mode embedded · {modeState.sessionId}</div>
@@ -218,7 +218,7 @@
   {:else}
     {@const fallbackPages = modeState.kind === 'fallback' ? modeState.svgPages : modeState.fallbackSvgPages}
     {#if modeState.kind === 'starting'}
-      <div class="preview-status">兼容预览</div>
+      <div class="preview-status">预览加载中</div>
     {:else if modeState.kind === 'fallback' && modeState.label}
       <div class="preview-status">{modeState.label}</div>
     {:else if modeState.kind === 'error'}
@@ -235,7 +235,7 @@
     {:else}
       <div class="placeholder">
         <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
-        <p>在左侧编辑 Markdown，选择模板后预览将在此显示</p>
+        <p>{modeState.kind === 'starting' ? '预览加载中' : '在左侧编辑 Markdown，选择模板后预览将在此显示'}</p>
       </div>
     {/if}
   {/if}

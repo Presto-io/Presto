@@ -146,6 +146,20 @@ func (a *App) startup(ctx context.Context) {
 	}()
 }
 
+func (a *App) domReady(ctx context.Context) {
+	a.ctx = ctx
+	a.showMainWindow("dom-ready")
+}
+
+func (a *App) showMainWindow(reason string) {
+	if a.ctx == nil {
+		return
+	}
+	logger.Debug("[window] show main window", "reason", reason)
+	wailsRuntime.WindowShow(a.ctx)
+	wailsRuntime.WindowUnminimise(a.ctx)
+}
+
 func main() {
 	flag.Parse()
 	initLogger()
@@ -249,6 +263,7 @@ func main() {
 		Height:           800,
 		MinWidth:         800,
 		MinHeight:        600,
+		StartHidden:      true,
 		Frameless:        runtime.GOOS == "windows",
 		BackgroundColour: options.NewRGB(26, 27, 38),
 		AssetServer: &assetserver.Options{
@@ -258,8 +273,9 @@ func main() {
 		DragAndDrop: &options.DragAndDrop{
 			EnableFileDrop: true,
 		},
-		Menu:      appMenu,
-		OnStartup: app.startup,
+		Menu:       appMenu,
+		OnStartup:  app.startup,
+		OnDomReady: app.domReady,
 		OnBeforeClose: func(ctx context.Context) (prevent bool) {
 			if !app.hasDirtyContent {
 				if app.previewRunner != nil {
