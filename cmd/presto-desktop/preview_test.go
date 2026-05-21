@@ -199,6 +199,52 @@ func TestPreviewRunnerStartTinymistReturnsStartError(t *testing.T) {
 	}
 }
 
+func TestPreviewRunnerStopsBrokenSessionAfterRefreshFailure(t *testing.T) {
+	templateRoot := t.TempDir()
+	writeDesktopPreviewTestTemplate(t, templateRoot, "mock")
+
+	compiler := typst.NewCompiler()
+	compiler.BinPath = filepath.Join(t.TempDir(), "missing-typst")
+	service := preview.NewService()
+	runner := newPreviewRunner(service, "tinymist")
+	app := NewApp(
+		template.NewManager(templateRoot),
+		compiler,
+		nil,
+		ReleaseCapabilities{},
+		service,
+		runner,
+	)
+
+	sessionDir := t.TempDir()
+	runner.sessionWorkDir = sessionDir
+	runner.cmd = exec.Command("go", "version")
+	closedControlURL, closedControlConn := startClosedControlPlane(t)
+	runner.setControlPlane(closedControlURL, closedControlConn)
+
+	first := service.BeginUpdate(preview.DocumentIdentity{TemplateID: "mock", DocumentKey: "doc.md"})
+	if event, ok := service.StartSessionForVersion(first.Version, preview.DocumentIdentity{TemplateID: "mock", DocumentKey: "doc.md"}); !ok {
+		t.Fatalf("start session failed: %#v", event)
+	}
+	if event, ok := service.ApplySessionEventForVersion(first.Version, service.CurrentSessionID(), preview.EventReady, "http://127.0.0.1:1", nil); !ok {
+		t.Fatalf("ready session failed: %#v", event)
+	}
+
+	second := service.BeginUpdate(preview.DocumentIdentity{TemplateID: "mock", DocumentKey: "doc.md"})
+	if _, err := app.finishPreviewUpdate(&second, "#let doc = new", "mock", "", "doc.md"); err == nil {
+		t.Fatal("finishPreviewUpdate should return fallback compile error after tinymist refresh failure")
+	}
+	if runner.hasProcess() {
+		t.Fatal("broken tinymist session should be stopped so next preview can restart it")
+	}
+	if runner.sessionWorkDir != "" {
+		t.Fatalf("sessionWorkDir = %q, want cleared", runner.sessionWorkDir)
+	}
+	if _, err := os.Stat(sessionDir); !os.IsNotExist(err) {
+		t.Fatalf("broken session dir should be removed, stat err = %v", err)
+	}
+}
+
 func TestWaitForPreviewDataPlaneWaitsUntilReady(t *testing.T) {
 	var ready atomic.Bool
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -218,6 +264,33 @@ func TestWaitForPreviewDataPlaneWaitsUntilReady(t *testing.T) {
 	if err := waitForPreviewDataPlane(context.Background(), server.URL, time.Second, 10*time.Millisecond); err != nil {
 		t.Fatalf("waitForPreviewDataPlane returned error: %v", err)
 	}
+}
+
+func startClosedControlPlane(t *testing.T) (string, *websocket.Conn) {
+	t.Helper()
+	upgrader := websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool { return true },
+	}
+	accepted := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			t.Errorf("upgrade websocket: %v", err)
+			return
+		}
+		close(accepted)
+		_ = conn.Close()
+	}))
+	t.Cleanup(server.Close)
+
+	controlURL := "ws" + server.URL[len("http"):]
+	conn, _, err := websocket.DefaultDialer.Dial(controlURL, nil)
+	if err != nil {
+		t.Fatalf("dial closed control plane: %v", err)
+	}
+	<-accepted
+	_ = conn.Close()
+	return controlURL, conn
 }
 
 func TestWaitForPreviewDataPlaneTimesOut(t *testing.T) {

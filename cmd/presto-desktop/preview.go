@@ -467,6 +467,7 @@ func (a *App) finishPreviewUpdate(result *preview.UpdateResult, typstSource stri
 			if logger != nil {
 				logger.Warn("[preview] tinymist refresh failed", "version", result.Version, "error", err)
 			}
+			_ = a.previewRunner.stop()
 			return applyFallback(fmt.Sprintf("tinymist preview refresh failed: %v", err))
 		}
 	}
