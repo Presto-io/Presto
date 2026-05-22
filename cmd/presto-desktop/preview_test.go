@@ -230,7 +230,7 @@ func TestPreviewRunnerStopsBrokenSessionAfterRefreshFailure(t *testing.T) {
 	compiler := typst.NewCompiler()
 	compiler.BinPath = filepath.Join(t.TempDir(), "missing-typst")
 	service := preview.NewService()
-	runner := newPreviewRunner(service, "tinymist")
+	runner := newPreviewRunner(service, filepath.Join(t.TempDir(), "tinymist"))
 	app := NewApp(
 		template.NewManager(templateRoot),
 		compiler,

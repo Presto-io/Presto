@@ -179,9 +179,14 @@ endif
 # SEC-22: Set TYPST_SHA256 to verify integrity of downloaded binary
 ifeq ($(OS),Windows_NT)
 _download-typst:
-	@powershell -NoProfile -Command "New-Item -ItemType Directory -Force -Path (Split-Path -Parent '$(TYPST_OUT)') | Out-Null"
-	@powershell -NoProfile -Command '$$out = "$(TYPST_OUT)"; $$cache = "$(TYPST_CACHE_DIR)/$(TYPST_ARCHIVE)"; New-Item -ItemType Directory -Force -Path (Split-Path -Parent $$cache) | Out-Null; if (Test-Path $$out) { $$sig = -join ([System.IO.File]::ReadAllBytes($$out)[0..1] | ForEach-Object { [char]$$_ }); if ($$sig -ne "MZ") { if ("$(TYPST_ARCHIVE)" -like "*.zip" -and $$sig -eq "PK" -and -not (Test-Path $$cache)) { Move-Item -LiteralPath $$out -Destination $$cache -Force; Write-Host "==> Recovered cached typst archive $$cache" } else { Remove-Item -LiteralPath $$out -Force } } }'
-	@powershell -NoProfile -Command 'if (-not (Test-Path "$(TYPST_OUT)")) { if ("$(REQUIRE_TYPST_SHA256)" -eq "1" -and "$(TYPST_SHA256)" -eq "") { throw "ERROR: TYPST_SHA256 is required" }; $$cache = "$(TYPST_CACHE_DIR)/$(TYPST_ARCHIVE)"; New-Item -ItemType Directory -Force -Path (Split-Path -Parent $$cache) | Out-Null; if (-not (Test-Path $$cache)) { Write-Host "==> Downloading typst $(TYPST_VERSION) ($(TYPST_ARCHIVE))..."; & curl.exe -fL --retry 5 --retry-delay 2 --connect-timeout 30 --max-time 600 "$(TYPST_BASE)/$(TYPST_ARCHIVE)" -o $$cache; if ($$LASTEXITCODE -ne 0) { Remove-Item -LiteralPath $$cache -Force -ErrorAction SilentlyContinue; exit $$LASTEXITCODE } } else { Write-Host "==> Using cached typst archive $$cache" }; if ("$(TYPST_SHA256)" -ne "") { $$hash = (Get-FileHash -Algorithm SHA256 $$cache).Hash.ToLowerInvariant(); if ($$hash -ne "$(TYPST_SHA256)") { Remove-Item -LiteralPath $$cache -Force -ErrorAction SilentlyContinue; throw "ERROR: typst checksum verification failed!" } }; $$tmp = Join-Path ([System.IO.Path]::GetTempPath()) ([System.IO.Path]::GetRandomFileName()); New-Item -ItemType Directory -Path $$tmp | Out-Null; try { if ("$(TYPST_ARCHIVE)" -like "*.zip") { Expand-Archive -LiteralPath $$cache -DestinationPath $$tmp -Force } else { & "$$env:SystemRoot\System32\tar.exe" -xf $$cache -C $$tmp; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE } }; $$bin = Get-ChildItem -LiteralPath $$tmp -Recurse -File | Where-Object { $$_.Name -eq "typst.exe" -or $$_.Name -eq "typst" } | Sort-Object @{Expression = { if ($$_.Name -eq "typst.exe") { 0 } else { 1 } }}, @{Expression = "Length"; Descending = $$true} | Select-Object -First 1; if (-not $$bin) { throw "typst binary not found in archive" }; Copy-Item -LiteralPath $$bin.FullName -Destination "$(TYPST_OUT)" -Force; $$outSig = -join ([System.IO.File]::ReadAllBytes("$(TYPST_OUT)")[0..1] | ForEach-Object { [char]$$_ }); if ("$(TYPST_OUT)" -like "*.exe" -and $$outSig -ne "MZ") { Remove-Item -LiteralPath "$(TYPST_OUT)" -Force; throw "extracted typst is not a Windows executable" }; Write-Host "==> $(TYPST_OUT)" } finally { Remove-Item -LiteralPath $$tmp -Recurse -Force -ErrorAction SilentlyContinue } }'
+	@pwsh.exe -NoProfile -ExecutionPolicy Bypass -File build/windows/download-typst.ps1 \
+		-TypestOut "$(TYPST_OUT)" \
+		-CacheDir "$(TYPST_CACHE_DIR)" \
+		-Archive "$(TYPST_ARCHIVE)" \
+		-BaseUrl "$(TYPST_BASE)" \
+		-Sha256 "$(TYPST_SHA256)" \
+		-RequireSha256 "$(REQUIRE_TYPST_SHA256)" \
+		-Version "$(TYPST_VERSION)"
 else
 _download-typst:
 	@mkdir -p $(dir $(TYPST_OUT))
@@ -219,8 +224,13 @@ endif
 # Usage: $(MAKE) _download-tinymist TINYMIST_ARCHIVE=<name> TINYMIST_OUT=<path> TINYMIST_SHA256=<hash>
 ifeq ($(OS),Windows_NT)
 _download-tinymist:
-	@powershell -NoProfile -Command "New-Item -ItemType Directory -Force -Path (Split-Path -Parent '$(TINYMIST_OUT)') | Out-Null"
-	@powershell -NoProfile -Command 'if (-not (Test-Path "$(TINYMIST_OUT)")) { if ("$(TINYMIST_SHA256)" -eq "") { throw "ERROR: TINYMIST_SHA256 is required" }; $$cache = "$(TINYMIST_CACHE_DIR)/$(TINYMIST_ARCHIVE)"; New-Item -ItemType Directory -Force -Path (Split-Path -Parent $$cache) | Out-Null; if (-not (Test-Path $$cache)) { Write-Host "==> Downloading tinymist $(TINYMIST_VERSION) ($(TINYMIST_ARCHIVE))..."; & curl.exe -fL --retry 5 --retry-delay 2 --connect-timeout 30 --max-time 600 "$(TINYMIST_BASE)/$(TINYMIST_ARCHIVE)" -o $$cache; if ($$LASTEXITCODE -ne 0) { Remove-Item -LiteralPath $$cache -Force -ErrorAction SilentlyContinue; exit $$LASTEXITCODE } } else { Write-Host "==> Using cached tinymist archive $$cache" }; $$hash = (Get-FileHash -Algorithm SHA256 $$cache).Hash.ToLowerInvariant(); if ($$hash -ne "$(TINYMIST_SHA256)") { Remove-Item -LiteralPath $$cache -Force -ErrorAction SilentlyContinue; throw "ERROR: tinymist checksum verification failed!" }; $$tmp = Join-Path ([System.IO.Path]::GetTempPath()) ([System.IO.Path]::GetRandomFileName()); New-Item -ItemType Directory -Path $$tmp | Out-Null; try { if ("$(TINYMIST_ARCHIVE)" -like "*.zip") { Expand-Archive -LiteralPath $$cache -DestinationPath $$tmp -Force } else { & "$$env:SystemRoot\System32\tar.exe" -xf $$cache -C $$tmp; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE } }; $$bin = Get-ChildItem -LiteralPath $$tmp -Recurse -File | Where-Object { $$_.Name -eq "tinymist.exe" -or $$_.Name -eq "tinymist" } | Sort-Object @{Expression = { if ($$_.Name -eq "tinymist.exe") { 0 } else { 1 } }}, @{Expression = "Length"; Descending = $$true} | Select-Object -First 1; if (-not $$bin) { throw "tinymist binary not found in archive" }; Copy-Item -LiteralPath $$bin.FullName -Destination "$(TINYMIST_OUT)" -Force; $$outSig = -join ([System.IO.File]::ReadAllBytes("$(TINYMIST_OUT)")[0..1] | ForEach-Object { [char]$$_ }); if ("$(TINYMIST_OUT)" -like "*.exe" -and $$outSig -ne "MZ") { Remove-Item -LiteralPath "$(TINYMIST_OUT)" -Force; throw "extracted tinymist is not a Windows executable" }; Write-Host "==> $(TINYMIST_OUT)" } finally { Remove-Item -LiteralPath $$tmp -Recurse -Force -ErrorAction SilentlyContinue } }'
+	@pwsh.exe -NoProfile -ExecutionPolicy Bypass -File build/windows/download-tinymist.ps1 \
+		-TinymistOut "$(TINYMIST_OUT)" \
+		-CacheDir "$(TINYMIST_CACHE_DIR)" \
+		-Archive "$(TINYMIST_ARCHIVE)" \
+		-BaseUrl "$(TINYMIST_BASE)" \
+		-Sha256 "$(TINYMIST_SHA256)" \
+		-Version "$(TINYMIST_VERSION)"
 else
 _download-tinymist:
 	@mkdir -p $(dir $(TINYMIST_OUT))
@@ -678,9 +688,11 @@ windows-installer: inno
 .PHONY: _inno-language
 ifeq ($(OS),Windows_NT)
 _inno-language:
-	@powershell -NoProfile -Command "New-Item -ItemType Directory -Force -Path '$(INNO_LANG_DIR)' | Out-Null"
-	@powershell -NoProfile -Command 'if (-not (Test-Path "$(INNO_ZH_FILE)")) { Write-Host "==> Downloading Inno Setup Simplified Chinese language file..."; Invoke-WebRequest -UseBasicParsing -Uri "$(INNO_ZH_URL)" -OutFile "$(INNO_ZH_FILE).tmp"; $$hash = (Get-FileHash -Algorithm SHA256 "$(INNO_ZH_FILE).tmp").Hash.ToLowerInvariant(); if ($$hash -ne "$(INNO_ZH_SHA256)") { Remove-Item -Force "$(INNO_ZH_FILE).tmp" -ErrorAction SilentlyContinue; throw "ERROR: checksum mismatch for $(INNO_ZH_FILE)" }; Move-Item -LiteralPath "$(INNO_ZH_FILE).tmp" -Destination "$(INNO_ZH_FILE)" -Force }'
-	@powershell -NoProfile -Command '$$hash = (Get-FileHash -Algorithm SHA256 "$(INNO_ZH_FILE)").Hash.ToLowerInvariant(); if ($$hash -ne "$(INNO_ZH_SHA256)") { throw "ERROR: checksum mismatch for $(INNO_ZH_FILE)" }'
+	@pwsh.exe -NoProfile -ExecutionPolicy Bypass -File build/windows/download-inno-lang.ps1 \
+		-LangDir "$(INNO_LANG_DIR)" \
+		-ZhFile "$(INNO_ZH_FILE)" \
+		-ZhUrl "$(INNO_ZH_URL)" \
+		-ZhSha256 "$(INNO_ZH_SHA256)"
 else
 _inno-language:
 	@mkdir -p "$(INNO_LANG_DIR)"
