@@ -68,6 +68,7 @@ AppCopyright={#INFO_COPYRIGHT}
 AppMutex=com.mrered.presto
 DefaultDirName={autopf}\{#INFO_COMPANYNAME}\{#INFO_PRODUCTNAME}
 DefaultGroupName={#INFO_PRODUCTNAME}
+UsedUserAreasWarning=no
 DisableProgramGroupPage=yes
 OutputDir={#ARG_OUTPUT_DIR}
 OutputBaseFilename={#ARG_OUTPUT_BASENAME}
@@ -77,7 +78,8 @@ LicenseFile={#SourcePath}\license.txt
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
-PrivilegesRequired=admin
+PrivilegesRequired=lowest
+PrivilegesRequiredOverridesAllowed=dialog
 MinVersion=10.0
 ArchitecturesAllowed={#ARCHITECTURES_ALLOWED}
 ArchitecturesInstallIn64BitMode={#ARCHITECTURES_64BIT}
@@ -118,7 +120,7 @@ Name: "{group}\Presto"; Filename: "{app}\{#PRODUCT_EXECUTABLE}"; WorkingDir: "{a
 Name: "{group}\卸载 Presto"; Filename: "{uninstallexe}"; Tasks: startmenuicon
 
 [Run]
-Filename: "{tmp}\vc_redist.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "{cm:InstallingVCRuntime}"; Flags: runhidden waituntilterminated
+Filename: "{tmp}\vc_redist.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "{cm:InstallingVCRuntime}"; Flags: runhidden waituntilterminated; Check: NeedsVCRedist
 Filename: "{app}\{#PRODUCT_EXECUTABLE}"; Parameters: "--migrate-legacy-data"; StatusMsg: "Migrating existing Presto data..."; Flags: runhidden waituntilterminated
 Filename: "{app}\{#PRODUCT_EXECUTABLE}"; Description: "{cm:LaunchPresto}"; Flags: nowait postinstall skipifsilent
 
@@ -238,4 +240,46 @@ end;
 function ShouldDeleteUserPrestoData(): Boolean;
 begin
   Result := DeleteUserPrestoData;
+end;
+
+function NeedsVCRedist(): Boolean;
+var
+  Version: string;
+  MajorVersion: Cardinal;
+  MinorVersion: Cardinal;
+  BuildVersion: Cardinal;
+begin
+  // Check for Visual C++ 2015-2022 Redistributable (v14.0 or higher)
+  // The registry key is shared across VC++ 2015, 2017, 2019, and 2022
+
+  #if ARG_ARCH == "arm64"
+    // ARM64: Check ARM64 registry
+    if RegQueryStringValue(HKLM64, 'SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\ARM64', 'Version', Version) then begin
+      if RegQueryDwordValue(HKLM64, 'SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\ARM64', 'Major', MajorVersion) and
+         RegQueryDwordValue(HKLM64, 'SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\ARM64', 'Minor', MinorVersion) and
+         RegQueryDwordValue(HKLM64, 'SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\ARM64', 'Bld', BuildVersion) then begin
+        // VC++ 2015-2022 is v14.x, we need at least v14.0
+        if (MajorVersion >= 14) then begin
+          Result := False;
+          Exit;
+        end;
+      end;
+    end;
+  #else
+    // x64: Check x64 registry
+    if RegQueryStringValue(HKLM64, 'SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64', 'Version',Version) then begin
+      if RegQueryDwordValue(HKLM64, 'SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64', 'Major', MajorVersion) and
+         RegQueryDwordValue(HKLM64, 'SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64', 'Minor', MinorVersion) and
+         RegQueryDwordValue(HKLM64, 'SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64', 'Bld', BuildVersion) then begin
+        // VC++ 2015-2022 is v14.x, we need at least v14.0
+        if (MajorVersion >= 14) then begin
+          Result := False;
+          Exit;
+        end;
+      end;
+    end;
+  #endif
+
+  // Not found or version too old, needs installation
+  Result := True;
 end;
