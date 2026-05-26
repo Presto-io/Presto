@@ -1,0 +1,134 @@
+name: Temporary Docker 0.8.2
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/temp-docker-082.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  GO_VERSION: '1.26.3'
+  NODE_VERSION: '22'
+  TYPST_VERSION: '0.14.2'
+  TINYMIST_VERSION: '0.14.18'
+
+jobs:
+  build-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend
+        run: cd frontend && npm ci && npm run build
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: frontend-build
+          path: frontend/build/
+          retention-days: 1
+
+  build-docker:
+    needs: build-frontend
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+            typst_sha256: a6044cbad2a954deb921167e257e120ac0a16b20339ec01121194ff9d394996d
+            tinymist_sha256: 6a7a2b525e9900f3718830f45a8337c5e35e55a54c8ccf7f84cd92209b924e9c
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+            typst_sha256: 491b101aa40a3a7ea82a3f8a6232cabb4e6a7e233810082e5ac812d43fdcd47a
+            tinymist_sha256: 7d85fcb2c60eaa7ed7160dd68f67917f462810a6f42b1940d297e603ddc1d2ab
+    runs-on: ${{ matrix.runner }}
+    env:
+      REGISTRY_IMAGE: ghcr.io/${{ github.repository_owner }}/presto
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: frontend-build
+          path: frontend/build/
+
+      - name: Lowercase registry image
+        run: echo "REGISTRY_IMAGE=${REGISTRY_IMAGE,,}" >> "$GITHUB_ENV"
+
+      - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+
+      - uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
+        id: build
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          cache-from: type=gha,scope=temp-docker-082-${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=temp-docker-082-${{ matrix.platform }}
+          build-args: |
+            TYPST_SHA256_AMD64=${{ matrix.typst_sha256 }}
+            TYPST_SHA256_ARM64=${{ matrix.typst_sha256 }}
+            TINYMIST_SHA256_AMD64=${{ matrix.tinymist_sha256 }}
+            TINYMIST_SHA256_ARM64=${{ matrix.tinymist_sha256 }}
+            SKIP_FRONTEND_BUILD=true
+          outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: docker-digest-${{ strategy.job-index }}
+          path: /tmp/digests/*
+          retention-days: 1
+
+  merge-docker:
+    needs: build-docker
+    runs-on: ubuntu-latest
+    env:
+      REGISTRY_IMAGE: ghcr.io/${{ github.repository_owner }}/presto
+    steps:
+      - name: Lowercase registry image
+        run: echo "REGISTRY_IMAGE=${REGISTRY_IMAGE,,}" >> "$GITHUB_ENV"
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          path: /tmp/digests
+          pattern: docker-digest-*
+          merge-multiple: true
+
+      - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+
+      - uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create 0.8.2 manifest and push
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create \
+            -t "${REGISTRY_IMAGE}:0.8.2" \
+            -t "${REGISTRY_IMAGE}:latest" \
+            $(printf "${REGISTRY_IMAGE}@sha256:%s " *)
