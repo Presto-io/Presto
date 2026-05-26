@@ -75,15 +75,20 @@ RUN apk add --no-cache curl tar && \
 # Stage 5: Final image (target platform)
 FROM alpine:3.21
 
+RUN apk add --no-cache su-exec
+
 # SEC-21: Create non-root user
 RUN addgroup -S presto && adduser -S -G presto presto
 
 COPY --from=typst-downloader /usr/local/bin/typst /usr/local/bin/typst
 COPY --from=tinymist-downloader /usr/local/bin/tinymist /usr/local/bin/tinymist
 COPY --from=go-builder /bin/presto-server /usr/local/bin/
+COPY packaging/docker/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # Create explicit app dirs for containers. These are intended to be mounted by users.
-RUN mkdir -p /config /data/fonts /cache /logs && chown -R presto:presto /config /data /cache /logs
+RUN mkdir -p /config /data/fonts /cache /logs && \
+    chown -R presto:presto /config /data /cache /logs /usr/local/bin/docker-entrypoint.sh && \
+    chmod +x /usr/local/bin/docker-entrypoint.sh
 
 COPY --from=frontend-builder /app/build /srv/frontend
 
@@ -98,5 +103,5 @@ ENV PRESTO_CACHE_DIR=/cache
 ENV PRESTO_LOG_DIR=/logs
 EXPOSE 8080
 
-USER presto
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["presto-server"]

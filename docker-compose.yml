@@ -11,8 +11,15 @@ services:
       PRESTO_LOG_DIR: /logs
       FONT_PATHS: /data/fonts:/usr/share/fonts
     volumes:
-      - ./.presto-data/config:/config
-      - ./.presto-data/data:/data
-      - ./.presto-data/cache:/cache
-      - ./.presto-data/logs:/logs
+      - presto-config:/config
+      - presto-data:/data
+      - presto-cache:/cache
+      - presto-logs:/logs
+      - ./.presto-fonts:/data/fonts
     restart: unless-stopped
+
+volumes:
+  presto-config:
+  presto-data:
+  presto-cache:
+  presto-logs:

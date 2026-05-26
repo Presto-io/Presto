@@ -39,7 +39,7 @@ brew install --cask brewforge/more/presto
 ### Docker 部署（Web 端）
 
 ```bash
-mkdir -p .presto-data/data/fonts .presto-data/config .presto-data/cache .presto-data/logs
+mkdir -p .presto-fonts
 docker compose up -d
 ```
 
@@ -47,10 +47,10 @@ docker compose up -d
 
 默认的 `docker-compose.yml` 会持久化自定义字体目录：
 
-- 字体文件放在 `./.presto-data/data/fonts`，对应容器内路径 `/data/fonts`。
+- 字体文件放在 `./.presto-fonts`，对应容器内路径 `/data/fonts`。
 - Presto 服务端启动时会从 `/data/fonts` 加载字体。
 
-如果目录曾由 root 或其他用户创建，先修正权限，确保当前用户可以复制字体文件：
+配置、模板、缓存和日志默认保存到 Docker 命名卷中，避免宿主机目录权限影响非 root 容器进程。如果你沿用旧版 `./.presto-data` bind mount，且看到 `/config` 或 `/data` permission denied，先修正旧目录权限：
 
 ```bash
 sudo chown -R "$(id -u):$(id -g)" .presto-data
