@@ -34,6 +34,6 @@
 		"dompurify": "^3.4.9",
 		"fuse.js": "^7.3.0",
 		"lucide-svelte": "^1.0.1",
-		"marked": "^18.0.4"
+		"marked": "^18.0.5"
 	}
 }
